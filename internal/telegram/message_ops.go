@@ -156,16 +156,17 @@ func ForwardMessages(ctx context.Context, api *tg.Client, resolver *peer.Resolve
 
 // DeleteMessages performs the Telegram RPC for `tg msg delete`.
 func DeleteMessages(ctx context.Context, api *tg.Client, resolver *peer.Resolver, q actionmessage.DeleteQuery) error {
+	sender := gotdmessage.NewSender(api)
+	if !q.Revoke {
+		_, err := sender.Delete().Messages(ctx, q.IDs...)
+		return err
+	}
+
 	resolved, err := resolver.Resolve(ctx, q.Ref)
 	if err != nil {
 		return err
 	}
-	sender := gotdmessage.NewSender(api)
-	if q.Revoke {
-		_, err = sender.To(resolved.InputPeer).Revoke().Messages(ctx, q.IDs...)
-		return err
-	}
-	_, err = sender.Delete().Messages(ctx, q.IDs...)
+	_, err = sender.To(resolved.InputPeer).Revoke().Messages(ctx, q.IDs...)
 	return err
 }
 

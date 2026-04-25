@@ -113,12 +113,12 @@ type DeletePhotoRequest struct {
 type DeletePhotoFunc func(context.Context) error
 
 // DeletePhoto confirms and deletes the current profile photo.
-func DeletePhoto(ctx context.Context, req DeletePhotoRequest, delete DeletePhotoFunc) error {
-	if delete == nil {
+func DeletePhoto(ctx context.Context, req DeletePhotoRequest, deletePhoto DeletePhotoFunc) error {
+	if deletePhoto == nil {
 		return fmt.Errorf("%w: profile delete-photo called without delete function", command.ErrPrecondition)
 	}
 	if err := ui.ConfirmDestructive(req.Prompter, "delete current profile photo?", req.Yes); err != nil {
 		return err
 	}
-	return delete(ctx)
+	return deletePhoto(ctx)
 }

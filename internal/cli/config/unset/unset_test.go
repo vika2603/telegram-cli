@@ -139,10 +139,3 @@ func TestRun_RowOldValueIncluded(t *testing.T) {
 	// json.Unmarshal into any — use EqualValues to compare across numeric types.
 	require.EqualValues(t, int64(42), row.Old)
 }
-
-// Compile-time checks.
-var _ = unset.Run
-var _ = unset.Options{}
-
-// filepath is used above; keep import via explicit reference.
-var _ = filepath.Join

@@ -31,9 +31,5 @@ func List(ctx context.Context, req ListRequest, fetch ListFunc) ([]output.Contac
 	if fetch == nil {
 		return nil, fmt.Errorf("%w: contact list called without fetch function", command.ErrPrecondition)
 	}
-	return fetch(ctx, ListQuery{
-		Blocked:    req.Blocked,
-		MutualOnly: req.MutualOnly,
-		Bots:       req.Bots,
-	})
+	return fetch(ctx, ListQuery(req))
 }

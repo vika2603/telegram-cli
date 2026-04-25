@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"reflect"
 	"sort"
 	"strconv"
 	"strings"
@@ -142,11 +141,11 @@ func (s *PeerStore) Find(_ context.Context, key peers.Key) (peers.Value, bool, e
 	return out, found, err
 }
 
-func (s *PeerStore) SavePhone(_ context.Context, phone string, key peers.Key) error {
+func (s *PeerStore) SavePhone(ctx context.Context, phone string, key peers.Key) error {
 	if s == nil || s.db == nil {
 		return nil
 	}
-	value, found, err := s.Find(context.Background(), key)
+	value, found, err := s.Find(ctx, key)
 	if err != nil {
 		return err
 	}
@@ -272,7 +271,17 @@ func (s *PeerStore) FindChannelFull(_ context.Context, id int64) (*tg.ChannelFul
 	return findTGObject(s, BucketPeerCacheChanFulls, id, func() *tg.ChannelFull { return new(tg.ChannelFull) })
 }
 
-func saveTGObjects[T interface{ Encode(*bin.Buffer) error }](s *PeerStore, bucket string, items []T, idOf func(T) int64) error {
+type peerCacheObject interface {
+	*tg.User | *tg.UserFull | *tg.Chat | *tg.ChatFull | *tg.Channel | *tg.ChannelFull
+	Encode(*bin.Buffer) error
+}
+
+type peerCacheDecodeObject interface {
+	peerCacheObject
+	Decode(*bin.Buffer) error
+}
+
+func saveTGObjects[T peerCacheObject](s *PeerStore, bucket string, items []T, idOf func(T) int64) error {
 	if s == nil || s.db == nil {
 		return nil
 	}
@@ -282,7 +291,7 @@ func saveTGObjects[T interface{ Encode(*bin.Buffer) error }](s *PeerStore, bucke
 			return err
 		}
 		for _, item := range items {
-			if reflect.ValueOf(item).IsNil() {
+			if item == nil {
 				continue
 			}
 			var buf bin.Buffer
@@ -298,7 +307,7 @@ func saveTGObjects[T interface{ Encode(*bin.Buffer) error }](s *PeerStore, bucke
 	})
 }
 
-func findTGObject[T interface{ Decode(*bin.Buffer) error }](s *PeerStore, bucket string, id int64, newT func() T) (T, bool, error) {
+func findTGObject[T peerCacheDecodeObject](s *PeerStore, bucket string, id int64, newT func() T) (T, bool, error) {
 	if s == nil || s.db == nil {
 		var zero T
 		return zero, false, nil
@@ -466,7 +475,7 @@ func listJSON[T interface{ GetUpdatedAt() time.Time }, R any](
 		return b.ForEach(func(_, v []byte) error {
 			var raw R
 			if err := json.Unmarshal(v, &raw); err != nil {
-				return nil
+				return err
 			}
 			row, searchable := adapt(raw)
 			if q == "" || strings.Contains(strings.ToLower(searchable), q) {

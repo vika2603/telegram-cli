@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strconv"
 	"strings"
 	"time"
 
@@ -141,7 +142,7 @@ func recordSentMessages(store *account.PeerStore, peerRef, text string, rows []o
 			continue
 		}
 		_ = store.RecordRecentMessage(account.RecentMessage{
-			Ref:       peerRef + ":" + fmt.Sprint(row.MessageID),
+			Ref:       peerRef + ":" + strconv.Itoa(row.MessageID),
 			PeerRef:   peerRef,
 			MessageID: row.MessageID,
 			Date:      row.Date,

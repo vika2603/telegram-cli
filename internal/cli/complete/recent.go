@@ -3,6 +3,7 @@ package complete
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -129,7 +130,7 @@ func messageDescription(row account.RecentMessage) string {
 		return row.PeerRef
 	}
 	if row.MessageID != 0 {
-		return fmt.Sprintf("%d", row.MessageID)
+		return strconv.Itoa(row.MessageID)
 	}
 	return ""
 }

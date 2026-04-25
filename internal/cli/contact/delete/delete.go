@@ -1,5 +1,5 @@
-// Package delete implements "tg contact delete <ref>".
-package delete
+// Package deletecmd implements "tg contact delete <ref>".
+package deletecmd
 
 import (
 	"context"

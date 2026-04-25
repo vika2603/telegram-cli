@@ -10,11 +10,11 @@ func oneLine(s string) string {
 	return strings.Join(strings.Fields(s), " ")
 }
 
-func fitText(s string, max int) string {
-	if max <= 0 {
+func fitText(s string, limit int) string {
+	if limit <= 0 {
 		return ""
 	}
-	return xansi.Truncate(s, max, "…")
+	return xansi.Truncate(s, limit, "…")
 }
 
 func padRight(s string, width int) string {

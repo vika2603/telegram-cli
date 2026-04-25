@@ -3,7 +3,7 @@ package list
 
 import (
 	"context"
-	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/gotd/td/telegram/peers"
@@ -126,7 +126,7 @@ func contactRef(row output.ContactRow) string {
 		return "@" + row.Username
 	}
 	if row.ID != 0 {
-		return fmt.Sprintf("%d", row.ID)
+		return strconv.FormatInt(row.ID, 10)
 	}
 	return ""
 }

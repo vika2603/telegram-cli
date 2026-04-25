@@ -109,13 +109,13 @@ func Logout(ctx context.Context, req LogoutRequest, deps LogoutDeps) (LogoutResu
 			if deps.ClearDefault == nil {
 				return LogoutResult{}, fmt.Errorf("%w: auth logout called without clear-default function", command.ErrPrecondition)
 			}
-			clear, err := deps.ClearDefault()
+			clearedDefault, err := deps.ClearDefault()
 			if err != nil {
 				warnings = append(warnings, fmt.Sprintf(
 					"tg: purge of %q succeeded but could not clear default_account in %s: %s; run `tg config unset default_account` manually.",
-					name, clear.Path, err.Error()))
+					name, clearedDefault.Path, err.Error()))
 			} else {
-				defaultCleared = clear.Cleared
+				defaultCleared = clearedDefault.Cleared
 			}
 		}
 	}

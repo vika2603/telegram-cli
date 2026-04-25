@@ -40,18 +40,18 @@ func Block(ctx context.Context, req PeerRequest, block PeerFunc) error {
 }
 
 // Delete validates a contact delete request, confirms it, and delegates mutation.
-func Delete(ctx context.Context, req PeerRequest, delete PeerFunc) error {
+func Delete(ctx context.Context, req PeerRequest, deletePeer PeerFunc) error {
 	query, err := normalizePeer(req.RawRef)
 	if err != nil {
 		return err
 	}
-	if delete == nil {
+	if deletePeer == nil {
 		return fmt.Errorf("%w: contact delete called without delete function", command.ErrPrecondition)
 	}
 	if err := ui.ConfirmDestructive(req.Prompter, fmt.Sprintf("delete contact %s?", req.RawRef), req.Yes); err != nil {
 		return err
 	}
-	return delete(ctx, query)
+	return deletePeer(ctx, query)
 }
 
 // Unblock validates a contact unblock request and delegates mutation.

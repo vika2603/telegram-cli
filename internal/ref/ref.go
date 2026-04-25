@@ -141,11 +141,11 @@ func parsePeerRef(s string) (Ref, bool, error) {
 	switch kind {
 	case "chat":
 		if len(parts) != 2 {
-			return Ref{}, true, fmt.Errorf("chat ref must be g:<id>")
+			return Ref{}, true, errors.New("chat ref must be g:<id>")
 		}
 		id, err := strconv.ParseInt(parts[1], 10, 64)
 		if err != nil || id <= 0 {
-			return Ref{}, true, fmt.Errorf("chat ref id must be positive")
+			return Ref{}, true, errors.New("chat ref id must be positive")
 		}
 		return Ref{Kind: RefKindPeer, Value: kind, ID: id}, true, nil
 	case "user", "channel":

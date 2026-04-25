@@ -105,23 +105,36 @@ func renderMessagesTTY(io *ui.IOStreams, rows []MessageRow) error {
 	colors := io.ColorScheme()
 	for i, r := range rows {
 		if i > 0 {
-			fmt.Fprintln(io.Out)
+			if _, err := fmt.Fprintln(io.Out); err != nil {
+				return err
+			}
 		}
 		ref := displayMessageRef(r)
 		header := messageHeader(r)
-		if header == "" {
-			fmt.Fprintln(io.Out, colors.Bold(ref))
-		} else if displayWidth(ref)+displayWidth(header)+2 <= width {
-			fmt.Fprintf(io.Out, "%s  %s\n", colors.Bold(ref), colors.Gray(fitText(header, width-displayWidth(ref)-2)))
-		} else {
-			fmt.Fprintln(io.Out, colors.Bold(ref))
-			fmt.Fprintf(io.Out, "  %s\n", colors.Gray(fitText(header, width-2)))
+		switch {
+		case header == "":
+			if _, err := fmt.Fprintln(io.Out, colors.Bold(ref)); err != nil {
+				return err
+			}
+		case displayWidth(ref)+displayWidth(header)+2 <= width:
+			if _, err := fmt.Fprintf(io.Out, "%s  %s\n", colors.Bold(ref), colors.Gray(fitText(header, width-displayWidth(ref)-2))); err != nil {
+				return err
+			}
+		default:
+			if _, err := fmt.Fprintln(io.Out, colors.Bold(ref)); err != nil {
+				return err
+			}
+			if _, err := fmt.Fprintf(io.Out, "  %s\n", colors.Gray(fitText(header, width-2))); err != nil {
+				return err
+			}
 		}
 		body := messagePreview(r)
 		if body == "" {
 			body = "[empty]"
 		}
-		fmt.Fprintf(io.Out, "  %s\n", fitText(oneLine(body), max(width-2, 16)))
+		if _, err := fmt.Fprintf(io.Out, "  %s\n", fitText(oneLine(body), max(width-2, 16))); err != nil {
+			return err
+		}
 	}
 	return nil
 }

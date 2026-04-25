@@ -38,10 +38,5 @@ func Add(ctx context.Context, req AddRequest, add AddFunc) (output.ContactRow, e
 	if req.First == "" {
 		return output.ContactRow{}, fmt.Errorf("%w: --first is required", command.ErrUsage)
 	}
-	return add(ctx, AddQuery{
-		Phone:  req.Phone,
-		First:  req.First,
-		Last:   req.Last,
-		Mutual: req.Mutual,
-	})
+	return add(ctx, AddQuery(req))
 }

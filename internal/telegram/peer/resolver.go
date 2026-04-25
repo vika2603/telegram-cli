@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/gotd/td/constant"
@@ -65,7 +66,7 @@ func (r *Resolver) Resolve(ctx context.Context, target ref.Ref) (Resolved, error
 	)
 	switch target.Kind {
 	case ref.RefKindMe, ref.RefKindSaved:
-		out, err = r.resolveSelf(ctx)
+		out = r.resolveSelf()
 	case ref.RefKindUsername:
 		out, err = r.resolveUsername(ctx, target.Value)
 	case ref.RefKindID:
@@ -115,12 +116,12 @@ func resolveDirectPeer(target ref.Ref) (Resolved, error) {
 	}
 }
 
-func (r *Resolver) resolveSelf(_ context.Context) (Resolved, error) {
+func (r *Resolver) resolveSelf() Resolved {
 	return Resolved{
 		InputPeer: &tg.InputPeerSelf{},
 		Kind:      "user",
 		ID:        r.selfID,
-	}, nil
+	}
 }
 
 func (r *Resolver) recordRecent(p Resolved) error {
@@ -166,7 +167,7 @@ func (r *Resolver) resolveID(ctx context.Context, id int64) (Resolved, error) {
 	if r.store == nil {
 		return Resolved{}, fmt.Errorf("%w: id %d (no cache)", ErrCacheMiss, id)
 	}
-	hit, ok, err := lookupCachedByID(r.store, id)
+	hit, ok, err := lookupCachedByID(ctx, r.store, id)
 	if err != nil {
 		return Resolved{}, err
 	}
@@ -175,7 +176,7 @@ func (r *Resolver) resolveID(ctx context.Context, id int64) (Resolved, error) {
 	}
 	p, err := r.mgr.ResolveTDLibID(ctx, constant.TDLibPeerID(id))
 	if err != nil {
-		return Resolved{}, mapResolveErr(err, fmt.Sprintf("%d", id))
+		return Resolved{}, mapResolveErr(err, strconv.FormatInt(id, 10))
 	}
 	return fromPeersPeer(p), nil
 }
@@ -334,10 +335,10 @@ func userDisplayName(u peers.User) string {
 // lookupCachedByID queries the peer cache by numeric ID.
 // ID-only lookup returning raw bytes is a forward-compat hook; the current
 // store does not yet deserialize cached peers back into Resolved.
-func lookupCachedByID(store *account.PeerStore, id int64) (Resolved, bool, error) {
+func lookupCachedByID(ctx context.Context, store *account.PeerStore, id int64) (Resolved, bool, error) {
 	switch {
 	case id > 0:
-		u, ok, err := store.FindUser(context.Background(), id)
+		u, ok, err := store.FindUser(ctx, id)
 		if err != nil || !ok {
 			return Resolved{}, ok, err
 		}
@@ -356,7 +357,7 @@ func lookupCachedByID(store *account.PeerStore, id int64) (Resolved, bool, error
 		}, true, nil
 	case id < -1_000_000_000_000:
 		channelID := -1_000_000_000_000 - id
-		c, ok, err := store.FindChannel(context.Background(), channelID)
+		c, ok, err := store.FindChannel(ctx, channelID)
 		if err != nil || !ok {
 			return Resolved{}, ok, err
 		}
@@ -374,7 +375,7 @@ func lookupCachedByID(store *account.PeerStore, id int64) (Resolved, bool, error
 		}, true, nil
 	case id < 0:
 		chatID := -id
-		c, ok, err := store.FindChat(context.Background(), chatID)
+		c, ok, err := store.FindChat(ctx, chatID)
 		if err != nil || !ok {
 			return Resolved{}, ok, err
 		}

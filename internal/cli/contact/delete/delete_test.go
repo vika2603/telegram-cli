@@ -1,4 +1,4 @@
-package delete_test
+package deletecmd_test
 
 import (
 	"context"

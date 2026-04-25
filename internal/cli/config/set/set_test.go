@@ -179,12 +179,5 @@ func TestRun_NormalWrite_RowFields(t *testing.T) {
 	require.Equal(t, "debug", row.New)
 }
 
-// Compile-time checks
-var _ = set.Run
-var _ = set.Options{}
-
 // Ensure StubPrompter is exported from ui (not a test-local type).
 var _ ui.Prompter = (*ui.StubPrompter)(nil)
-
-// filepath is used above; keep import via explicit reference.
-var _ = filepath.Join

@@ -1,5 +1,5 @@
-// Package delete implements "tg msg delete <msg-ref> [<msg-ref>...]".
-package delete
+// Package deletecmd implements "tg msg delete <msg-ref> [<msg-ref>...]".
+package deletecmd
 
 import (
 	"context"

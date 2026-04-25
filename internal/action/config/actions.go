@@ -318,20 +318,13 @@ func typedValue(k appconfig.Key, raw any, present, noRedact bool) any {
 func displayValue(k appconfig.Key, raw any) any {
 	if k.Name == "api_hash" {
 		if s, ok := raw.(string); ok && s != "" {
-			return redactHash(s)
+			return appconfig.MaskAPIHash(s)
 		}
 		if raw != nil {
 			return "****"
 		}
 	}
 	return raw
-}
-
-func redactHash(h string) string {
-	if len(h) <= 8 {
-		return "****"
-	}
-	return h[:8] + "…****"
 }
 
 func ensureVersion(raw map[string]any) {

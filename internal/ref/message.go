@@ -1,6 +1,7 @@
 package ref
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -26,11 +27,11 @@ func FormatMessageRef(peer string, messageID int) string {
 func ParseMessageRef(s string) (MessageRef, error) {
 	i := strings.LastIndex(s, ":")
 	if i <= 0 || i == len(s)-1 {
-		return MessageRef{}, fmt.Errorf("message ref must be <peer-ref>:<message-id>")
+		return MessageRef{}, errors.New("message ref must be <peer-ref>:<message-id>")
 	}
 	msgID, err := strconv.Atoi(s[i+1:])
 	if err != nil || msgID <= 0 {
-		return MessageRef{}, fmt.Errorf("message ref id must be positive")
+		return MessageRef{}, errors.New("message ref id must be positive")
 	}
 	peer, err := ParseRef(s[:i])
 	if err != nil {

@@ -21,9 +21,7 @@ type RedactedConfig struct {
 	Aliases        map[string]string `json:"aliases,omitempty"`
 }
 
-// Redact returns a RedactedConfig with api_hash masked. First 8 chars are
-// preserved so users can distinguish environments; the remainder becomes
-// "…****". For api_hash of 8 chars or fewer the whole value becomes "****".
+// Redact returns a RedactedConfig with api_hash masked.
 func Redact(c Config) RedactedConfig {
 	out := RedactedConfig{
 		Version:        c.Version,
@@ -35,13 +33,16 @@ func Redact(c Config) RedactedConfig {
 		Aliases:        c.Aliases,
 	}
 	if c.APIHash != nil {
-		m := maskAPIHash(*c.APIHash)
+		m := MaskAPIHash(*c.APIHash)
 		out.APIHash = &m
 	}
 	return out
 }
 
-func maskAPIHash(h string) string {
+// MaskAPIHash returns the display-safe form of an api_hash. First 8 chars are
+// preserved so users can distinguish environments; the remainder becomes
+// "…****". For api_hash of 8 chars or fewer the whole value becomes "****".
+func MaskAPIHash(h string) string {
 	if len(h) <= 8 {
 		return "****"
 	}

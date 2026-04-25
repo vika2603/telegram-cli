@@ -1,7 +1,6 @@
 package ui_test
 
 import (
-	"bytes"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -43,5 +42,4 @@ func TestTest_OutWritesGoToStdoutBuffer(t *testing.T) {
 	_, err := ios.Out.Write([]byte("hello"))
 	require.NoError(t, err)
 	require.Equal(t, "hello", stdout.String())
-	_ = bytes.NewBuffer // silence unused import in a larger test file
 }

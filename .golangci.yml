@@ -1,0 +1,65 @@
+version: "2"
+
+linters:
+  default: standard
+  enable:
+    - contextcheck
+    - copyloopvar
+    - errchkjson
+    - errname
+    - errorlint
+    - exhaustive
+    - forbidigo
+    - gocritic
+    - intrange
+    - misspell
+    - musttag
+    - nilerr
+    - nolintlint
+    - perfsprint
+    - predeclared
+    - revive
+    - tagliatelle
+    - testifylint
+    - thelper
+    - tparallel
+    - unconvert
+    - unparam
+  settings:
+    exhaustive:
+      default-signifies-exhaustive: true
+    forbidigo:
+      analyze-types: true
+      forbid:
+        - pattern: '^os\.Exit$'
+          msg: 'never os.Exit from commands; return a tgerr-wrapped error so cmdutil.EmitError maps the exit code'
+        - pattern: '^fmt\.(Print|Printf|Println)$'
+          msg: 'stdout is data-only; write through iostreams.Out/ErrOut or the JSON emitters in internal/tgjson'
+    revive:
+      rules:
+        - name: exported
+          disabled: true
+    tagliatelle:
+      case:
+        rules:
+          json: snake
+  exclusions:
+    rules:
+      - path: '_test\.go'
+        linters:
+          - errcheck
+      - path: 'cmd/tg/main\.go'
+        linters:
+          - forbidigo
+      - path: 'internal/cmd/(contact|msg)/delete/'
+        linters:
+          - predeclared
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/vika2603/telegram-cli

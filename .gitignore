@@ -1,0 +1,10 @@
+/tg
+/dist/
+*.test
+*.out
+.DS_Store
+.vscode/
+.idea/
+
+# Claude Code worktrees
+/.claude/worktrees/

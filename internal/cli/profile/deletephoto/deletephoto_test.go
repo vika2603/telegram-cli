@@ -16,7 +16,6 @@ type stubPrompter struct{ ok bool }
 
 func (s stubPrompter) Confirm(string, bool) (bool, error)   { return s.ok, nil }
 func (s stubPrompter) Password(string) (string, error)      { return "", nil }
-func (s stubPrompter) Select(string, []string) (int, error) { return 0, nil }
 func (s stubPrompter) Input(string, string) (string, error) { return "", nil }
 
 func TestNew_FlagParsing(t *testing.T) {

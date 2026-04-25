@@ -17,7 +17,6 @@ import (
 	"github.com/vika2603/telegram-cli/internal/account"
 	"github.com/vika2603/telegram-cli/internal/command"
 	"github.com/vika2603/telegram-cli/internal/logging"
-	"github.com/vika2603/telegram-cli/internal/output"
 	"github.com/vika2603/telegram-cli/internal/runtime"
 	"github.com/vika2603/telegram-cli/internal/telegram/session"
 	"github.com/vika2603/telegram-cli/internal/ui"
@@ -40,26 +39,6 @@ func CompleteAccountNames(_ *cobra.Command, _ []string, _ string) ([]string, cob
 		return nil, cobra.ShellCompDirectiveError
 	}
 	return names, cobra.ShellCompDirectiveNoFileComp
-}
-
-// WriteAccountDTO emits an AccountDTO after a mutating account command
-// (add / login). If exp is non-nil the JSON exporter path is used, otherwise
-// a human line is written to f.IOStreams.Out. quiet suppresses all output but
-// still verifies the meta is readable.
-func WriteAccountDTO(f *runtime.Invocation, name, def string, exp output.Exporter, quiet bool) error {
-	m, err := account.ReadMeta(name)
-	if err != nil {
-		return err
-	}
-	if quiet {
-		return nil
-	}
-	dto := account.DTOFromMeta(m, name == def)
-	if exp != nil {
-		return exp.Write(f.IOStreams, dto)
-	}
-	_, _ = fmt.Fprintln(f.IOStreams.Out, dto.Human())
-	return nil
 }
 
 // CredsIfAvailableFromPtrs returns the api_id/api_hash pair when both pointer
@@ -97,19 +76,8 @@ func ResolveCreds(apiID *int, apiHash *string) (int, string, error) {
 	return id, hash, nil
 }
 
-// RotationCreds resolves rotation credentials by precedence:
-// flags > env > config file. Returns (id, hash, shouldRotate, err).
-// shouldRotate is true only when BOTH fields differ from the stored values.
-// Partial provisioning at the highest-priority tier is a usage error.
-func RotationCreds(cmd *cobra.Command, cfgAPIID *int, cfgAPIHash *string, flagAPIID int, flagAPIHash string, curID int, curHash string) (int, string, bool, error) {
-	flagIDChanged := cmd.Flags().Changed("api-id")
-	flagHashChanged := cmd.Flags().Changed("api-hash")
-	return RotationCredsFromInputs(flagIDChanged, flagHashChanged, cfgAPIID, cfgAPIHash, flagAPIID, flagAPIHash, curID, curHash)
-}
-
 // RotationCredsFromInputs resolves rotation credentials from already-normalized
-// flag state. This keeps action code independent from cobra while preserving
-// RotationCreds for existing cobra callers.
+// flag state.
 func RotationCredsFromInputs(flagIDChanged, flagHashChanged bool, cfgAPIID *int, cfgAPIHash *string, flagAPIID int, flagAPIHash string, curID int, curHash string) (int, string, bool, error) {
 	if flagIDChanged != flagHashChanged {
 		return 0, "", false, fmt.Errorf("%w: --api-id and --api-hash must be provided together", command.ErrUsage)
@@ -147,37 +115,6 @@ func ApplyRotation(newID int, newHash string, curID int, curHash string) (int, s
 		return 0, "", false, fmt.Errorf("%w: api_id/api_hash both required for rotation (got id=%d, hash_empty=%v)", command.ErrUsage, newID, newHash == "")
 	}
 	return newID, newHash, newID != curID || newHash != curHash, nil
-}
-
-// DoLogin runs session.Login or session.LoginQR against the named account.
-// It does NOT emit AccountDTO — the enclosing command emits after this
-// returns so the DTO reflects the post-login Meta state.
-//
-// flagAPIID / flagAPIHash carry any --api-id / --api-hash values the caller
-// parsed; cmd is used only to normalize whether those flags were changed.
-func DoLogin(
-	ctx context.Context,
-	f *runtime.Invocation,
-	cmd *cobra.Command,
-	name string,
-	qr, force bool,
-	flagAPIID int, flagAPIHash string,
-) error {
-	flagIDChanged := false
-	flagHashChanged := false
-	if cmd != nil && cmd.Flags() != nil {
-		flagIDChanged = cmd.Flags().Changed("api-id")
-		flagHashChanged = cmd.Flags().Changed("api-hash")
-	}
-	return DoLoginWithOptions(ctx, f, LoginOptions{
-		Name:           name,
-		QR:             qr,
-		Force:          force,
-		APIID:          flagAPIID,
-		APIHash:        flagAPIHash,
-		APIIDChanged:   flagIDChanged,
-		APIHashChanged: flagHashChanged,
-	})
 }
 
 // LoginOptions is the cobra-free input for DoLoginWithOptions.

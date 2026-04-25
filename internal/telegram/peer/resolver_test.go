@@ -11,7 +11,6 @@ import (
 	gotdtgerr "github.com/gotd/td/tgerr"
 	"github.com/stretchr/testify/require"
 
-	"github.com/vika2603/telegram-cli/internal/account"
 	"github.com/vika2603/telegram-cli/internal/command"
 	"github.com/vika2603/telegram-cli/internal/ref"
 	"github.com/vika2603/telegram-cli/internal/telegram/peer"
@@ -93,14 +92,13 @@ func TestNormalizeInputPeerID_matchesChatListConvention(t *testing.T) {
 	}
 }
 
-func TestResolve_IDCacheMissReturnsCacheMiss(t *testing.T) {
+func TestResolve_IDMissAsksPeerManager(t *testing.T) {
 	mgr := peers.Options{}.Build(tg.NewClient(stubInvoker{}))
 	r, err := peer.New(mgr, nil, 1)
 	require.NoError(t, err)
 
 	_, err = r.Resolve(context.Background(), ref.Ref{Kind: ref.RefKindID, ID: 42})
 	require.Error(t, err)
-	require.ErrorIs(t, err, peer.ErrCacheMiss)
 }
 
 func TestResolve_IDFallsBackToGotdPeerManager(t *testing.T) {
@@ -110,7 +108,7 @@ func TestResolve_IDFallsBackToGotdPeerManager(t *testing.T) {
 	require.NoError(t, mgr.Apply(context.Background(), []tg.UserClass{
 		&tg.User{ID: 42, AccessHash: 9001, FirstName: "Ada", Username: "ada"},
 	}, nil))
-	r, err := peer.New(mgr, account.NewPeerStore(nil), 1)
+	r, err := peer.New(mgr, nil, 1)
 	require.NoError(t, err)
 
 	got, err := r.Resolve(context.Background(), ref.Ref{Kind: ref.RefKindID, ID: 42})

@@ -19,12 +19,14 @@ linters:
     - perfsprint
     - predeclared
     - revive
+    - staticcheck
     - tagliatelle
     - testifylint
     - thelper
     - tparallel
     - unconvert
     - unparam
+    - unused
   settings:
     exhaustive:
       default-signifies-exhaustive: true

@@ -6,7 +6,6 @@ import (
 
 	"github.com/gotd/td/telegram/auth/qrlogin"
 	"github.com/gotd/td/tg"
-	"go.uber.org/zap"
 
 	"github.com/vika2603/telegram-cli/internal/account"
 )
@@ -19,16 +18,14 @@ import (
 // Post-auth bookkeeping mirrors Login:
 //   - flip Meta.State to AUTHED
 //   - persist Meta.Phone from Self() in E.164 form
-//   - cache self into peers.db (non-fatal on failure)
 //
 // display.Done(true) is called only after all post-auth bookkeeping succeeds;
 // any earlier failure fires display.Done(false) so the UI can clean up.
-// Self-cache failure does NOT downgrade Done to false.
 func LoginQR(ctx context.Context, acct *account.Account, opts Options, display account.QRDisplay) error {
 	dispatcher := tg.NewUpdateDispatcher()
 	loggedIn := qrlogin.OnLoginToken(&dispatcher)
 
-	b, err := buildTelegramClientWithHandler(acct, opts, dbPeers, &dispatcher)
+	b, err := buildTelegramClientWithHandler(acct, opts, &dispatcher)
 	if err != nil {
 		return err
 	}
@@ -63,12 +60,6 @@ func LoginQR(ctx context.Context, acct *account.Account, opts Options, display a
 			return fmt.Errorf("persist AUTHED: %w", werr)
 		}
 		acct.Meta = m
-		if b.pStore != nil {
-			if cerr := b.pStore.CacheSelf(self); cerr != nil && opts.Logger != nil {
-				opts.Logger.Warn("cache self peer after qr login",
-					zap.String("account", acct.Meta.Name), zap.Error(cerr))
-			}
-		}
 		display.Done(ctx, true)
 		return nil
 	})

@@ -10,8 +10,7 @@ import (
 )
 
 // atomicWriteLockTimeout bounds how long we wait for account.lock before
-// giving up with ErrBusy. Matches the bbolt-open timeout. `var` not
-// `const` so tests can compress it via init().
+// giving up with ErrBusy. `var` not `const` so tests can compress it via init().
 var atomicWriteLockTimeout = 5 * time.Second
 
 // AtomicWrite writes data to path via tmp + rename. Creates the parent

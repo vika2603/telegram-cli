@@ -73,11 +73,11 @@ func openRecentStore(cmd *cobra.Command, f *runtime.Invocation) (*account.PeerSt
 	if name == "" {
 		return nil, func() {}
 	}
-	db, err := account.OpenPeersDBReadOnly(name)
+	store, err := account.OpenRecentStoreReadOnly(name)
 	if err != nil {
 		return nil, func() {}
 	}
-	return account.NewPeerStore(db), func() { _ = db.Close() }
+	return store, func() {}
 }
 
 func accountNameForCompletion(cmd *cobra.Command, f *runtime.Invocation) string {

@@ -1,7 +1,7 @@
 // Package ui is the unified terminal I/O abstraction for every command.
 // Commands read from and write to IOStreams instead of os.Stdin/Stdout/
-// Stderr, which makes TTY detection, color, pagination, prompting, and
-// spinners testable. Test() constructs an instance backed by bytes.Buffer
+// Stderr, which makes TTY detection, color, and prompting testable.
+// Test() constructs an instance backed by bytes.Buffer
 // triples; System() wraps the process's real streams.
 package ui
 
@@ -11,8 +11,8 @@ import (
 	"os"
 )
 
-// IOStreams wraps in/out/err, TTY flags, color capabilities, pager state,
-// spinner state, and prompt gating. Commands never touch os.Stdin/Stdout/
+// IOStreams wraps in/out/err, TTY flags, color capabilities, and prompt
+// gating. Commands never touch os.Stdin/Stdout/
 // Stderr directly; they call fields/methods on IOStreams.
 type IOStreams struct {
 	In     io.ReadCloser
@@ -28,12 +28,6 @@ type IOStreams struct {
 	color256       bool
 	colorTruecolor bool
 	scheme         *ColorScheme
-
-	pagerCommand string
-	pagerProcess *os.Process
-
-	progress        interface{ Stop() }
-	progressEnabled bool
 
 	altScreenOn bool
 }

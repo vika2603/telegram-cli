@@ -9,7 +9,7 @@ import (
 )
 
 func TestStubPrompter_DispensesAnswersInOrder(t *testing.T) {
-	p := &ui.StubPrompter{Answers: []any{"alice", true, 2, "bob"}}
+	p := &ui.StubPrompter{Answers: []any{"alice", true, "bob"}}
 
 	name, err := p.Input("who?", "")
 	require.NoError(t, err)
@@ -18,10 +18,6 @@ func TestStubPrompter_DispensesAnswersInOrder(t *testing.T) {
 	ok, err := p.Confirm("sure?", false)
 	require.NoError(t, err)
 	require.True(t, ok)
-
-	idx, err := p.Select("which?", []string{"a", "b", "c"})
-	require.NoError(t, err)
-	require.Equal(t, 2, idx)
 
 	pw, err := p.Password("pw?")
 	require.NoError(t, err)
@@ -58,16 +54,6 @@ func TestSystemPrompter_ConfirmAccessible(t *testing.T) {
 	got, err := (&ui.SystemPrompter{IO: ios}).Confirm("Continue?", false)
 	require.NoError(t, err)
 	require.True(t, got)
-}
-
-func TestSystemPrompter_SelectAccessible(t *testing.T) {
-	ios, stdin, _, _ := ui.Test()
-	ios.SetStdinTTY(true)
-	stdin.WriteString("2\n")
-
-	got, err := (&ui.SystemPrompter{IO: ios}).Select("Account", []string{"work", "home"})
-	require.NoError(t, err)
-	require.Equal(t, 1, got)
 }
 
 func TestSystemPrompter_RequiresPromptableStdin(t *testing.T) {

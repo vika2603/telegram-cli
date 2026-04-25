@@ -10,7 +10,7 @@ import (
 )
 
 // DefaultWithClient is the production wiring for Invocation.WithClient. It
-// delegates to session.Run, which owns the bbolt + gotd lifecycle.
+// delegates to session.Run, which owns the gotd lifecycle.
 func DefaultWithClient(
 	ctx context.Context,
 	acct *account.Account,

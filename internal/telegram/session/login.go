@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/gotd/td/telegram/auth"
-	"go.uber.org/zap"
 
 	"github.com/vika2603/telegram-cli/internal/account"
 )
@@ -16,13 +15,10 @@ import (
 // Post-auth bookkeeping:
 //   - flip Meta.State to AUTHED
 //   - persist Meta.Phone from Self() in E.164 form
-//   - cache the self peer in peers.db (non-fatal on failure)
 //
-// All post-auth writes happen only AFTER auth.IfNecessary succeeds. A failed
-// login never mutates Meta or peers.db. A self-cache write failure logs a
-// warn but does not fail the login.
+// All post-auth writes happen only AFTER auth.IfNecessary succeeds.
 func Login(ctx context.Context, acct *account.Account, opts Options, authr account.UserAuthenticator) error {
-	b, err := buildTelegramClient(acct, opts, dbPeers)
+	b, err := buildTelegramClient(acct, opts)
 	if err != nil {
 		return err
 	}
@@ -46,12 +42,6 @@ func Login(ctx context.Context, acct *account.Account, opts Options, authr accou
 			return fmt.Errorf("persist AUTHED: %w", werr)
 		}
 		acct.Meta = m
-		if b.pStore != nil {
-			if cerr := b.pStore.CacheSelf(self); cerr != nil && opts.Logger != nil {
-				opts.Logger.Warn("cache self peer after login",
-					zap.String("account", acct.Meta.Name), zap.Error(cerr))
-			}
-		}
 		return nil
 	})
 }

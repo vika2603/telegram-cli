@@ -167,7 +167,7 @@ func logoutPrompt(name string, purge, clearsDefault bool) string {
 	}
 	msg := fmt.Sprintf(
 		"Purge account %q? This revokes the server session AND removes local storage"+
-			" (peers.db, session.bin, account.json, account.lock).",
+			" (recent.json, session.bin, account.json, account.lock).",
 		name,
 	)
 	if clearsDefault {

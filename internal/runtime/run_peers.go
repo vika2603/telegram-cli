@@ -19,10 +19,8 @@ import (
 // but are not used by this pure-construction implementation; future impls
 // may use them to hydrate the resolver from cache or server lookups.
 //
-// The PeerStore is intentionally nil: session.Run already owns the peersDB
-// handle for the same account, so opening it again would block on the bbolt
-// file lock and return ErrBusy. ID-based lookups degrade to ErrCacheMiss,
-// which is the current resolver contract.
+// The completion store is intentionally nil here: DefaultResolver is a pure
+// constructor and should not write recent suggestions as a side effect.
 //
 // selfID is zero here because this closure does not have access to
 // cl.Self(). Callers resolving RefKindMe/Saved must use Invocation.WithPeers
@@ -40,12 +38,6 @@ func DefaultResolver(
 
 // DefaultWithPeers wraps session.Run with peers.Manager + peer.Resolver
 // construction so command code can stay short.
-//
-// The PeerStore is intentionally nil for the same reason as DefaultResolver:
-// session.Run opens peers.db and owns its bbolt handle for the lifetime of
-// the callback; a second open from this goroutine would block and return
-// ErrBusy. Commands that need cached ID lookups must warm the cache via a
-// username or t.me ref first.
 func DefaultWithPeers(
 	ctx context.Context,
 	acct *account.Account,
@@ -54,8 +46,13 @@ func DefaultWithPeers(
 ) error {
 	return session.Run(ctx, acct, opts, func(ctx context.Context, cl session.Client) error {
 		api := tg.NewClient(cl.Invoker())
-		store := cl.PeerStore()
-		mgr := peers.Options{Storage: store, Cache: store}.Build(api)
+		storage := &peers.InmemoryStorage{}
+		cache := &peers.InmemoryCache{}
+		mgr := peers.Options{Storage: storage, Cache: cache}.Build(api)
+		store, err := account.OpenRecentStore(acct.Meta.Name)
+		if err != nil {
+			return err
+		}
 		selfID := cl.Self().ID
 		res, err := peer.New(mgr, store, selfID)
 		if err != nil {

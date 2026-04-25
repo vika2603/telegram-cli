@@ -1,5 +1,4 @@
-// Package peer resolves parsed peer references into concrete Telegram peers,
-// consulting the local bbolt cache first and falling back to gotd.
+// Package peer resolves parsed peer references into concrete Telegram peers.
 package peer
 
 import (
@@ -31,7 +30,7 @@ type Resolved struct {
 	Phone      string
 }
 
-// Resolver owns a peers.Manager and a PeerStore and converts ref.Ref
+// Resolver owns a peers.Manager and a recent-completion store and converts ref.Ref
 // values to Resolved. It is safe to reuse across commands within one
 // session.Run callback, but MUST NOT outlive it.
 type Resolver struct {
@@ -40,8 +39,8 @@ type Resolver struct {
 	selfID int64
 }
 
-// New builds a Resolver. mgr must be non-nil; store may be nil (cache
-// disabled).
+// New builds a Resolver. mgr must be non-nil; store may be nil (completion
+// recording disabled).
 func New(mgr *peers.Manager, store *account.PeerStore, selfID int64) (*Resolver, error) {
 	if mgr == nil {
 		return nil, errors.New("telegram peer: manager is nil")
@@ -164,16 +163,6 @@ func (r *Resolver) resolveUsername(ctx context.Context, name string) (Resolved, 
 }
 
 func (r *Resolver) resolveID(ctx context.Context, id int64) (Resolved, error) {
-	if r.store == nil {
-		return Resolved{}, fmt.Errorf("%w: id %d (no cache)", ErrCacheMiss, id)
-	}
-	hit, ok, err := lookupCachedByID(ctx, r.store, id)
-	if err != nil {
-		return Resolved{}, err
-	}
-	if ok {
-		return hit, nil
-	}
 	p, err := r.mgr.ResolveTDLibID(ctx, constant.TDLibPeerID(id))
 	if err != nil {
 		return Resolved{}, mapResolveErr(err, strconv.FormatInt(id, 10))
@@ -330,77 +319,4 @@ func userDisplayName(u peers.User) string {
 		return "@" + n
 	}
 	return fmt.Sprintf("user#%d", u.ID())
-}
-
-// lookupCachedByID queries the peer cache by numeric ID.
-// ID-only lookup returning raw bytes is a forward-compat hook; the current
-// store does not yet deserialize cached peers back into Resolved.
-func lookupCachedByID(ctx context.Context, store *account.PeerStore, id int64) (Resolved, bool, error) {
-	switch {
-	case id > 0:
-		u, ok, err := store.FindUser(ctx, id)
-		if err != nil || !ok {
-			return Resolved{}, ok, err
-		}
-		kind := "user"
-		if u.Bot {
-			kind = "bot"
-		}
-		return Resolved{
-			InputPeer:  &tg.InputPeerUser{UserID: u.ID, AccessHash: u.AccessHash},
-			Kind:       kind,
-			ID:         u.ID,
-			AccessHash: u.AccessHash,
-			Title:      userTitleFromTG(u),
-			Username:   u.Username,
-			Phone:      u.Phone,
-		}, true, nil
-	case id < -1_000_000_000_000:
-		channelID := -1_000_000_000_000 - id
-		c, ok, err := store.FindChannel(ctx, channelID)
-		if err != nil || !ok {
-			return Resolved{}, ok, err
-		}
-		kind := "chat"
-		if c.Broadcast {
-			kind = "channel"
-		}
-		return Resolved{
-			InputPeer:  &tg.InputPeerChannel{ChannelID: c.ID, AccessHash: c.AccessHash},
-			Kind:       kind,
-			ID:         id,
-			AccessHash: c.AccessHash,
-			Title:      c.Title,
-			Username:   c.Username,
-		}, true, nil
-	case id < 0:
-		chatID := -id
-		c, ok, err := store.FindChat(ctx, chatID)
-		if err != nil || !ok {
-			return Resolved{}, ok, err
-		}
-		return Resolved{
-			InputPeer: &tg.InputPeerChat{ChatID: c.ID},
-			Kind:      "chat",
-			ID:        id,
-			Title:     c.Title,
-		}, true, nil
-	default:
-		return Resolved{}, false, nil
-	}
-}
-
-func userTitleFromTG(u *tg.User) string {
-	switch {
-	case u.FirstName != "" && u.LastName != "":
-		return u.FirstName + " " + u.LastName
-	case u.FirstName != "":
-		return u.FirstName
-	case u.LastName != "":
-		return u.LastName
-	case u.Username != "":
-		return "@" + u.Username
-	default:
-		return fmt.Sprintf("user#%d", u.ID)
-	}
 }

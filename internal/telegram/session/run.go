@@ -15,8 +15,8 @@ import (
 
 // Run is the sole lifecycle entry: builds a telegram.Client, starts it via
 // telegram.Client.Run, and invokes fn inside the Run callback with a live
-// directClient. All resources (bbolt handles, MTProto connection) are torn
-// down when fn returns or ctx is cancelled.
+// directClient. The MTProto connection is torn down when fn returns or ctx is
+// cancelled.
 //
 // A stored StateEXPIRED Meta is rejected before dialing. Once dialed, Self()
 // is the liveness probe: auth.IsUnauthorized surfaces as ErrAuth and flips
@@ -25,7 +25,7 @@ func Run(ctx context.Context, acct *account.Account, opts Options, fn func(ctx c
 	if acct.Meta.State == account.StateEXPIRED {
 		return fmt.Errorf("account %s: %w", acct.Meta.Name, ErrAuth)
 	}
-	b, err := buildTelegramClient(acct, opts, dbPeers)
+	b, err := buildTelegramClient(acct, opts)
 	if err != nil {
 		return err
 	}
@@ -33,11 +33,10 @@ func Run(ctx context.Context, acct *account.Account, opts Options, fn func(ctx c
 	return stripCallbackPrefix(b.tgCl.Run(ctx, func(ctx context.Context) error {
 		return runLifecycle(ctx, acct, opts, b.tgCl, func(self tg.User) Client {
 			return &directClient{
-				tgCl:   b.tgCl,
-				self:   self,
-				opts:   opts,
-				acct:   acct,
-				pStore: b.pStore,
+				tgCl: b.tgCl,
+				self: self,
+				opts: opts,
+				acct: acct,
 			}
 		}, fn)
 	}))

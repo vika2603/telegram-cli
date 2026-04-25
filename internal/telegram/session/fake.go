@@ -5,7 +5,6 @@ import (
 
 	"github.com/gotd/td/tg"
 
-	"github.com/vika2603/telegram-cli/internal/account"
 	"github.com/vika2603/telegram-cli/internal/command"
 	"github.com/vika2603/telegram-cli/internal/ref"
 )
@@ -13,11 +12,10 @@ import (
 // FakeClient implements Client for tests. Every method returns
 // command.ErrUnsupported unless the matching *Fn override is set.
 type FakeClient struct {
-	SelfValue      tg.User
-	PeerStoreValue *account.PeerStore
-	InvokerFn      func() tg.Invoker
-	ResolvePeerFn  func(context.Context, ref.Ref) (tg.InputPeerClass, error)
-	RefreshPeerFn  func(context.Context, ref.Ref) (tg.InputPeerClass, error)
+	SelfValue     tg.User
+	InvokerFn     func() tg.Invoker
+	ResolvePeerFn func(context.Context, ref.Ref) (tg.InputPeerClass, error)
+	RefreshPeerFn func(context.Context, ref.Ref) (tg.InputPeerClass, error)
 }
 
 func (f *FakeClient) Invoker() tg.Invoker {
@@ -28,8 +26,6 @@ func (f *FakeClient) Invoker() tg.Invoker {
 }
 
 func (f *FakeClient) Self() tg.User { return f.SelfValue }
-
-func (f *FakeClient) PeerStore() *account.PeerStore { return f.PeerStoreValue }
 
 func (f *FakeClient) ResolvePeer(ctx context.Context, r ref.Ref) (tg.InputPeerClass, error) {
 	if f.ResolvePeerFn != nil {

@@ -32,9 +32,8 @@ func (p *capturingPrompter) Confirm(prompt string, _ bool) (bool, error) {
 	return p.confirm, nil
 }
 
-func (p *capturingPrompter) Input(_, _ string) (string, error)        { return "", nil }
-func (p *capturingPrompter) Password(_ string) (string, error)        { return "", nil }
-func (p *capturingPrompter) Select(_ string, _ []string) (int, error) { return 0, nil }
+func (p *capturingPrompter) Input(_, _ string) (string, error) { return "", nil }
+func (p *capturingPrompter) Password(_ string) (string, error) { return "", nil }
 
 // makeInvocation returns a test Invocation wired with a Config closure that returns
 // a config with the given defaultAccount (empty string = nil pointer).

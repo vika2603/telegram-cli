@@ -1,7 +1,6 @@
 // Package defaults wires production defaults onto a runtime.Invocation. The
 // separation from command lets leaf-command tests import command without
-// pulling in the full dependency chain (bbolt, gotd, etc.) that the
-// production closures need.
+// pulling in the full gotd dependency chain that the production closures need.
 package defaults
 
 import (
@@ -18,7 +17,7 @@ import (
 // read f.ConfigPath and f.AccountName, which the root PersistentPreRun
 // populates from the --config and --account flags before any RunE fires.
 // WithClient delegates to runtime.DefaultWithClient (which calls
-// session.Run), keeping the bbolt/gotd lifetime scoped to a single command.
+// session.Run), keeping the gotd lifetime scoped to a single command.
 func New(appVersion string) *runtime.Invocation {
 	f := runtime.NewInvocation(appVersion)
 

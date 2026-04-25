@@ -53,5 +53,4 @@ func (s *stubPrompter) Confirm(prompt string, def bool) (bool, error) {
 	return s.confirm(prompt, def)
 }
 func (s *stubPrompter) Password(string) (string, error)      { return "", nil }
-func (s *stubPrompter) Select(string, []string) (int, error) { return 0, nil }
 func (s *stubPrompter) Input(string, string) (string, error) { return "", nil }

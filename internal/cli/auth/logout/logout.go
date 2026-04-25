@@ -30,7 +30,7 @@ type Options struct {
 	// Do runs inside WithClient: AuthLogOut + DeleteSession + WriteMeta(state=NEW).
 	// The outer Run loop calls account.RemoveAccount after WithClient returns,
 	// only when opts.Purge is set. That keeps directory removal outside the
-	// live gotd / bbolt file handles.
+	// live gotd client lifetime.
 	Do func(ctx context.Context, a DoArgs) error
 }
 
@@ -56,7 +56,7 @@ func New(f *runtime.Invocation, runF func(*Options) error) *cobra.Command {
 		},
 	}
 	cmd.Flags().BoolVar(&opts.Purge, "purge", false,
-		"Also remove the local account directory (peers.db, session.bin, account.json)")
+		"Also remove the local account directory (recent.json, session.bin, account.json)")
 	cmd.Flags().BoolVarP(&opts.Yes, "yes", "y", false, "Skip destructive confirmation prompt")
 	// AccountFromArg: positional [name] selects the slot. Root pre-runE must
 	// NOT pre-load the default slot — the command body resolves it via

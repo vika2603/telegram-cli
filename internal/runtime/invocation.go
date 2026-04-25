@@ -19,9 +19,8 @@ import (
 // lazy closures — invoked only when the command actually needs them.
 //
 // The Client lifetime uses a callback (WithClient) rather than a handle
-// return because bbolt + gotd resources are scoped to a single Run call
-// and must be torn down regardless of error path. The callback form makes
-// this structural.
+// return because gotd resources are scoped to a single Run call and must be
+// torn down regardless of error path. The callback form makes this structural.
 type Invocation struct {
 	AppVersion     string
 	ExecutablePath string

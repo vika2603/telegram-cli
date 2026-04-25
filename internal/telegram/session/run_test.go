@@ -57,9 +57,6 @@ type fakeClient struct{ self tg.User }
 
 func (f *fakeClient) Invoker() tg.Invoker { return nil }
 func (f *fakeClient) Self() tg.User       { return f.self }
-func (f *fakeClient) PeerStore() *account.PeerStore {
-	return nil
-}
 func (f *fakeClient) ResolvePeer(context.Context, ref.Ref) (tg.InputPeerClass, error) {
 	return nil, errors.New("not used")
 }

@@ -9,7 +9,6 @@ import (
 	"github.com/gotd/td/tg"
 	"go.uber.org/zap"
 
-	"github.com/vika2603/telegram-cli/internal/account"
 	"github.com/vika2603/telegram-cli/internal/ref"
 )
 
@@ -18,7 +17,6 @@ import (
 type Client interface {
 	Invoker() tg.Invoker
 	Self() tg.User
-	PeerStore() *account.PeerStore
 	ResolvePeer(ctx context.Context, r ref.Ref) (tg.InputPeerClass, error)
 	RefreshPeer(ctx context.Context, r ref.Ref) (tg.InputPeerClass, error)
 }

@@ -28,4 +28,4 @@ func AccountDir(name string) string {
 func MetaFile(name string) string    { return filepath.Join(AccountDir(name), "account.json") }
 func SessionFile(name string) string { return filepath.Join(AccountDir(name), "session.bin") }
 func LockFile(name string) string    { return filepath.Join(AccountDir(name), "account.lock") }
-func PeersDB(name string) string     { return filepath.Join(AccountDir(name), "peers.db") }
+func RecentFile(name string) string  { return filepath.Join(AccountDir(name), "recent.json") }

@@ -1,11 +1,12 @@
 package ui
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
 	"strings"
 
-	"charm.land/huh/v2"
+	"golang.org/x/term"
 
 	"github.com/vika2603/telegram-cli/internal/command"
 )
@@ -16,102 +17,99 @@ import (
 type Prompter interface {
 	Password(prompt string) (string, error)
 	Confirm(prompt string, defaultAns bool) (bool, error)
-	Select(prompt string, options []string) (int, error)
 	Input(prompt, defaultValue string) (string, error)
 }
 
-// SystemPrompter is the production Prompter. It delegates prompt rendering,
-// selection, validation, terminal key handling, and password echo behavior to
-// Charm's huh package while keeping the rest of the codebase behind the small
-// Prompter interface.
+// SystemPrompter is the production Prompter.
 type SystemPrompter struct{ IO *IOStreams }
 
-func (p *SystemPrompter) run(field huh.Field) error {
+func (p *SystemPrompter) ensurePromptable() error {
 	if p == nil || p.IO == nil {
 		return fmt.Errorf("%w: no terminal IO available for prompt", command.ErrPrecondition)
 	}
 	if !p.IO.CanPrompt() {
 		return fmt.Errorf("%w: stdin is not an interactive terminal", command.ErrPrecondition)
 	}
-	form := huh.NewForm(huh.NewGroup(field)).
-		WithInput(p.IO.In).
-		WithOutput(p.IO.ErrOut).
-		WithShowHelp(false).
-		WithWidth(p.IO.TerminalWidth())
-	if !p.IO.IsStderrTTY() {
-		form.WithAccessible(true)
-	}
-	if err := form.Run(); err != nil {
-		if errors.Is(err, huh.ErrUserAborted) {
-			return fmt.Errorf("%w", command.ErrCancel)
-		}
-		return err
-	}
 	return nil
 }
 
 // Password prompts for a secret value.
 func (p *SystemPrompter) Password(prompt string) (string, error) {
-	var value string
-	field := huh.NewInput().
-		Title(prompt).
-		Value(&value).
-		EchoMode(huh.EchoModeNone).
-		Inline(true)
-	if err := p.run(field); err != nil {
+	if err := p.ensurePromptable(); err != nil {
 		return "", err
+	}
+	if _, err := fmt.Fprintf(p.IO.ErrOut, "%s: ", prompt); err != nil {
+		return "", err
+	}
+	if f, ok := p.IO.In.(interface{ Fd() uintptr }); ok && p.IO.IsStdinTTY() {
+		b, err := term.ReadPassword(int(f.Fd()))
+		_, _ = fmt.Fprintln(p.IO.ErrOut)
+		if err != nil {
+			return "", err
+		}
+		return strings.TrimRight(string(b), "\r\n"), nil
+	}
+	return readPromptLine(p.IO.In)
+}
+
+func (p *SystemPrompter) Input(prompt, defaultValue string) (string, error) {
+	if err := p.ensurePromptable(); err != nil {
+		return "", err
+	}
+	label := prompt
+	if defaultValue != "" {
+		label += fmt.Sprintf(" [%s]", defaultValue)
+	}
+	if _, err := fmt.Fprintf(p.IO.ErrOut, "%s: ", label); err != nil {
+		return "", err
+	}
+	value, err := readPromptLine(p.IO.In)
+	if err != nil {
+		return "", err
+	}
+	if value == "" {
+		return defaultValue, nil
 	}
 	return value, nil
 }
 
 func (p *SystemPrompter) Confirm(prompt string, defaultAns bool) (bool, error) {
-	value := defaultAns
-	field := huh.NewConfirm().
-		Title(prompt).
-		Value(&value).
-		Affirmative("Yes").
-		Negative("No").
-		Inline(true)
-	if err := p.run(field); err != nil {
+	if err := p.ensurePromptable(); err != nil {
 		return false, err
 	}
-	return value, nil
+	suffix := " [y/N]: "
+	if defaultAns {
+		suffix = " [Y/n]: "
+	}
+	for {
+		if _, err := fmt.Fprint(p.IO.ErrOut, prompt+suffix); err != nil {
+			return false, err
+		}
+		value, err := readPromptLine(p.IO.In)
+		if err != nil {
+			return false, err
+		}
+		switch strings.ToLower(strings.TrimSpace(value)) {
+		case "":
+			return defaultAns, nil
+		case "y", "yes":
+			return true, nil
+		case "n", "no":
+			return false, nil
+		default:
+			if _, err := fmt.Fprintln(p.IO.ErrOut, "please answer yes or no"); err != nil {
+				return false, err
+			}
+		}
+	}
 }
 
-func (p *SystemPrompter) Select(prompt string, options []string) (int, error) {
-	if len(options) == 0 {
-		return -1, errors.New("selection requires at least one option")
-	}
-	value := 0
-	opts := make([]huh.Option[int], 0, len(options))
-	for i, option := range options {
-		opts = append(opts, huh.NewOption(option, i))
-	}
-	height := len(options)
-	if height > 10 {
-		height = 10
-	}
-	field := huh.NewSelect[int]().
-		Title(prompt).
-		Options(opts...).
-		Value(&value).
-		Height(height)
-	if err := p.run(field); err != nil {
-		return -1, err
-	}
-	return value, nil
-}
-
-func (p *SystemPrompter) Input(prompt, defaultValue string) (string, error) {
-	value := defaultValue
-	field := huh.NewInput().
-		Title(prompt).
-		Value(&value).
-		Inline(true)
-	if err := p.run(field); err != nil {
+func readPromptLine(r interface{ Read([]byte) (int, error) }) (string, error) {
+	line, err := bufio.NewReader(r).ReadString('\n')
+	if err != nil && line == "" {
 		return "", err
 	}
-	return strings.TrimRight(value, "\r\n"), nil
+	return strings.TrimRight(line, "\r\n"), nil
 }
 
 // StubPrompter dispenses canned answers in order. Every method pops the
@@ -153,18 +151,6 @@ func (p *StubPrompter) Confirm(_ string, _ bool) (bool, error) {
 		return false, fmt.Errorf("StubPrompter.Confirm: expected bool, got %T", v)
 	}
 	return b, nil
-}
-
-func (p *StubPrompter) Select(_ string, _ []string) (int, error) {
-	v, err := p.next()
-	if err != nil {
-		return -1, err
-	}
-	i, ok := v.(int)
-	if !ok {
-		return -1, fmt.Errorf("StubPrompter.Select: expected int, got %T", v)
-	}
-	return i, nil
 }
 
 var _ Prompter = (*SystemPrompter)(nil)

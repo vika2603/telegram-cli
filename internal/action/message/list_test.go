@@ -82,6 +82,44 @@ func TestNormalizeList_BadOrderIsUsage(t *testing.T) {
 	require.ErrorIs(t, err, command.ErrUsage)
 }
 
+func TestNormalizeList_PassesOffsetID(t *testing.T) {
+	got, err := actionmessage.NormalizeList(actionmessage.ListRequest{
+		RawRef:   "@ch",
+		Limit:    30,
+		OffsetID: 1234,
+	})
+	require.NoError(t, err)
+	require.Equal(t, 1234, got.OffsetID)
+}
+
+func TestNormalizeList_NegativeOffsetIDIsUsage(t *testing.T) {
+	_, err := actionmessage.NormalizeList(actionmessage.ListRequest{
+		RawRef:   "@ch",
+		Limit:    30,
+		OffsetID: -1,
+	})
+	require.ErrorIs(t, err, command.ErrUsage)
+}
+
+func TestNormalizeList_PassesMinID(t *testing.T) {
+	got, err := actionmessage.NormalizeList(actionmessage.ListRequest{
+		RawRef: "@ch",
+		Limit:  30,
+		MinID:  100,
+	})
+	require.NoError(t, err)
+	require.Equal(t, 100, got.MinID)
+}
+
+func TestNormalizeList_NegativeMinIDIsUsage(t *testing.T) {
+	_, err := actionmessage.NormalizeList(actionmessage.ListRequest{
+		RawRef: "@ch",
+		Limit:  30,
+		MinID:  -1,
+	})
+	require.ErrorIs(t, err, command.ErrUsage)
+}
+
 func TestList_DelegatesValidatedQuery(t *testing.T) {
 	rows, err := actionmessage.List(context.Background(), actionmessage.ListRequest{
 		RawRef: "@ch",

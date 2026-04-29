@@ -15,20 +15,24 @@ const maxListLimit = 1000
 
 // ListRequest is the raw request for `tg msg list`.
 type ListRequest struct {
-	RawRef  string
-	Limit   int
-	MinDate string
-	MaxDate string
-	Order   string
+	RawRef   string
+	Limit    int
+	MinDate  string
+	MaxDate  string
+	Order    string
+	OffsetID int
+	MinID    int
 }
 
 // ListQuery is the validated query passed to the Telegram data loader.
 type ListQuery struct {
-	Ref     ref.Ref
-	Limit   int
-	MinDate time.Time
-	MaxDate time.Time
-	Asc     bool
+	Ref      ref.Ref
+	Limit    int
+	MinDate  time.Time
+	MaxDate  time.Time
+	Asc      bool
+	OffsetID int
+	MinID    int
 }
 
 // ListFunc loads message rows after the request has been validated.
@@ -53,6 +57,12 @@ func NormalizeList(req ListRequest) (ListQuery, error) {
 	}
 	if req.Limit > maxListLimit {
 		req.Limit = maxListLimit
+	}
+	if req.OffsetID < 0 {
+		return ListQuery{}, fmt.Errorf("%w: --offset-id must be non-negative", command.ErrUsage)
+	}
+	if req.MinID < 0 {
+		return ListQuery{}, fmt.Errorf("%w: --min-id must be non-negative", command.ErrUsage)
 	}
 	switch req.Order {
 	case "", "asc", "desc":
@@ -80,10 +90,12 @@ func NormalizeList(req ListRequest) (ListQuery, error) {
 		return ListQuery{}, fmt.Errorf("%w: %s", command.ErrUsage, err.Error())
 	}
 	return ListQuery{
-		Ref:     parsed,
-		Limit:   req.Limit,
-		MinDate: minT,
-		MaxDate: maxT,
-		Asc:     req.Order == "asc",
+		Ref:      parsed,
+		Limit:    req.Limit,
+		MinDate:  minT,
+		MaxDate:  maxT,
+		Asc:      req.Order == "asc",
+		OffsetID: req.OffsetID,
+		MinID:    req.MinID,
 	}, nil
 }

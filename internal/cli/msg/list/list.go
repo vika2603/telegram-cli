@@ -26,6 +26,8 @@ type Options struct {
 	MinDate   string
 	MaxDate   string
 	Order     string
+	OffsetID  int
+	MinID     int
 	Exporter  output.Exporter
 	IOStreams *ui.IOStreams
 	Fetch     actionmessage.ListFunc
@@ -53,6 +55,8 @@ func New(f *runtime.Invocation, runF func(*Options) error) *cobra.Command {
 	cmd.Flags().StringVar(&opts.MinDate, "min-date", "", "RFC3339 lower bound")
 	cmd.Flags().StringVar(&opts.MaxDate, "max-date", "", "RFC3339 upper bound")
 	cmd.Flags().StringVar(&opts.Order, "order", "desc", "asc|desc")
+	cmd.Flags().IntVar(&opts.OffsetID, "offset-id", 0, "Return messages older than this id (0 = newest)")
+	cmd.Flags().IntVar(&opts.MinID, "min-id", 0, "Stop once a message id <= this is reached (incremental sync)")
 	command.SetMeta(cmd, command.Meta{NeedsAccount: true, NeedsClient: true})
 	output.AddJSONFlags(cmd, &opts.Exporter,
 		[]string{"ref", "id", "date", "from", "text", "media", "reply_to", "views", "is_pinned"})
@@ -62,11 +66,13 @@ func New(f *runtime.Invocation, runF func(*Options) error) *cobra.Command {
 // Run executes the list logic using opts.Fetch for data retrieval.
 func Run(ctx context.Context, opts *Options) error {
 	rows, err := actionmessage.List(ctx, actionmessage.ListRequest{
-		RawRef:  opts.RawRef,
-		Limit:   opts.Limit,
-		MinDate: opts.MinDate,
-		MaxDate: opts.MaxDate,
-		Order:   opts.Order,
+		RawRef:   opts.RawRef,
+		Limit:    opts.Limit,
+		MinDate:  opts.MinDate,
+		MaxDate:  opts.MaxDate,
+		Order:    opts.Order,
+		OffsetID: opts.OffsetID,
+		MinID:    opts.MinID,
 	}, opts.Fetch)
 	if err != nil {
 		return err

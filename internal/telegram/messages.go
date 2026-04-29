@@ -22,7 +22,11 @@ func ListMessages(ctx context.Context, api *tg.Client, resolver *peer.Resolver, 
 	}
 	var rows []output.MessageRow
 	baseRef := output.PreferredRefFromResolved(resolved)
-	iter := query.Messages(api).GetHistory(resolved.InputPeer).BatchSize(100).Iter()
+	hist := query.Messages(api).GetHistory(resolved.InputPeer).BatchSize(100)
+	if q.OffsetID > 0 {
+		hist = hist.OffsetID(q.OffsetID)
+	}
+	iter := hist.Iter()
 	for iter.Next(ctx) {
 		if len(rows) >= q.Limit {
 			break
@@ -31,6 +35,11 @@ func ListMessages(ctx context.Context, api *tg.Client, resolver *peer.Resolver, 
 		m, ok := el.Msg.(*tg.Message)
 		if !ok {
 			continue
+		}
+		// gotd's GetHistory iterator walks newest -> oldest, so once we cross
+		// MinID we can stop early instead of paging further.
+		if q.MinID > 0 && m.ID <= q.MinID {
+			break
 		}
 		t := time.Unix(int64(m.Date), 0)
 		if !q.MinDate.IsZero() && t.Before(q.MinDate) {

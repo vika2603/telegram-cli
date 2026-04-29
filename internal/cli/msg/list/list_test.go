@@ -28,6 +28,8 @@ func TestNew_Flags(t *testing.T) {
 		"--min-date", "2026-01-01T00:00:00Z",
 		"--max-date", "2026-01-02T00:00:00Z",
 		"--order", "asc",
+		"--offset-id", "42",
+		"--min-id", "7",
 	})
 	require.NoError(t, cmd.Execute())
 	require.Equal(t, "@ch", captured.RawRef)
@@ -35,6 +37,8 @@ func TestNew_Flags(t *testing.T) {
 	require.Equal(t, "2026-01-01T00:00:00Z", captured.MinDate)
 	require.Equal(t, "2026-01-02T00:00:00Z", captured.MaxDate)
 	require.Equal(t, "asc", captured.Order)
+	require.Equal(t, 42, captured.OffsetID)
+	require.Equal(t, 7, captured.MinID)
 }
 
 func TestRun_BadDateIsUsage(t *testing.T) {

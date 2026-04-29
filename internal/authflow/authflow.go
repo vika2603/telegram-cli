@@ -211,19 +211,34 @@ func DoLoginWithOptions(ctx context.Context, f *runtime.Invocation, opts LoginOp
 		return err
 	}
 	if opts.QR {
-		return session.LoginQR(ctx, acct, sessionOpts, display)
+		return session.LoginQR(ctx, acct, sessionOpts, authr, display)
 	}
 	return session.Login(ctx, acct, sessionOpts, authr)
 }
 
-// PickAuth chooses the (authenticator, display) pair.
+// PickAuth chooses the (authenticator, display) pair. In QR mode the
+// authenticator is best-effort and is only consulted when Telegram returns
+// SESSION_PASSWORD_NEEDED; a nil authr is acceptable when the account has no
+// 2FA, but the QR flow will fail with a clear error if 2FA is required and no
+// password source is available.
 func PickAuth(ios *ui.IOStreams, qr bool) (account.UserAuthenticator, account.QRDisplay, error) {
 	if ios == nil {
 		ios = ui.System()
 	}
 	if qr {
 		d, err := newQRDisplay(ios)
-		return nil, d, err
+		if err != nil {
+			return nil, nil, err
+		}
+		if os.Getenv("TG_2FA_PASSWORD") != "" {
+			return newEnvAuth(), d, nil
+		}
+		if ios.IsStdinTTY() {
+			// IsStdinTTY guards the only error path inside newTTYAuth.
+			a, _ := newTTYAuth(ios)
+			return a, d, nil
+		}
+		return nil, d, nil
 	}
 	if os.Getenv("TG_PHONE") != "" || os.Getenv("TG_CODE") != "" ||
 		os.Getenv("TG_CODE_CMD") != "" || os.Getenv("TG_2FA_PASSWORD") != "" {

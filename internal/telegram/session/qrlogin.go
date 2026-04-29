@@ -2,10 +2,13 @@ package session
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
+	gotdauth "github.com/gotd/td/telegram/auth"
 	"github.com/gotd/td/telegram/auth/qrlogin"
 	"github.com/gotd/td/tg"
+	"github.com/gotd/td/tgerr"
 
 	"github.com/vika2603/telegram-cli/internal/account"
 )
@@ -15,13 +18,18 @@ import (
 // so we install a tg.UpdateDispatcher on the client before Run and register
 // qrlogin.OnLoginToken against it.
 //
+// When the account has 2FA enabled, AuthImportLoginToken returns
+// SESSION_PASSWORD_NEEDED; in that case authr.Password is used to complete the
+// flow via auth.Client.Password. Pass authr=nil only in contexts where 2FA is
+// known not to apply.
+//
 // Post-auth bookkeeping mirrors Login:
 //   - flip Meta.State to AUTHED
 //   - persist Meta.Phone from Self() in E.164 form
 //
 // display.Done(true) is called only after all post-auth bookkeeping succeeds;
 // any earlier failure fires display.Done(false) so the UI can clean up.
-func LoginQR(ctx context.Context, acct *account.Account, opts Options, display account.QRDisplay) error {
+func LoginQR(ctx context.Context, acct *account.Account, opts Options, authr account.UserAuthenticator, display account.QRDisplay) error {
 	dispatcher := tg.NewUpdateDispatcher()
 	loggedIn := qrlogin.OnLoginToken(&dispatcher)
 
@@ -42,8 +50,26 @@ func LoginQR(ctx context.Context, acct *account.Account, opts Options, display a
 			return display.Refresh(ctx, t.URL())
 		})
 		if err != nil {
-			display.Done(ctx, false)
-			return fmt.Errorf("qr auth: %w", err)
+			if !tgerr.Is(err, "SESSION_PASSWORD_NEEDED") {
+				display.Done(ctx, false)
+				return fmt.Errorf("qr auth: %w", err)
+			}
+			if authr == nil {
+				display.Done(ctx, false)
+				return fmt.Errorf("qr auth: %w: 2FA required but no password source (set TG_2FA_PASSWORD or run from a TTY)", ErrAuth)
+			}
+			pw, perr := authr.Password(ctx)
+			if perr != nil {
+				display.Done(ctx, false)
+				return fmt.Errorf("qr auth: read 2FA password: %w", perr)
+			}
+			if _, perr := b.tgCl.Auth().Password(ctx, pw); perr != nil {
+				display.Done(ctx, false)
+				if errors.Is(perr, gotdauth.ErrPasswordInvalid) {
+					return fmt.Errorf("qr auth: %w", ErrBadPassword)
+				}
+				return fmt.Errorf("qr auth: 2FA: %w", perr)
+			}
 		}
 		self, err := b.tgCl.Self(ctx)
 		if err != nil {

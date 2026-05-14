@@ -43,7 +43,7 @@ func ListMessages(ctx context.Context, api *tg.Client, resolver *peer.Resolver, 
 		}
 		t := time.Unix(int64(m.Date), 0)
 		if !q.MinDate.IsZero() && t.Before(q.MinDate) {
-			continue
+			break
 		}
 		if !q.MaxDate.IsZero() && t.After(q.MaxDate) {
 			continue

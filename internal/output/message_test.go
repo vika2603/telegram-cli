@@ -1,6 +1,7 @@
 package output_test
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 	"unicode/utf8"
@@ -88,4 +89,73 @@ func TestRenderMessages_TTYDoesNotTruncateLongRefs(t *testing.T) {
 	rows := []output.MessageRow{{ID: 77, Ref: ref, Date: "2026-04-23T12:00:00Z", Text: "hello"}}
 	require.NoError(t, output.RenderMessages(ios, rows))
 	require.Contains(t, stdout.String(), ref)
+}
+
+func TestMessageRow_MarshalJSON_EntitiesForwardButtons(t *testing.T) {
+	row := output.MessageRow{
+		ID:   1,
+		Ref:  "@dst:1",
+		Date: "2026-04-23T12:00:00Z",
+		Text: "hi",
+		Entities: []output.MessageEntity{
+			{Type: "text_url", Text: "hi", URL: "https://e.com"},
+		},
+		Buttons: []output.MessageButton{
+			{Row: 0, Text: "Open", URL: "https://e.com", Type: "url"},
+		},
+		Forward: &output.ForwardInfo{
+			Date:          "2026-04-22T00:00:00Z",
+			ChannelPostID: 7,
+			Link:          "https://t.me/src/7",
+			From: &output.PeerObject{
+				Ref:      "@src",
+				Type:     "channel",
+				Title:    "Src",
+				Username: "src",
+				Link:     "https://t.me/src",
+			},
+		},
+	}
+	b, err := json.Marshal(row)
+	require.NoError(t, err)
+
+	var got map[string]any
+	require.NoError(t, json.Unmarshal(b, &got))
+
+	require.Contains(t, got, "entities")
+	require.Contains(t, got, "buttons")
+	require.Contains(t, got, "forward")
+	fwd := got["forward"].(map[string]any)
+	require.Equal(t, "https://t.me/src/7", fwd["link"])
+	require.Equal(t, float64(7), fwd["channel_post_id"])
+	from := fwd["from"].(map[string]any)
+	require.Equal(t, "src", from["username"])
+}
+
+func TestMessageRow_MarshalJSON_OmitsEmptyForwardAndEntities(t *testing.T) {
+	row := output.MessageRow{ID: 1, Date: "2026-04-23T12:00:00Z", Text: "hi"}
+	b, err := json.Marshal(row)
+	require.NoError(t, err)
+
+	var got map[string]any
+	require.NoError(t, json.Unmarshal(b, &got))
+	require.NotContains(t, got, "entities")
+	require.NotContains(t, got, "buttons")
+	require.NotContains(t, got, "forward")
+}
+
+func TestRenderMessages_TTYShowsForwardLabel(t *testing.T) {
+	ios, _, stdout, _ := ui.Test()
+	ios.SetStdoutTTY(true)
+	rows := []output.MessageRow{{
+		ID:   10,
+		Ref:  "@dst:10",
+		Date: "2026-04-23T12:00:00Z",
+		Text: "post",
+		Forward: &output.ForwardInfo{
+			From: &output.PeerObject{Username: "src", Title: "Src"},
+		},
+	}}
+	require.NoError(t, output.RenderMessages(ios, rows))
+	require.Contains(t, stdout.String(), "fwd @src")
 }

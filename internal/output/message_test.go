@@ -127,7 +127,7 @@ func TestMessageRow_MarshalJSON_EntitiesForwardButtons(t *testing.T) {
 	require.Contains(t, got, "forward")
 	fwd := got["forward"].(map[string]any)
 	require.Equal(t, "https://t.me/src/7", fwd["link"])
-	require.Equal(t, float64(7), fwd["channel_post_id"])
+	require.InDelta(t, 7, fwd["channel_post_id"], 0)
 	from := fwd["from"].(map[string]any)
 	require.Equal(t, "src", from["username"])
 }

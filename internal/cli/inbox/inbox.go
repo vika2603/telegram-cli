@@ -3,6 +3,7 @@ package inbox
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/gotd/td/telegram/peers"
 	"github.com/gotd/td/tg"
@@ -90,6 +91,23 @@ func newFetch(f *runtime.Invocation) actionchat.ListFunc {
 		if err != nil {
 			return nil, err
 		}
+		// Daemon fast-path mirrors me.show / msg.list.
+		if cl, _ := runtime.MaybeDialDaemon(ctx, f, acct); cl != nil {
+			defer func() { _ = cl.Close() }()
+			raw, err := cl.Call(ctx, "chat.list", req)
+			if err != nil {
+				return nil, err
+			}
+			var rows []output.ChatRow
+			if err := json.Unmarshal(raw, &rows); err != nil {
+				return nil, err
+			}
+			if store, err := account.OpenRecentStore(acct.Meta.Name); err == nil {
+				recordInboxPeers(store, rows)
+			}
+			return rows, nil
+		}
+
 		var rows []output.ChatRow
 		err = f.WithPeers(ctx, acct, runtime.ClientOptsFrom(f, acct),
 			func(ctx context.Context, api *tg.Client, _ *peers.Manager, res *peer.Resolver) error {

@@ -37,6 +37,9 @@ import (
 )
 
 // Options holds the resolved flags and injected dependencies for Run.
+// NoDaemon is sourced from the global --no-daemon root flag via
+// runtime.Invocation, not from a watch-specific flag, so the same
+// switch governs every daemon-aware command.
 type Options struct {
 	RawRefs   []string
 	Kinds     []string
@@ -57,6 +60,7 @@ func New(f *runtime.Invocation, runF func(*Options) error) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.RawRefs = args
 			opts.IOStreams = f.IOStreams
+			opts.NoDaemon = f.NoDaemon
 			if runF != nil {
 				return runF(opts)
 			}
@@ -66,7 +70,6 @@ func New(f *runtime.Invocation, runF func(*Options) error) *cobra.Command {
 	}
 	cmd.Flags().StringSliceVar(&opts.Kinds, "kind", nil, "Filter event kinds (repeatable / comma-separated): message,edit,delete")
 	cmd.Flags().IntVar(&opts.Limit, "limit", 0, "Exit after N events (0 = stream until cancelled)")
-	cmd.Flags().BoolVar(&opts.NoDaemon, "no-daemon", false, "Force local MTProto connection even if a daemon is reachable")
 	// Watch does NOT set NeedsClient: when a daemon is running the
 	// client never dials MTProto, so the precondition would fail
 	// gratuitously. The streaming path explicitly resolves the account

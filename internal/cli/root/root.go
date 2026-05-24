@@ -60,6 +60,7 @@ func New(f *runtime.Invocation) *cobra.Command {
 	pf.Bool("no-wait", false, "Fail on FLOOD_WAIT")
 	pf.Int("flood-wait-max", 30, "Max seconds to wait on FLOOD_WAIT")
 	pf.Bool("quiet", false, "Suppress stdout")
+	pf.Bool("no-daemon", false, "Force a fresh MTProto session even if a daemon is reachable")
 
 	fixed := func(values ...string) func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
 		return func(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
@@ -144,6 +145,7 @@ func newRootPreRun(f *runtime.Invocation) func(*cobra.Command, []string) error {
 		}
 		f.ConfigPath, _ = cmd.Flags().GetString("config")
 		f.AccountName, _ = cmd.Flags().GetString("account")
+		f.NoDaemon, _ = cmd.Flags().GetBool("no-daemon")
 
 		m := command.MetaFrom(cmd)
 		if m.AccountFromArg {

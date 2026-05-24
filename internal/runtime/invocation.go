@@ -35,6 +35,14 @@ type Invocation struct {
 	ConfigPath  string
 	AccountName string
 
+	// NoDaemon mirrors the --no-daemon root flag. Daemon-aware commands
+	// (msg list, me, inbox, ...) consult this before probing the per-
+	// account socket; when set, they always open a fresh MTProto session
+	// even if a daemon is reachable. Useful for debugging, for running
+	// against a different account than the daemon's, and for tests that
+	// must not race with a background process.
+	NoDaemon bool
+
 	Config  func() (*config.Config, error)
 	Logger  func() (*zap.Logger, func(), error)
 	Account func(name string) (*account.Account, error)

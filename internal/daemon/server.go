@@ -21,6 +21,16 @@ import (
 // subscription by ref.
 type PeerRefResolver func(ctx context.Context, ref string) (int64, error)
 
+// HandlerFunc is the contract for application-level RPC methods that
+// are not connection-state-affecting (ping/subscribe/unsubscribe are
+// built in). The worker registers one per CLI command it wants to
+// route through the socket: me.show, msg.list, chat.resolve, etc.
+//
+// params is the raw JSON the client sent (may be empty). The return
+// value is marshalled into Frame.Result on success or Frame.Error on
+// failure — error messages should be safe to surface to scripts.
+type HandlerFunc func(ctx context.Context, params json.RawMessage) (json.RawMessage, error)
+
 // Server is the Unix-socket front door of the daemon. It accepts
 // client connections, sends a Hello frame, dispatches incoming RPC
 // frames to handlers, and fans out subscribed events back to the
@@ -32,6 +42,12 @@ type Server struct {
 	listen   net.Listener
 	subs     *SubscriptionManager
 	resolver PeerRefResolver
+
+	// handlers is the application-level RPC table. Methods not present
+	// here fall through to the built-in handlers (ping/subscribe/
+	// unsubscribe) and finally to an "unknown_method" error.
+	handlersMu sync.RWMutex
+	handlers   map[string]HandlerFunc
 
 	// conns tracks live connections so Close can shut them down.
 	connMu sync.Mutex
@@ -58,9 +74,28 @@ func NewServer(account, sockPath string, subs *SubscriptionManager, resolver Pee
 		sock:     sockPath,
 		subs:     subs,
 		resolver: resolver,
+		handlers: make(map[string]HandlerFunc),
 		conns:    make(map[net.Conn]struct{}),
 		closed:   make(chan struct{}),
 	}
+}
+
+// Register binds an application-level RPC method to its handler. Call
+// before Serve to avoid the race between Accept and method dispatch.
+// Re-registering a name overwrites the previous handler — useful in
+// tests, intentional in production where a worker reload may want to
+// re-bind closures.
+func (s *Server) Register(method string, h HandlerFunc) {
+	s.handlersMu.Lock()
+	defer s.handlersMu.Unlock()
+	s.handlers[method] = h
+}
+
+func (s *Server) handler(method string) (HandlerFunc, bool) {
+	s.handlersMu.RLock()
+	defer s.handlersMu.RUnlock()
+	h, ok := s.handlers[method]
+	return h, ok
 }
 
 // Listen binds the Unix socket. Separate from Serve so the caller can
@@ -251,6 +286,19 @@ func (s *Server) dispatch(
 		_ = writeFrame(Frame{ID: req.ID, Result: rawJSON("true")})
 
 	default:
+		if h, ok := s.handler(req.Method); ok {
+			// Run the handler off the dispatch goroutine so a slow
+			// method does not block the per-connection request stream.
+			go func(req Frame, h HandlerFunc) {
+				result, err := h(ctx, req.Params)
+				if err != nil {
+					_ = writeFrame(errorFrame(req.ID, "method_failed", 1, err.Error()))
+					return
+				}
+				_ = writeFrame(Frame{ID: req.ID, Result: result})
+			}(*req, h)
+			return
+		}
 		_ = writeFrame(errorFrame(req.ID, "unknown_method", 64,
 			fmt.Sprintf("unknown method %q", req.Method)))
 	}

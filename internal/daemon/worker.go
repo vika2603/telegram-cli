@@ -15,19 +15,30 @@ import (
 
 	"github.com/vika2603/telegram-cli/internal/account"
 	"github.com/vika2603/telegram-cli/internal/ref"
-	"github.com/vika2603/telegram-cli/internal/runtime"
 	"github.com/vika2603/telegram-cli/internal/telegram"
 	"github.com/vika2603/telegram-cli/internal/telegram/peer"
-	"github.com/vika2603/telegram-cli/internal/ui"
+	"github.com/vika2603/telegram-cli/internal/telegram/session"
 )
+
+// WithPeersFunc is the narrow surface this worker needs from
+// runtime.Invocation. Declared locally so the daemon package does
+// not have to import internal/runtime — that direction is reserved
+// for internal/runtime importing daemon (for MaybeDial). Anyone with
+// a runtime.Invocation can pass inv.WithPeers directly.
+type WithPeersFunc func(
+	ctx context.Context,
+	acct *account.Account,
+	opts session.Options,
+	fn func(ctx context.Context, api *tg.Client, pm *peers.Manager, res *peer.Resolver) error,
+) error
 
 // WorkerOptions plumbs the live runtime into Run. The worker holds the
 // account flock via WithPeers's underlying session.Run, so a second
 // invocation while the daemon is running fails with account.ErrBusy.
 type WorkerOptions struct {
-	Inv       *runtime.Invocation
-	Account   *account.Account
-	IOStreams *ui.IOStreams
+	Account    *account.Account
+	WithPeers  WithPeersFunc
+	ClientOpts session.Options
 }
 
 // Run is the entry point for the background worker that gets exec'd by
@@ -50,8 +61,8 @@ type WorkerOptions struct {
 // stubbed out — only the peer.Resolver built by WithPeers can do real
 // resolution via gotd's peers.Manager.
 func Run(ctx context.Context, opts WorkerOptions) error {
-	if opts.Inv == nil || opts.Account == nil {
-		return errors.New("daemon worker requires Inv and Account")
+	if opts.Account == nil || opts.WithPeers == nil {
+		return errors.New("daemon worker requires Account and WithPeers")
 	}
 
 	// Honor SIGTERM/SIGINT so launchctl bootout / systemctl stop close
@@ -72,10 +83,6 @@ func Run(ctx context.Context, opts WorkerOptions) error {
 	if err := EnsureDir(DaemonDir(opts.Account.Meta.Name)); err != nil {
 		return fmt.Errorf("ensure daemon dir: %w", err)
 	}
-	// Rotate any previous log eagerly so a long-lived service does not
-	// grow unbounded. The actual writes go through stdout/stderr that
-	// the service definition redirects; rotation here trims the file
-	// at startup.
 	_ = RotateIfLarger(LogFile(opts.Account.Meta.Name), DefaultLogMaxSize)
 
 	sink, err := openUpdatesSink(UpdatesFile(opts.Account.Meta.Name))
@@ -84,9 +91,6 @@ func Run(ctx context.Context, opts WorkerOptions) error {
 	}
 	defer func() { _ = sink.Close() }()
 
-	// Subscription manager: gotd dispatcher pushes once, this fans out
-	// to (a) the on-disk updates.ndjson sink and (b) every connected
-	// socket subscriber.
 	subs := NewSubscriptionManager(128)
 	defer subs.Close()
 
@@ -94,11 +98,11 @@ func Run(ctx context.Context, opts WorkerOptions) error {
 	disp := tg.NewUpdateDispatcher()
 	telegram.RegisterWatchHandlers(disp, telegram.WatchFilter{}, nil, events)
 
-	clientOpts := runtime.ClientOptsFrom(opts.Inv, opts.Account)
+	clientOpts := opts.ClientOpts
 	clientOpts.UpdateHandler = disp
 
-	return opts.Inv.WithPeers(ctx, opts.Account, clientOpts,
-		func(ctx context.Context, _ *tg.Client, _ *peers.Manager, res *peer.Resolver) error {
+	return opts.WithPeers(ctx, opts.Account, clientOpts,
+		func(ctx context.Context, api *tg.Client, _ *peers.Manager, res *peer.Resolver) error {
 			// Wrap the peer.Resolver into the simpler signature the
 			// socket server speaks: raw ref string → normalized peer ID.
 			resolver := func(ctx context.Context, raw string) (int64, error) {
@@ -115,6 +119,7 @@ func Run(ctx context.Context, opts WorkerOptions) error {
 
 			srv := NewServer(opts.Account.Meta.Name,
 				SocketPath(opts.Account.Meta.Name), subs, resolver)
+			registerHandlers(srv, opts.Account, api, res)
 			if err := srv.Listen(); err != nil {
 				return fmt.Errorf("ipc server listen: %w", err)
 			}

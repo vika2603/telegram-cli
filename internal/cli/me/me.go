@@ -4,6 +4,7 @@ package me
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/gotd/td/telegram/peers"
@@ -69,6 +70,22 @@ func newFetch(f *runtime.Invocation) func(context.Context) (output.UserRow, erro
 		if err != nil {
 			return output.UserRow{}, err
 		}
+		// Daemon fast-path: if a per-account socket is reachable and
+		// the user has not opted out, run me.show over IPC and skip
+		// the dial/auth/resume round trip entirely.
+		if cl, _ := runtime.MaybeDialDaemon(ctx, f, acct); cl != nil {
+			defer func() { _ = cl.Close() }()
+			raw, err := cl.Call(ctx, "me.show", nil)
+			if err != nil {
+				return output.UserRow{}, err
+			}
+			var row output.UserRow
+			if err := json.Unmarshal(raw, &row); err != nil {
+				return output.UserRow{}, err
+			}
+			return row, nil
+		}
+
 		var row output.UserRow
 		err = f.WithPeers(ctx, acct, runtime.ClientOptsFrom(f, acct),
 			func(ctx context.Context, api *tg.Client, _ *peers.Manager, _ *peer.Resolver) error {

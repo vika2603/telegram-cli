@@ -45,7 +45,10 @@ func New(f *runtime.Invocation, runF func(*Options) error) *cobra.Command {
 	return cmd
 }
 
-// Run dispatches to daemon.Run for the resolved account.
+// Run dispatches to daemon.Run for the resolved account. The daemon
+// package itself takes plain function/value dependencies (not the
+// whole Invocation) so it does not need to import internal/runtime;
+// the bridge happens here.
 func Run(ctx context.Context, opts *Options) error {
 	if opts.Inv == nil || opts.Inv.Account == nil {
 		return fmt.Errorf("%w: daemon run requires runtime account accessor",
@@ -56,8 +59,8 @@ func Run(ctx context.Context, opts *Options) error {
 		return err
 	}
 	return daemon.Run(ctx, daemon.WorkerOptions{
-		Inv:       opts.Inv,
-		Account:   acct,
-		IOStreams: opts.IOStreams,
+		Account:    acct,
+		WithPeers:  opts.Inv.WithPeers,
+		ClientOpts: runtime.ClientOptsFrom(opts.Inv, acct),
 	})
 }

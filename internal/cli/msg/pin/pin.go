@@ -79,10 +79,16 @@ func Run(ctx context.Context, opts *Options) error {
 }
 
 // newDo returns the production Do closure that calls the Telegram API.
+// Used by both "tg msg pin" and "tg msg unpin" (q.Unpin discriminates).
 func newDo(f *runtime.Invocation) actionmessage.PinFunc {
 	return func(ctx context.Context, q actionmessage.PinQuery) error {
 		acct, err := f.Account("")
 		if err != nil {
+			return err
+		}
+		if cl, _ := runtime.MaybeDialDaemon(ctx, f, acct); cl != nil {
+			defer func() { _ = cl.Close() }()
+			_, err := cl.Call(ctx, "msg.pin", q)
 			return err
 		}
 		return f.WithPeers(ctx, acct, runtime.ClientOptsFrom(f, acct),

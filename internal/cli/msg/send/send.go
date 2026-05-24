@@ -3,6 +3,7 @@ package send
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"strconv"
@@ -114,12 +115,34 @@ func Run(ctx context.Context, opts *Options) error {
 }
 
 // newSend returns the production Send closure that calls the Telegram API.
+//
+// Daemon fast-path applies only when the payload is pure text — file
+// attachments and stdin require byte streams the IPC socket does not
+// carry yet, so those fall through to the local WithPeers path.
 func newSend(f *runtime.Invocation) actionmessage.SendFunc {
 	return func(ctx context.Context, q actionmessage.SendQuery) ([]output.SendResultRow, error) {
 		acct, err := f.Account("")
 		if err != nil {
 			return nil, err
 		}
+		if canDaemonSend(q) {
+			if cl, _ := runtime.MaybeDialDaemon(ctx, f, acct); cl != nil {
+				defer func() { _ = cl.Close() }()
+				raw, err := cl.Call(ctx, "msg.send", q)
+				if err != nil {
+					return nil, err
+				}
+				var rows []output.SendResultRow
+				if err := json.Unmarshal(raw, &rows); err != nil {
+					return nil, err
+				}
+				if store, err := account.OpenRecentStore(acct.Meta.Name); err == nil {
+					recordSentMessages(store, q.Ref.String(), q.Text, rows)
+				}
+				return rows, nil
+			}
+		}
+
 		var rows []output.SendResultRow
 		err = f.WithPeers(ctx, acct, runtime.ClientOptsFrom(f, acct),
 			func(ctx context.Context, api *tg.Client, _ *peers.Manager, res *peer.Resolver) error {
@@ -131,6 +154,15 @@ func newSend(f *runtime.Invocation) actionmessage.SendFunc {
 			})
 		return rows, err
 	}
+}
+
+// canDaemonSend reports whether a SendQuery is daemon-routable.
+// Attachments and stdin uploads require bytes the daemon cannot read
+// from the client's filesystem, so we fall back to local mode for
+// those. Schedule + Silent + Parse + ReplyTo are pure metadata and
+// stay supported.
+func canDaemonSend(q actionmessage.SendQuery) bool {
+	return len(q.Attachments) == 0 && q.Stdin == nil
 }
 
 func recordSentMessages(store *account.PeerStore, peerRef, text string, rows []output.SendResultRow) {

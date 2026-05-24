@@ -3,6 +3,7 @@ package reply
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"strconv"
@@ -99,6 +100,27 @@ func newSend(f *runtime.Invocation) actionmessage.SendFunc {
 		if err != nil {
 			return nil, err
 		}
+		// Daemon fast-path is text-only; attachments / stdin uploads
+		// fall through to local mode because the daemon cannot read
+		// the client's filesystem (see internal/cli/msg/send).
+		if len(q.Attachments) == 0 && q.Stdin == nil {
+			if cl, _ := runtime.MaybeDialDaemon(ctx, f, acct); cl != nil {
+				defer func() { _ = cl.Close() }()
+				raw, err := cl.Call(ctx, "msg.send", q)
+				if err != nil {
+					return nil, err
+				}
+				var rows []output.SendResultRow
+				if err := json.Unmarshal(raw, &rows); err != nil {
+					return nil, err
+				}
+				if store, err := account.OpenRecentStore(acct.Meta.Name); err == nil {
+					recordSentMessages(store, q.Ref.String(), q.Text, rows)
+				}
+				return rows, nil
+			}
+		}
+
 		var rows []output.SendResultRow
 		err = f.WithPeers(ctx, acct, runtime.ClientOptsFrom(f, acct),
 			func(ctx context.Context, api *tg.Client, _ *peers.Manager, res *peer.Resolver) error {

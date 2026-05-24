@@ -3,6 +3,7 @@ package edit
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/gotd/td/telegram/peers"
 	"github.com/gotd/td/tg"
@@ -80,6 +81,19 @@ func newEdit(f *runtime.Invocation) actionmessage.EditFunc {
 		if err != nil {
 			return output.SendResultRow{}, err
 		}
+		if cl, _ := runtime.MaybeDialDaemon(ctx, f, acct); cl != nil {
+			defer func() { _ = cl.Close() }()
+			raw, err := cl.Call(ctx, "msg.edit", q)
+			if err != nil {
+				return output.SendResultRow{}, err
+			}
+			var row output.SendResultRow
+			if err := json.Unmarshal(raw, &row); err != nil {
+				return output.SendResultRow{}, err
+			}
+			return row, nil
+		}
+
 		var row output.SendResultRow
 		err = f.WithPeers(ctx, acct, runtime.ClientOptsFrom(f, acct),
 			func(ctx context.Context, api *tg.Client, _ *peers.Manager, res *peer.Resolver) error {

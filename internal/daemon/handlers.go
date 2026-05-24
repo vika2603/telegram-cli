@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 
 	"github.com/gotd/td/tg"
 
@@ -90,5 +91,92 @@ func registerHandlers(
 			return nil, err
 		}
 		return json.Marshal(rows)
+	})
+
+	// Write handlers (Phase 5). Each accepts the post-validation Query
+	// shape produced by actionmessage.Normalize*. The CLI side gates
+	// on payload shape (no attachments / no stdin) before routing here
+	// — those need byte streams the client owns, which the socket
+	// protocol does not carry yet.
+
+	// msg.send: text-only sends. SendQuery.Stdin is reset to nil on
+	// the wire (io.Reader is not encodable); the CLI guarantees Stdin
+	// is unused on the daemon path.
+	srv.Register("msg.send", func(ctx context.Context, params json.RawMessage) (json.RawMessage, error) {
+		var q actionmessage.SendQuery
+		if err := json.Unmarshal(params, &q); err != nil { //nolint:musttag
+
+			return nil, fmt.Errorf("invalid msg.send params: %w", err)
+		}
+		q.Stdin = nil // never trust client-supplied io.Reader, even if it
+		// somehow round-trips; the gate is upstream too.
+		rows, err := telegram.SendMessage(ctx, api, res, q, io.Discard)
+		if err != nil {
+			return nil, err
+		}
+		return json.Marshal(rows)
+	})
+
+	srv.Register("msg.edit", func(ctx context.Context, params json.RawMessage) (json.RawMessage, error) {
+		var q actionmessage.EditQuery
+		if err := json.Unmarshal(params, &q); err != nil { //nolint:musttag
+
+			return nil, fmt.Errorf("invalid msg.edit params: %w", err)
+		}
+		row, err := telegram.EditMessage(ctx, api, res, q, io.Discard)
+		if err != nil {
+			return nil, err
+		}
+		return json.Marshal(row)
+	})
+
+	srv.Register("msg.forward", func(ctx context.Context, params json.RawMessage) (json.RawMessage, error) {
+		var q actionmessage.ForwardQuery
+		if err := json.Unmarshal(params, &q); err != nil { //nolint:musttag
+
+			return nil, fmt.Errorf("invalid msg.forward params: %w", err)
+		}
+		row, err := telegram.ForwardMessages(ctx, api, res, q)
+		if err != nil {
+			return nil, err
+		}
+		return json.Marshal(row)
+	})
+
+	srv.Register("msg.delete", func(ctx context.Context, params json.RawMessage) (json.RawMessage, error) {
+		var q actionmessage.DeleteQuery
+		if err := json.Unmarshal(params, &q); err != nil { //nolint:musttag
+
+			return nil, fmt.Errorf("invalid msg.delete params: %w", err)
+		}
+		if err := telegram.DeleteMessages(ctx, api, res, q); err != nil {
+			return nil, err
+		}
+		return json.RawMessage("true"), nil
+	})
+
+	srv.Register("msg.pin", func(ctx context.Context, params json.RawMessage) (json.RawMessage, error) {
+		var q actionmessage.PinQuery
+		if err := json.Unmarshal(params, &q); err != nil { //nolint:musttag
+
+			return nil, fmt.Errorf("invalid msg.pin params: %w", err)
+		}
+		if err := telegram.PinMessage(ctx, api, res, q); err != nil {
+			return nil, err
+		}
+		return json.RawMessage("true"), nil
+	})
+
+	srv.Register("msg.react", func(ctx context.Context, params json.RawMessage) (json.RawMessage, error) {
+		var q actionmessage.ReactQuery
+		if err := json.Unmarshal(params, &q); err != nil { //nolint:musttag
+
+			return nil, fmt.Errorf("invalid msg.react params: %w", err)
+		}
+		row, err := telegram.ReactMessage(ctx, api, res, q)
+		if err != nil {
+			return nil, err
+		}
+		return json.Marshal(row)
 	})
 }

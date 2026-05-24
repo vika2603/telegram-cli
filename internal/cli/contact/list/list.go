@@ -3,6 +3,7 @@ package list
 
 import (
 	"context"
+	"encoding/json"
 	"strconv"
 	"strings"
 
@@ -83,6 +84,22 @@ func newFetch(f *runtime.Invocation) actioncontact.ListFunc {
 		if err != nil {
 			return nil, err
 		}
+		if cl, _ := runtime.MaybeDialDaemon(ctx, f, acct); cl != nil {
+			defer func() { _ = cl.Close() }()
+			raw, err := cl.Call(ctx, "contact.list", q)
+			if err != nil {
+				return nil, err
+			}
+			var rows []output.ContactRow
+			if err := json.Unmarshal(raw, &rows); err != nil {
+				return nil, err
+			}
+			if store, err := account.OpenRecentStore(acct.Meta.Name); err == nil {
+				recordContactPeers(store, rows)
+			}
+			return rows, nil
+		}
+
 		var rows []output.ContactRow
 		err = f.WithPeers(ctx, acct, runtime.ClientOptsFrom(f, acct),
 			func(ctx context.Context, api *tg.Client, pm *peers.Manager, res *peer.Resolver) error {

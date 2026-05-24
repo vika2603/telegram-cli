@@ -6,17 +6,21 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/gotd/td/telegram/peers"
 	"github.com/gotd/td/tg"
 
 	"github.com/vika2603/telegram-cli/internal/account"
 	actionchat "github.com/vika2603/telegram-cli/internal/action/chat"
+	actioncontact "github.com/vika2603/telegram-cli/internal/action/contact"
 	actionmessage "github.com/vika2603/telegram-cli/internal/action/message"
+	actionprofile "github.com/vika2603/telegram-cli/internal/action/profile"
+	actionsearch "github.com/vika2603/telegram-cli/internal/action/search"
 	"github.com/vika2603/telegram-cli/internal/telegram"
 	"github.com/vika2603/telegram-cli/internal/telegram/peer"
 )
 
 // registerHandlers binds the daemon's application-level RPC table to
-// the live session. The closures capture api / res / acct so each
+// the live session. The closures capture api / pm / res / acct so each
 // handler can serve requests off the daemon's existing MTProto
 // connection rather than dialing again.
 //
@@ -25,10 +29,17 @@ import (
 // closure on the CLI side. Failures translate to "method_failed"
 // frames; richer exit-code propagation can follow once we wire
 // status.Code over the wire.
+//
+// Action structs use struct-field names directly on the wire (no
+// json tags). The musttag linter flags this; touching the action
+// layer just for daemon serialization is worse than the per-call
+// directives below. If the socket is ever exposed to untrusted
+// clients, add explicit tags and drop them.
 func registerHandlers(
 	srv *Server,
 	acct *account.Account,
 	api *tg.Client,
+	pm *peers.Manager,
 	res *peer.Resolver,
 ) {
 	_ = acct // reserved for future handlers (recent peer store)
@@ -41,17 +52,9 @@ func registerHandlers(
 		return json.Marshal(row)
 	})
 
-	// chat.resolve takes the post-validation ShowQuery for the same
-	// reason msg.list does — the client has already normalized the ref.
-	// Action structs use struct-field names directly on the wire (no
-	// json tags). The musttag linter flags this, but touching the
-	// action layer just for daemon serialization is worse than the
-	// inline directives below. If we ever expose the socket to
-	// untrusted clients, add explicit tags and drop them.
 	srv.Register("chat.resolve", func(ctx context.Context, params json.RawMessage) (json.RawMessage, error) {
 		var q actionchat.ShowQuery
 		if err := json.Unmarshal(params, &q); err != nil { //nolint:musttag
-
 			return nil, fmt.Errorf("invalid chat.resolve params: %w", err)
 		}
 		row, err := telegram.ShowChat(ctx, res, q)
@@ -65,7 +68,6 @@ func registerHandlers(
 		var p actionchat.ListRequest
 		if len(params) > 0 {
 			if err := json.Unmarshal(params, &p); err != nil { //nolint:musttag
-
 				return nil, fmt.Errorf("invalid chat.list params: %w", err)
 			}
 		}
@@ -76,14 +78,9 @@ func registerHandlers(
 		return json.Marshal(rows)
 	})
 
-	// msg.list takes the post-validation Query (not ListRequest) so the
-	// CLI side has already enforced limit caps and date parsing — the
-	// daemon trusts its clients on this. If we ever expose the socket
-	// to untrusted clients we should re-normalize here.
 	srv.Register("msg.list", func(ctx context.Context, params json.RawMessage) (json.RawMessage, error) {
 		var q actionmessage.ListQuery
 		if err := json.Unmarshal(params, &q); err != nil { //nolint:musttag
-
 			return nil, fmt.Errorf("invalid msg.list params: %w", err)
 		}
 		rows, err := telegram.ListMessages(ctx, api, res, q)
@@ -93,23 +90,16 @@ func registerHandlers(
 		return json.Marshal(rows)
 	})
 
-	// Write handlers (Phase 5). Each accepts the post-validation Query
-	// shape produced by actionmessage.Normalize*. The CLI side gates
-	// on payload shape (no attachments / no stdin) before routing here
-	// — those need byte streams the client owns, which the socket
-	// protocol does not carry yet.
+	// ── Phase 5: writes (text-only payloads). File uploads remain on
+	// the local path because the socket protocol does not carry bytes
+	// the client owns.
 
-	// msg.send: text-only sends. SendQuery.Stdin is reset to nil on
-	// the wire (io.Reader is not encodable); the CLI guarantees Stdin
-	// is unused on the daemon path.
 	srv.Register("msg.send", func(ctx context.Context, params json.RawMessage) (json.RawMessage, error) {
 		var q actionmessage.SendQuery
 		if err := json.Unmarshal(params, &q); err != nil { //nolint:musttag
-
 			return nil, fmt.Errorf("invalid msg.send params: %w", err)
 		}
-		q.Stdin = nil // never trust client-supplied io.Reader, even if it
-		// somehow round-trips; the gate is upstream too.
+		q.Stdin = nil // never trust an io.Reader from the wire
 		rows, err := telegram.SendMessage(ctx, api, res, q, io.Discard)
 		if err != nil {
 			return nil, err
@@ -120,7 +110,6 @@ func registerHandlers(
 	srv.Register("msg.edit", func(ctx context.Context, params json.RawMessage) (json.RawMessage, error) {
 		var q actionmessage.EditQuery
 		if err := json.Unmarshal(params, &q); err != nil { //nolint:musttag
-
 			return nil, fmt.Errorf("invalid msg.edit params: %w", err)
 		}
 		row, err := telegram.EditMessage(ctx, api, res, q, io.Discard)
@@ -133,7 +122,6 @@ func registerHandlers(
 	srv.Register("msg.forward", func(ctx context.Context, params json.RawMessage) (json.RawMessage, error) {
 		var q actionmessage.ForwardQuery
 		if err := json.Unmarshal(params, &q); err != nil { //nolint:musttag
-
 			return nil, fmt.Errorf("invalid msg.forward params: %w", err)
 		}
 		row, err := telegram.ForwardMessages(ctx, api, res, q)
@@ -146,7 +134,6 @@ func registerHandlers(
 	srv.Register("msg.delete", func(ctx context.Context, params json.RawMessage) (json.RawMessage, error) {
 		var q actionmessage.DeleteQuery
 		if err := json.Unmarshal(params, &q); err != nil { //nolint:musttag
-
 			return nil, fmt.Errorf("invalid msg.delete params: %w", err)
 		}
 		if err := telegram.DeleteMessages(ctx, api, res, q); err != nil {
@@ -158,7 +145,6 @@ func registerHandlers(
 	srv.Register("msg.pin", func(ctx context.Context, params json.RawMessage) (json.RawMessage, error) {
 		var q actionmessage.PinQuery
 		if err := json.Unmarshal(params, &q); err != nil { //nolint:musttag
-
 			return nil, fmt.Errorf("invalid msg.pin params: %w", err)
 		}
 		if err := telegram.PinMessage(ctx, api, res, q); err != nil {
@@ -170,7 +156,6 @@ func registerHandlers(
 	srv.Register("msg.react", func(ctx context.Context, params json.RawMessage) (json.RawMessage, error) {
 		var q actionmessage.ReactQuery
 		if err := json.Unmarshal(params, &q); err != nil { //nolint:musttag
-
 			return nil, fmt.Errorf("invalid msg.react params: %w", err)
 		}
 		row, err := telegram.ReactMessage(ctx, api, res, q)
@@ -178,5 +163,149 @@ func registerHandlers(
 			return nil, err
 		}
 		return json.Marshal(row)
+	})
+
+	// ── Phase 6: search / contact / profile.
+
+	srv.Register("search.msg", func(ctx context.Context, params json.RawMessage) (json.RawMessage, error) {
+		var q actionsearch.MessageQuery
+		if err := json.Unmarshal(params, &q); err != nil { //nolint:musttag
+			return nil, fmt.Errorf("invalid search.msg params: %w", err)
+		}
+		rows, err := telegram.SearchMessages(ctx, api, res, q)
+		if err != nil {
+			return nil, err
+		}
+		return json.Marshal(rows)
+	})
+
+	srv.Register("search.chat", func(ctx context.Context, params json.RawMessage) (json.RawMessage, error) {
+		var q actionsearch.ChatQuery
+		if err := json.Unmarshal(params, &q); err != nil { //nolint:musttag
+			return nil, fmt.Errorf("invalid search.chat params: %w", err)
+		}
+		rows, err := telegram.SearchChats(ctx, api, q)
+		if err != nil {
+			return nil, err
+		}
+		return json.Marshal(rows)
+	})
+
+	srv.Register("contact.list", func(ctx context.Context, params json.RawMessage) (json.RawMessage, error) {
+		var q actioncontact.ListQuery
+		if len(params) > 0 {
+			if err := json.Unmarshal(params, &q); err != nil { //nolint:musttag
+				return nil, fmt.Errorf("invalid contact.list params: %w", err)
+			}
+		}
+		rows, err := telegram.ListContacts(ctx, api, pm, q)
+		if err != nil {
+			return nil, err
+		}
+		return json.Marshal(rows)
+	})
+
+	srv.Register("contact.add", func(ctx context.Context, params json.RawMessage) (json.RawMessage, error) {
+		var q actioncontact.AddQuery
+		if err := json.Unmarshal(params, &q); err != nil { //nolint:musttag
+			return nil, fmt.Errorf("invalid contact.add params: %w", err)
+		}
+		row, err := telegram.AddContact(ctx, api, pm, q)
+		if err != nil {
+			return nil, err
+		}
+		return json.Marshal(row)
+	})
+
+	srv.Register("contact.delete", func(ctx context.Context, params json.RawMessage) (json.RawMessage, error) {
+		var q actioncontact.PeerQuery
+		if err := json.Unmarshal(params, &q); err != nil { //nolint:musttag
+			return nil, fmt.Errorf("invalid contact.delete params: %w", err)
+		}
+		if err := telegram.DeleteContact(ctx, api, res, q); err != nil {
+			return nil, err
+		}
+		return json.RawMessage("true"), nil
+	})
+
+	srv.Register("contact.block", func(ctx context.Context, params json.RawMessage) (json.RawMessage, error) {
+		var q actioncontact.PeerQuery
+		if err := json.Unmarshal(params, &q); err != nil { //nolint:musttag
+			return nil, fmt.Errorf("invalid contact.block params: %w", err)
+		}
+		if err := telegram.BlockContact(ctx, api, res, q); err != nil {
+			return nil, err
+		}
+		return json.RawMessage("true"), nil
+	})
+
+	srv.Register("contact.unblock", func(ctx context.Context, params json.RawMessage) (json.RawMessage, error) {
+		var q actioncontact.PeerQuery
+		if err := json.Unmarshal(params, &q); err != nil { //nolint:musttag
+			return nil, fmt.Errorf("invalid contact.unblock params: %w", err)
+		}
+		if err := telegram.UnblockContact(ctx, api, res, q); err != nil {
+			return nil, err
+		}
+		return json.RawMessage("true"), nil
+	})
+
+	srv.Register("profile.set_name", func(ctx context.Context, params json.RawMessage) (json.RawMessage, error) {
+		var q actionprofile.SetNameRequest
+		if err := json.Unmarshal(params, &q); err != nil { //nolint:musttag
+			return nil, fmt.Errorf("invalid profile.set_name params: %w", err)
+		}
+		row, err := telegram.UpdateProfileName(ctx, api, q)
+		if err != nil {
+			return nil, err
+		}
+		return json.Marshal(row)
+	})
+
+	srv.Register("profile.set_bio", func(ctx context.Context, params json.RawMessage) (json.RawMessage, error) {
+		var q actionprofile.SetBioRequest
+		if err := json.Unmarshal(params, &q); err != nil { //nolint:musttag
+			return nil, fmt.Errorf("invalid profile.set_bio params: %w", err)
+		}
+		row, err := telegram.UpdateProfileBio(ctx, api, q.Bio)
+		if err != nil {
+			return nil, err
+		}
+		return json.Marshal(row)
+	})
+
+	srv.Register("profile.set_username", func(ctx context.Context, params json.RawMessage) (json.RawMessage, error) {
+		var q struct {
+			Username string `json:"username"`
+		}
+		if err := json.Unmarshal(params, &q); err != nil {
+			return nil, fmt.Errorf("invalid profile.set_username params: %w", err)
+		}
+		row, err := telegram.UpdateProfileUsername(ctx, api, q.Username)
+		if err != nil {
+			return nil, err
+		}
+		return json.Marshal(row)
+	})
+
+	srv.Register("profile.set_status", func(ctx context.Context, params json.RawMessage) (json.RawMessage, error) {
+		var q struct {
+			Offline bool `json:"offline"`
+		}
+		if err := json.Unmarshal(params, &q); err != nil {
+			return nil, fmt.Errorf("invalid profile.set_status params: %w", err)
+		}
+		row, err := telegram.UpdateProfileStatus(ctx, api, q.Offline)
+		if err != nil {
+			return nil, err
+		}
+		return json.Marshal(row)
+	})
+
+	srv.Register("profile.delete_photo", func(ctx context.Context, _ json.RawMessage) (json.RawMessage, error) {
+		if err := telegram.DeleteProfilePhoto(ctx, api); err != nil {
+			return nil, err
+		}
+		return json.RawMessage("true"), nil
 	})
 }

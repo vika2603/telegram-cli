@@ -102,7 +102,7 @@ func Run(ctx context.Context, opts WorkerOptions) error {
 	clientOpts.UpdateHandler = disp
 
 	return opts.WithPeers(ctx, opts.Account, clientOpts,
-		func(ctx context.Context, api *tg.Client, _ *peers.Manager, res *peer.Resolver) error {
+		func(ctx context.Context, api *tg.Client, pm *peers.Manager, res *peer.Resolver) error {
 			// Wrap the peer.Resolver into the simpler signature the
 			// socket server speaks: raw ref string → normalized peer ID.
 			resolver := func(ctx context.Context, raw string) (int64, error) {
@@ -119,7 +119,7 @@ func Run(ctx context.Context, opts WorkerOptions) error {
 
 			srv := NewServer(opts.Account.Meta.Name,
 				SocketPath(opts.Account.Meta.Name), subs, resolver)
-			registerHandlers(srv, opts.Account, api, res)
+			registerHandlers(srv, opts.Account, api, pm, res)
 			if err := srv.Listen(); err != nil {
 				return fmt.Errorf("ipc server listen: %w", err)
 			}

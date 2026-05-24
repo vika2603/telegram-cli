@@ -69,6 +69,11 @@ func newDelete(f *runtime.Invocation) func(context.Context) error {
 		if err != nil {
 			return err
 		}
+		if cl, _ := runtime.MaybeDialDaemon(ctx, f, acct); cl != nil {
+			defer func() { _ = cl.Close() }()
+			_, err := cl.Call(ctx, "profile.delete_photo", nil)
+			return err
+		}
 		return f.WithPeers(ctx, acct, runtime.ClientOptsFrom(f, acct),
 			func(ctx context.Context, api *tg.Client, _ *peers.Manager, _ *peer.Resolver) error {
 				return telegram.DeleteProfilePhoto(ctx, api)

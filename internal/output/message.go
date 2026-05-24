@@ -13,33 +13,65 @@ import (
 // MessageRow is the output of `msg list`. Text is the message text when
 // present; for media-only messages, Text is the caption (may be empty).
 type MessageRow struct {
-	ID           int    `json:"id"`
-	Ref          string `json:"ref,omitempty"`
-	Date         string `json:"date"` // RFC3339
-	FromID       int64  `json:"from_id,omitempty"`
-	FromRef      string `json:"from_ref,omitempty"`
-	FromKind     string `json:"from_kind,omitempty"`
-	FromTitle    string `json:"from_title,omitempty"`
-	FromUsername string `json:"from_username,omitempty"`
-	ReplyToID    int    `json:"reply_to_id,omitempty"`
-	Text         string `json:"text,omitempty"`
-	HasMedia     bool   `json:"has_media,omitempty"`
-	MediaKind    string `json:"media_kind,omitempty"` // "photo" | "video" | "document" | "voice" | "audio" | "sticker" | "poll" | "web_page" | "other"
-	Views        int    `json:"views,omitempty"`
-	IsPinned     bool   `json:"is_pinned,omitempty"`
+	ID           int             `json:"id"`
+	Ref          string          `json:"ref,omitempty"`
+	Date         string          `json:"date"` // RFC3339
+	FromID       int64           `json:"from_id,omitempty"`
+	FromRef      string          `json:"from_ref,omitempty"`
+	FromKind     string          `json:"from_kind,omitempty"`
+	FromTitle    string          `json:"from_title,omitempty"`
+	FromUsername string          `json:"from_username,omitempty"`
+	ReplyToID    int             `json:"reply_to_id,omitempty"`
+	Text         string          `json:"text,omitempty"`
+	Entities     []MessageEntity `json:"entities,omitempty"`
+	Buttons      []MessageButton `json:"buttons,omitempty"`
+	Forward      *ForwardInfo    `json:"forward,omitempty"`
+	HasMedia     bool            `json:"has_media,omitempty"`
+	MediaKind    string          `json:"media_kind,omitempty"` // "photo" | "video" | "document" | "voice" | "audio" | "sticker" | "poll" | "web_page" | "other"
+	Views        int             `json:"views,omitempty"`
+	IsPinned     bool            `json:"is_pinned,omitempty"`
+}
+
+// MessageEntity is a flattened representation of a Telegram message entity.
+type MessageEntity struct {
+	Type string `json:"type"`
+	Text string `json:"text,omitempty"`
+	URL  string `json:"url,omitempty"`
+}
+
+// MessageButton is a flattened representation of an inline-keyboard button.
+// Only buttons we know how to render to a URL are exposed.
+type MessageButton struct {
+	Row  int    `json:"row"`
+	Text string `json:"text,omitempty"`
+	URL  string `json:"url,omitempty"`
+	Type string `json:"type,omitempty"` // "url" | "switch_inline" | "callback" | "web_app" | ...
+}
+
+// ForwardInfo describes the origin of a forwarded message.
+type ForwardInfo struct {
+	From          *PeerObject `json:"from,omitempty"`
+	FromName      string      `json:"from_name,omitempty"`
+	Date          string      `json:"date,omitempty"` // RFC3339, original send time
+	ChannelPostID int         `json:"channel_post_id,omitempty"`
+	PostAuthor    string      `json:"post_author,omitempty"`
+	Link          string      `json:"link,omitempty"` // deep-link to original post when known
 }
 
 func (r MessageRow) MarshalJSON() ([]byte, error) {
 	type messageRowJSON struct {
-		Ref      string       `json:"ref,omitempty"`
-		ID       int          `json:"id,omitempty"`
-		Date     string       `json:"date,omitempty"`
-		From     *PeerObject  `json:"from,omitempty"`
-		Text     string       `json:"text,omitempty"`
-		Media    *MediaObject `json:"media,omitempty"`
-		ReplyTo  int          `json:"reply_to,omitempty"`
-		Views    int          `json:"views,omitempty"`
-		IsPinned bool         `json:"is_pinned,omitempty"`
+		Ref      string          `json:"ref,omitempty"`
+		ID       int             `json:"id,omitempty"`
+		Date     string          `json:"date,omitempty"`
+		From     *PeerObject     `json:"from,omitempty"`
+		Text     string          `json:"text,omitempty"`
+		Entities []MessageEntity `json:"entities,omitempty"`
+		Buttons  []MessageButton `json:"buttons,omitempty"`
+		Forward  *ForwardInfo    `json:"forward,omitempty"`
+		Media    *MediaObject    `json:"media,omitempty"`
+		ReplyTo  int             `json:"reply_to,omitempty"`
+		Views    int             `json:"views,omitempty"`
+		IsPinned bool            `json:"is_pinned,omitempty"`
 	}
 	var from *PeerObject
 	if r.FromID != 0 || r.FromRef != "" || r.FromTitle != "" || r.FromUsername != "" || r.FromKind != "" {
@@ -56,6 +88,9 @@ func (r MessageRow) MarshalJSON() ([]byte, error) {
 		Date:     r.Date,
 		From:     from,
 		Text:     r.Text,
+		Entities: r.Entities,
+		Buttons:  r.Buttons,
+		Forward:  r.Forward,
 		Media:    media,
 		ReplyTo:  r.ReplyToID,
 		Views:    r.Views,
@@ -199,6 +234,13 @@ func messageHeader(r MessageRow) string {
 	if r.ReplyToID > 0 {
 		parts = append(parts, "reply "+strconv.Itoa(r.ReplyToID))
 	}
+	if r.Forward != nil {
+		if label := forwardLabel(r.Forward); label != "" {
+			parts = append(parts, "fwd "+label)
+		} else {
+			parts = append(parts, "fwd")
+		}
+	}
 	if r.Views > 0 {
 		parts = append(parts, strconv.Itoa(r.Views)+" views")
 	}
@@ -206,6 +248,24 @@ func messageHeader(r MessageRow) string {
 		parts = append(parts, "pinned")
 	}
 	return strings.Join(parts, " · ")
+}
+
+func forwardLabel(f *ForwardInfo) string {
+	if f == nil {
+		return ""
+	}
+	if f.From != nil {
+		if f.From.Username != "" {
+			return "@" + f.From.Username
+		}
+		if f.From.Title != "" {
+			return f.From.Title
+		}
+		if f.From.Ref != "" {
+			return f.From.Ref
+		}
+	}
+	return f.FromName
 }
 
 func shortMessageDate(s string) string {

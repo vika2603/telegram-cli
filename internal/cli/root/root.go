@@ -27,6 +27,7 @@ import (
 	replycmd "github.com/vika2603/telegram-cli/internal/cli/reply"
 	searchcmd "github.com/vika2603/telegram-cli/internal/cli/search"
 	sessioncmd "github.com/vika2603/telegram-cli/internal/cli/session"
+	watchcmd "github.com/vika2603/telegram-cli/internal/cli/watch"
 	"github.com/vika2603/telegram-cli/internal/command"
 	"github.com/vika2603/telegram-cli/internal/runtime"
 	"github.com/vika2603/telegram-cli/internal/telegram/session"
@@ -120,7 +121,10 @@ func frequentCommands(f *runtime.Invocation) []*cobra.Command {
 	resolve.Short = "Resolve a user, chat, or channel"
 	resolve.GroupID = "frequent"
 
-	return []*cobra.Command{login, logout, send, reply, inbox, read, digest, resolve}
+	watch := watchcmd.New(f, nil)
+	watch.GroupID = "frequent"
+
+	return []*cobra.Command{login, logout, send, reply, inbox, read, digest, resolve, watch}
 }
 
 // newRootPreRun builds the PersistentPreRunE closure that consumes Meta

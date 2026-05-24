@@ -15,9 +15,11 @@ type built struct {
 func (b *built) close() {}
 
 // buildTelegramClient constructs a telegram.Client. The returned client is not
-// yet running; the caller invokes tgCl.Run.
+// yet running; the caller invokes tgCl.Run. The UpdateHandler from opts is
+// installed at construction time so updates start dispatching as soon as Run
+// reaches the callback.
 func buildTelegramClient(acct *account.Account, opts Options) (*built, error) {
-	return buildTelegramClientWithHandler(acct, opts, nil)
+	return buildTelegramClientWithHandler(acct, opts, opts.UpdateHandler)
 }
 
 // buildTelegramClientWithHandler installs handler into telegram.Options.UpdateHandler

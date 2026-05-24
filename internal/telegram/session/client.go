@@ -6,6 +6,7 @@ package session
 import (
 	"context"
 
+	"github.com/gotd/td/telegram"
 	"github.com/gotd/td/tg"
 	"go.uber.org/zap"
 
@@ -30,6 +31,12 @@ type Options struct {
 	Device      DeviceOptions
 	FloodMode   FloodMode // fail | wait
 	FloodMaxSec int       // cap for wait mode; 0 = unlimited
+	// UpdateHandler, when non-nil, receives MTProto updates pushed by the
+	// server while the Run callback is active. Pass a *tg.UpdateDispatcher
+	// (which satisfies telegram.UpdateHandler) configured with the desired
+	// On... handlers. Leaving this nil keeps the original short-lived RPC
+	// behavior — updates are simply dropped.
+	UpdateHandler telegram.UpdateHandler
 }
 
 // DeviceOptions controls the identity Telegram shows for this authorization

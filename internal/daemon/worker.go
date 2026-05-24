@@ -10,19 +10,20 @@ import (
 	"sync"
 	"syscall"
 
+	"github.com/gotd/td/telegram/peers"
 	"github.com/gotd/td/tg"
 
 	"github.com/vika2603/telegram-cli/internal/account"
+	"github.com/vika2603/telegram-cli/internal/ref"
 	"github.com/vika2603/telegram-cli/internal/runtime"
 	"github.com/vika2603/telegram-cli/internal/telegram"
-	"github.com/vika2603/telegram-cli/internal/telegram/session"
+	"github.com/vika2603/telegram-cli/internal/telegram/peer"
 	"github.com/vika2603/telegram-cli/internal/ui"
 )
 
 // WorkerOptions plumbs the live runtime into Run. The worker holds the
-// account flock via session.Run's existing acquisition path (acct.Lock
-// happens inside f.WithClient), so a second invocation while the
-// daemon is running fails with account.ErrBusy.
+// account flock via WithPeers's underlying session.Run, so a second
+// invocation while the daemon is running fails with account.ErrBusy.
 type WorkerOptions struct {
 	Inv       *runtime.Invocation
 	Account   *account.Account
@@ -33,14 +34,21 @@ type WorkerOptions struct {
 // the OS service manager (launchctl/systemctl/etc.) via the hidden
 // "tg daemon run" subcommand. It:
 //
-//  1. acquires the account flock (transitively via WithClient)
+//  1. acquires the account flock (transitively via WithPeers)
 //  2. opens a long-lived MTProto connection with an UpdateDispatcher
 //  3. appends every update to UpdatesFile(account) as ndjson
-//  4. waits for SIGTERM/SIGINT to exit cleanly
+//  4. opens a Unix socket and fans live events to connected clients
+//  5. waits for SIGTERM/SIGINT to exit cleanly
 //
 // Errors during the MTProto session are returned so the service
 // manager's restart policy (KeepAlive on launchd, Restart=on-failure
 // on systemd) takes over.
+//
+// Why WithPeers and not WithClient: clients connecting over the IPC
+// socket may pass raw peer refs ("@chan", "me", ...) that the daemon
+// must resolve on their behalf. session.directClient.ResolvePeer is
+// stubbed out — only the peer.Resolver built by WithPeers can do real
+// resolution via gotd's peers.Manager.
 func Run(ctx context.Context, opts WorkerOptions) error {
 	if opts.Inv == nil || opts.Account == nil {
 		return errors.New("daemon worker requires Inv and Account")
@@ -76,6 +84,12 @@ func Run(ctx context.Context, opts WorkerOptions) error {
 	}
 	defer func() { _ = sink.Close() }()
 
+	// Subscription manager: gotd dispatcher pushes once, this fans out
+	// to (a) the on-disk updates.ndjson sink and (b) every connected
+	// socket subscriber.
+	subs := NewSubscriptionManager(128)
+	defer subs.Close()
+
 	events := make(chan telegram.WatchEvent, 128)
 	disp := tg.NewUpdateDispatcher()
 	telegram.RegisterWatchHandlers(disp, telegram.WatchFilter{}, nil, events)
@@ -83,18 +97,56 @@ func Run(ctx context.Context, opts WorkerOptions) error {
 	clientOpts := runtime.ClientOptsFrom(opts.Inv, opts.Account)
 	clientOpts.UpdateHandler = disp
 
-	return opts.Inv.WithClient(ctx, opts.Account, clientOpts,
-		func(ctx context.Context, _ session.Client) error {
-			fmt.Fprintf(os.Stderr, "tg daemon: connected for account %q, streaming to %s\n",
-				opts.Account.Meta.Name, UpdatesFile(opts.Account.Meta.Name))
-			return drainToSink(ctx, events, sink)
+	return opts.Inv.WithPeers(ctx, opts.Account, clientOpts,
+		func(ctx context.Context, _ *tg.Client, _ *peers.Manager, res *peer.Resolver) error {
+			// Wrap the peer.Resolver into the simpler signature the
+			// socket server speaks: raw ref string → normalized peer ID.
+			resolver := func(ctx context.Context, raw string) (int64, error) {
+				r, perr := ref.ParseRef(raw)
+				if perr != nil {
+					return 0, perr
+				}
+				resolved, rerr := res.Resolve(ctx, r)
+				if rerr != nil {
+					return 0, rerr
+				}
+				return telegram.NormalizeInputPeerID(resolved.InputPeer), nil
+			}
+
+			srv := NewServer(opts.Account.Meta.Name,
+				SocketPath(opts.Account.Meta.Name), subs, resolver)
+			if err := srv.Listen(); err != nil {
+				return fmt.Errorf("ipc server listen: %w", err)
+			}
+			defer func() { _ = srv.Close() }()
+
+			fmt.Fprintf(os.Stderr,
+				"tg daemon: connected for account %q\n  updates: %s\n  socket:  %s\n",
+				opts.Account.Meta.Name,
+				UpdatesFile(opts.Account.Meta.Name),
+				SocketPath(opts.Account.Meta.Name))
+
+			serverErr := make(chan error, 1)
+			go func() { serverErr <- srv.Serve(ctx) }()
+
+			pumpErr := pumpEvents(ctx, events, sink, subs)
+
+			_ = srv.Close()
+			<-serverErr
+			return pumpErr
 		})
 }
 
-// drainToSink pumps watch events into sink until ctx is done. The sink
-// is its own writer rather than the worker's stdout so the service log
-// (stderr / stdout) stays distinct from the structured event stream.
-func drainToSink(ctx context.Context, events <-chan telegram.WatchEvent, sink *updatesSink) error {
+// pumpEvents is the single consumer of the dispatcher channel. Every
+// event is written to the on-disk sink (so the daemon still works as
+// a tailable file even with no clients connected) and published to
+// the subscription manager (so live clients receive it).
+func pumpEvents(
+	ctx context.Context,
+	events <-chan telegram.WatchEvent,
+	sink *updatesSink,
+	subs *SubscriptionManager,
+) error {
 	enc := json.NewEncoder(sink)
 	for {
 		select {
@@ -104,13 +156,14 @@ func drainToSink(ctx context.Context, events <-chan telegram.WatchEvent, sink *u
 			if err := enc.Encode(ev); err != nil {
 				return fmt.Errorf("write update: %w", err)
 			}
+			subs.Publish(ev)
 		}
 	}
 }
 
 // updatesSink is a mutex-guarded append writer. The mutex is forward
-// compatible with Phase 3, where the daemon will fan an event to the
-// file and to N socket subscribers under the same lock.
+// compatible with the socket fanout — both writers can race for the
+// same file handle when a subscriber appears between Write calls.
 type updatesSink struct {
 	mu sync.Mutex
 	f  *os.File

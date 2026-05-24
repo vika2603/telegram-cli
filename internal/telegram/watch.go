@@ -157,3 +157,20 @@ func normalizePeerID(p tg.PeerClass) int64 {
 	}
 	return peerID(p)
 }
+
+// NormalizeInputPeerID maps an InputPeerClass to the same ID encoding
+// that MessageRow.FromID and WatchFilter.PeerIDs use. Callers building
+// peer-scoped filters from resolved refs need this to stay in sync
+// with messageToRow's peerID() — exported so other internal packages
+// (daemon, cli/watch) can build filters without duplicating logic.
+func NormalizeInputPeerID(p tg.InputPeerClass) int64 {
+	switch v := p.(type) {
+	case *tg.InputPeerUser:
+		return v.UserID
+	case *tg.InputPeerChat:
+		return -v.ChatID
+	case *tg.InputPeerChannel:
+		return -1_000_000_000_000 - v.ChannelID
+	}
+	return 0
+}

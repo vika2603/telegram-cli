@@ -3,25 +3,32 @@
 // Watch is the first CLI surface that holds a long-lived MTProto
 // connection. Where every other command does dial → RPC → exit, watch
 // runs telegram.Client.Run for the lifetime of the process and bridges
-// the server-pushed UpdateDispatcher into stdout as ndjson. The
-// foreground mode is the baseline before any daemon work — once the
-// daemon arrives, this command will detect its socket and become a
-// subscription client instead, with the foreground path kept as a
-// fallback for unconfigured environments.
+// the server-pushed UpdateDispatcher into stdout as ndjson.
+//
+// When a daemon is running for the active account, watch detects its
+// socket and routes through the IPC subscription path instead of
+// dialing MTProto itself. This avoids spinning a second MTProto
+// session per `tg watch` invocation when the daemon already holds
+// one — multiple sessions per account are legal but wasteful and
+// share rate-limit budget. The local path is the fallback when no
+// daemon is reachable or when --no-daemon is set.
 package watch
 
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/gotd/td/telegram/peers"
 	"github.com/gotd/td/tg"
 	"github.com/spf13/cobra"
 
+	"github.com/vika2603/telegram-cli/internal/account"
 	actionwatch "github.com/vika2603/telegram-cli/internal/action/watch"
 	"github.com/vika2603/telegram-cli/internal/cli/complete"
 	"github.com/vika2603/telegram-cli/internal/command"
+	"github.com/vika2603/telegram-cli/internal/daemon"
 	"github.com/vika2603/telegram-cli/internal/runtime"
 	"github.com/vika2603/telegram-cli/internal/telegram"
 	"github.com/vika2603/telegram-cli/internal/telegram/peer"
@@ -34,6 +41,7 @@ type Options struct {
 	RawRefs   []string
 	Kinds     []string
 	Limit     int
+	NoDaemon  bool
 	IOStreams *ui.IOStreams
 	Stream    actionwatch.StreamFunc
 }
@@ -52,13 +60,18 @@ func New(f *runtime.Invocation, runF func(*Options) error) *cobra.Command {
 			if runF != nil {
 				return runF(opts)
 			}
-			opts.Stream = newStream(f, opts.IOStreams)
+			opts.Stream = newStream(f, opts)
 			return Run(cmd.Context(), opts)
 		},
 	}
 	cmd.Flags().StringSliceVar(&opts.Kinds, "kind", nil, "Filter event kinds (repeatable / comma-separated): message,edit,delete")
 	cmd.Flags().IntVar(&opts.Limit, "limit", 0, "Exit after N events (0 = stream until cancelled)")
-	command.SetMeta(cmd, command.Meta{NeedsAccount: true, NeedsClient: true})
+	cmd.Flags().BoolVar(&opts.NoDaemon, "no-daemon", false, "Force local MTProto connection even if a daemon is reachable")
+	// Watch does NOT set NeedsClient: when a daemon is running the
+	// client never dials MTProto, so the precondition would fail
+	// gratuitously. The streaming path explicitly resolves the account
+	// and chooses local vs. daemon mode.
+	command.SetMeta(cmd, command.Meta{NeedsAccount: true})
 	return cmd
 }
 
@@ -71,57 +84,119 @@ func Run(ctx context.Context, opts *Options) error {
 	}, opts.Stream)
 }
 
-// newStream wires the production streaming path: open a long-lived
-// MTProto session, register the UpdateDispatcher, write events to
-// ios.Out as ndjson until ctx is cancelled or limit is reached.
-func newStream(f *runtime.Invocation, ios *ui.IOStreams) actionwatch.StreamFunc {
+// newStream picks daemon mode or local mode at run time. Daemon mode
+// is preferred whenever the socket is reachable for the active
+// account, because the daemon owns the flock and a local dial would
+// fail anyway. --no-daemon forces the local path.
+func newStream(f *runtime.Invocation, opts *Options) actionwatch.StreamFunc {
 	return func(ctx context.Context, q actionwatch.Query) error {
 		acct, err := f.Account("")
 		if err != nil {
 			return err
 		}
+		if !opts.NoDaemon && daemon.DaemonReachable(acct.Meta.Name) {
+			return streamViaDaemon(ctx, acct.Meta.Name, opts.IOStreams, q)
+		}
+		return streamLocal(ctx, f, acct, opts.IOStreams, q)
+	}
+}
 
-		// Pre-resolve refs to a peer-ID filter so the dispatcher can
-		// drop unrelated traffic before we serialize anything.
-		filter := telegram.WatchFilter{}
-		if len(q.Refs) > 0 {
-			filter.PeerIDs = make(map[int64]struct{}, len(q.Refs))
-			err = f.WithPeers(ctx, acct, runtime.ClientOptsFrom(f, acct),
-				func(ctx context.Context, _ *tg.Client, _ *peers.Manager, res *peer.Resolver) error {
-					for _, r := range q.Refs {
-						resolved, err := res.Resolve(ctx, r)
-						if err != nil {
-							return err
-						}
-						filter.PeerIDs[normalizedID(resolved.InputPeer)] = struct{}{}
-					}
-					return nil
-				})
-			if err != nil {
+// streamViaDaemon connects to the per-account daemon socket and
+// subscribes for the requested kinds + refs. The daemon resolves refs
+// server-side using its live session, so the client never touches
+// MTProto.
+func streamViaDaemon(
+	ctx context.Context,
+	accountName string,
+	ios *ui.IOStreams,
+	q actionwatch.Query,
+) error {
+	cl, err := daemon.Dial(ctx, accountName)
+	if err != nil {
+		return fmt.Errorf("connect to daemon: %w", err)
+	}
+	defer func() { _ = cl.Close() }()
+
+	params := daemon.SubscribeParams{Kinds: q.Kinds}
+	for _, r := range q.Refs {
+		params.Refs = append(params.Refs, r.String())
+	}
+	subID, err := cl.SubscribeRaw(ctx, params)
+	if err != nil {
+		return fmt.Errorf("subscribe: %w", err)
+	}
+
+	emitted := 0
+	for {
+		select {
+		case <-ctx.Done():
+			if errors.Is(ctx.Err(), context.Canceled) {
+				return nil
+			}
+			return ctx.Err()
+		case frame, ok := <-cl.Events:
+			if !ok {
+				return errors.New("daemon closed the connection")
+			}
+			if frame.Sub != subID || frame.Event != "update" {
+				continue
+			}
+			if _, err := ios.Out.Write(append([]byte(frame.Data), '\n')); err != nil {
 				return err
 			}
-		}
-		if len(q.Kinds) > 0 {
-			filter.Kinds = make(map[telegram.WatchEventKind]struct{}, len(q.Kinds))
-			for _, k := range q.Kinds {
-				filter.Kinds[telegram.WatchEventKind(k)] = struct{}{}
+			emitted++
+			if q.Limit > 0 && emitted >= q.Limit {
+				return nil
 			}
 		}
-
-		// Buffered to give the dispatcher headroom; if the consumer
-		// stalls long enough to fill the buffer, gotd's handler will
-		// block, which is the correct back-pressure signal.
-		events := make(chan telegram.WatchEvent, 64)
-		disp := tg.NewUpdateDispatcher()
-		telegram.RegisterWatchHandlers(disp, filter, nil, events)
-
-		opts := runtime.ClientOptsFrom(f, acct)
-		opts.UpdateHandler = disp
-
-		return f.WithClient(ctx, acct, opts, func(ctx context.Context, _ session.Client) error {
-			return streamLoop(ctx, ios, events, q.Limit)
-		})
 	}
+}
+
+// streamLocal is the original Phase-1 path: open a local MTProto
+// session, register the dispatcher, write events to ios.Out. Used
+// when no daemon is reachable (or when --no-daemon forces this path).
+func streamLocal(
+	ctx context.Context,
+	f *runtime.Invocation,
+	acct *account.Account,
+	ios *ui.IOStreams,
+	q actionwatch.Query,
+) error {
+	filter := telegram.WatchFilter{}
+	if len(q.Refs) > 0 {
+		filter.PeerIDs = make(map[int64]struct{}, len(q.Refs))
+		err := f.WithPeers(ctx, acct, runtime.ClientOptsFrom(f, acct),
+			func(ctx context.Context, _ *tg.Client, _ *peers.Manager, res *peer.Resolver) error {
+				for _, r := range q.Refs {
+					resolved, err := res.Resolve(ctx, r)
+					if err != nil {
+						return err
+					}
+					filter.PeerIDs[telegram.NormalizeInputPeerID(resolved.InputPeer)] = struct{}{}
+				}
+				return nil
+			})
+		if err != nil {
+			return err
+		}
+	}
+	if len(q.Kinds) > 0 {
+		filter.Kinds = make(map[telegram.WatchEventKind]struct{}, len(q.Kinds))
+		for _, k := range q.Kinds {
+			filter.Kinds[telegram.WatchEventKind(k)] = struct{}{}
+		}
+	}
+
+	events := make(chan telegram.WatchEvent, 64)
+	disp := tg.NewUpdateDispatcher()
+	telegram.RegisterWatchHandlers(disp, filter, nil, events)
+
+	opts := runtime.ClientOptsFrom(f, acct)
+	opts.UpdateHandler = disp
+
+	return f.WithClient(ctx, acct, opts, func(ctx context.Context, _ session.Client) error {
+		return streamLoop(ctx, ios, events, q.Limit)
+	})
 }
 
 func streamLoop(ctx context.Context, ios *ui.IOStreams, events <-chan telegram.WatchEvent, limit int) error {
@@ -130,11 +205,10 @@ func streamLoop(ctx context.Context, ios *ui.IOStreams, events <-chan telegram.W
 	for {
 		select {
 		case <-ctx.Done():
-			err := ctx.Err()
-			if err == context.Canceled {
+			if errors.Is(ctx.Err(), context.Canceled) {
 				return nil
 			}
-			return err
+			return ctx.Err()
 		case ev := <-events:
 			if err := enc.Encode(ev); err != nil {
 				return fmt.Errorf("encode watch event: %w", err)
@@ -145,23 +219,4 @@ func streamLoop(ctx context.Context, ios *ui.IOStreams, events <-chan telegram.W
 			}
 		}
 	}
-}
-
-// normalizedID converts an InputPeer back to the same key scheme
-// peerID() in telegram/messages.go produces, so dispatcher filtering
-// matches MessageRow.FromID. Unrecognized variants return 0, which
-// silently fails the filter — that is the correct behavior for refs
-// we never resolved.
-func normalizedID(p tg.InputPeerClass) int64 {
-	switch v := p.(type) {
-	case *tg.InputPeerUser:
-		return v.UserID
-	case *tg.InputPeerChat:
-		return -v.ChatID
-	case *tg.InputPeerChannel:
-		return -1_000_000_000_000 - v.ChannelID
-	case *tg.InputPeerSelf:
-		return 0 // self only matches when filter is empty
-	}
-	return 0
 }

@@ -134,7 +134,7 @@ func Run(ctx context.Context, opts WorkerOptions) error {
 			serverErr := make(chan error, 1)
 			go func() { serverErr <- srv.Serve(ctx) }()
 
-			pumpErr := pumpEvents(ctx, events, sink, subs)
+			pumpErr := pumpEvents(ctx, events, sink, subs, srv.Metrics())
 
 			_ = srv.Close()
 			<-serverErr
@@ -144,13 +144,15 @@ func Run(ctx context.Context, opts WorkerOptions) error {
 
 // pumpEvents is the single consumer of the dispatcher channel. Every
 // event is written to the on-disk sink (so the daemon still works as
-// a tailable file even with no clients connected) and published to
-// the subscription manager (so live clients receive it).
+// a tailable file even with no clients connected), published to the
+// subscription manager (so live clients receive it), and counted in
+// the daemon's metrics for the `tg daemon stats` RPC.
 func pumpEvents(
 	ctx context.Context,
 	events <-chan telegram.WatchEvent,
 	sink *updatesSink,
 	subs *SubscriptionManager,
+	metrics *Metrics,
 ) error {
 	enc := json.NewEncoder(sink)
 	for {
@@ -162,6 +164,7 @@ func pumpEvents(
 				return fmt.Errorf("write update: %w", err)
 			}
 			subs.Publish(ev)
+			metrics.IncUpdates()
 		}
 	}
 }

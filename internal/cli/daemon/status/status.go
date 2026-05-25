@@ -42,26 +42,28 @@ func New(f *runtime.Invocation, runF func(*Options) error) *cobra.Command {
 	}
 	command.SetMeta(cmd, command.Meta{NeedsAccount: true, SkipAuthCheck: true})
 	output.AddJSONFlags(cmd, &opts.Exporter,
-		[]string{"account", "installed", "running", "pid", "platform", "log_file", "updates_file", "socket_path", "installed_at"})
+		[]string{"account", "installed", "running", "pid", "platform", "log_file", "updates_file", "socket_path", "installed_at", "stats"})
 	return cmd
 }
 
 // statusRow is the JSON shape emitted by "tg daemon status --json".
-// Mirrors daemon.Status fields plus the on-disk meta sidecar.
+// Mirrors daemon.Status fields plus the on-disk meta sidecar, with
+// live metrics merged in when the per-account socket is reachable.
 type statusRow struct {
-	Account     string `json:"account"`
-	Installed   bool   `json:"installed"`
-	Running     bool   `json:"running"`
-	PID         int    `json:"pid,omitempty"`
-	Platform    string `json:"platform"`
-	LogFile     string `json:"log_file,omitempty"`
-	UpdatesFile string `json:"updates_file,omitempty"`
-	SocketPath  string `json:"socket_path,omitempty"`
-	InstalledAt string `json:"installed_at,omitempty"`
+	Account     string                  `json:"account"`
+	Installed   bool                    `json:"installed"`
+	Running     bool                    `json:"running"`
+	PID         int                     `json:"pid,omitempty"`
+	Platform    string                  `json:"platform"`
+	LogFile     string                  `json:"log_file,omitempty"`
+	UpdatesFile string                  `json:"updates_file,omitempty"`
+	SocketPath  string                  `json:"socket_path,omitempty"`
+	InstalledAt string                  `json:"installed_at,omitempty"`
+	Stats       *daemon.MetricsSnapshot `json:"stats,omitempty"`
 }
 
 // Run prints status to stderr (human) or stdout (json).
-func Run(_ context.Context, opts *Options) error {
+func Run(ctx context.Context, opts *Options) error {
 	if opts.Account == "" {
 		return fmt.Errorf("%w: status requires an account", command.ErrUsage)
 	}
@@ -89,6 +91,19 @@ func Run(_ context.Context, opts *Options) error {
 	if meta, err := daemon.LoadMeta(opts.Account); err == nil && meta != nil {
 		row.LogFile = meta.LogFile
 		row.InstalledAt = meta.InstalledAt
+	}
+
+	// Pull live metrics over the socket when the daemon is up. Failure
+	// here is non-fatal — the OS-level status still renders. Common
+	// causes: daemon is bootstrapped but the socket is not yet open
+	// (race against worker startup) or schema mismatch.
+	if daemon.DaemonReachable(opts.Account) {
+		if cl, err := daemon.Dial(ctx, opts.Account); err == nil {
+			if snap, err := cl.Stats(ctx); err == nil {
+				row.Stats = &snap
+			}
+			_ = cl.Close()
+		}
 	}
 
 	if opts.Exporter != nil {

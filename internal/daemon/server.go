@@ -10,6 +10,7 @@ import (
 	"net"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/vika2603/telegram-cli/internal/telegram"
 )
@@ -42,10 +43,12 @@ type Server struct {
 	listen   net.Listener
 	subs     *SubscriptionManager
 	resolver PeerRefResolver
+	metrics  *Metrics
 
 	// handlers is the application-level RPC table. Methods not present
 	// here fall through to the built-in handlers (ping/subscribe/
-	// unsubscribe) and finally to an "unknown_method" error.
+	// unsubscribe / daemon.stats) and finally to an "unknown_method"
+	// error.
 	handlersMu sync.RWMutex
 	handlers   map[string]HandlerFunc
 
@@ -74,11 +77,17 @@ func NewServer(account, sockPath string, subs *SubscriptionManager, resolver Pee
 		sock:     sockPath,
 		subs:     subs,
 		resolver: resolver,
+		metrics:  NewMetrics(),
 		handlers: make(map[string]HandlerFunc),
 		conns:    make(map[net.Conn]struct{}),
 		closed:   make(chan struct{}),
 	}
 }
+
+// Metrics returns the server's live metrics object. The same value is
+// returned across calls, so tests and external watchers can attach
+// before the server starts serving.
+func (s *Server) Metrics() *Metrics { return s.metrics }
 
 // Register binds an application-level RPC method to its handler. Call
 // before Serve to avoid the race between Accept and method dispatch.
@@ -252,6 +261,20 @@ func (s *Server) dispatch(
 	case "ping":
 		_ = writeFrame(Frame{ID: req.ID, Result: rawJSON(`"pong"`)})
 
+	case "daemon.stats":
+		// Built-in introspection RPC. Kept here (not in the registry)
+		// so it is always available even before registerHandlers runs
+		// — useful for status checks that may race against worker
+		// bootup.
+		snap := s.metrics.Snapshot()
+		snap.Subscriptions = int64(s.subs.Len())
+		body, mErr := json.Marshal(snap)
+		if mErr != nil {
+			_ = writeFrame(errorFrame(req.ID, "internal", 1, mErr.Error()))
+			return
+		}
+		_ = writeFrame(Frame{ID: req.ID, Result: body})
+
 	case "subscribe":
 		var params SubscribeParams
 		if len(req.Params) > 0 {
@@ -290,7 +313,9 @@ func (s *Server) dispatch(
 			// Run the handler off the dispatch goroutine so a slow
 			// method does not block the per-connection request stream.
 			go func(req Frame, h HandlerFunc) {
+				start := time.Now()
 				result, err := h(ctx, req.Params)
+				s.metrics.RecordRPC(req.Method, time.Since(start), err)
 				if err != nil {
 					_ = writeFrame(errorFrame(req.ID, "method_failed", 1, err.Error()))
 					return

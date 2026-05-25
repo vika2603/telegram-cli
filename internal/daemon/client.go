@@ -113,6 +113,22 @@ func AttachClient(conn net.Conn) (*Client, error) {
 // Hello returns the welcome payload received at connect time.
 func (c *Client) Hello() HelloPayload { return c.hello }
 
+// Stats fetches the daemon's live MetricsSnapshot via the built-in
+// daemon.stats RPC. Used by tg daemon status to surface real-time
+// observability alongside the host service manager's installed/
+// running state.
+func (c *Client) Stats(ctx context.Context) (MetricsSnapshot, error) {
+	raw, err := c.Call(ctx, "daemon.stats", nil)
+	if err != nil {
+		return MetricsSnapshot{}, err
+	}
+	var out MetricsSnapshot
+	if err := json.Unmarshal(raw, &out); err != nil {
+		return MetricsSnapshot{}, err
+	}
+	return out, nil
+}
+
 // Call sends a single RPC and waits for the matching response. params
 // may be nil. Returns the raw Result; the caller unmarshals into the
 // method-specific shape.

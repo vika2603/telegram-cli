@@ -3,6 +3,7 @@ package join
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/gotd/td/telegram/peers"
 	"github.com/gotd/td/tg"
@@ -65,6 +66,19 @@ func newDo(f *runtime.Invocation) actionchat.MembershipFunc {
 		if err != nil {
 			return output.ChatMembershipRow{}, err
 		}
+		if cl, _ := runtime.MaybeDialDaemon(ctx, f, acct); cl != nil {
+			defer func() { _ = cl.Close() }()
+			raw, err := cl.Call(ctx, "chat.join", q)
+			if err != nil {
+				return output.ChatMembershipRow{}, err
+			}
+			var row output.ChatMembershipRow
+			if err := json.Unmarshal(raw, &row); err != nil {
+				return output.ChatMembershipRow{}, err
+			}
+			return row, nil
+		}
+
 		var row output.ChatMembershipRow
 		err = f.WithPeers(ctx, acct, runtime.ClientOptsFrom(f, acct),
 			func(ctx context.Context, api *tg.Client, _ *peers.Manager, res *peer.Resolver) error {

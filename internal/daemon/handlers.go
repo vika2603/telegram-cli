@@ -308,4 +308,114 @@ func registerHandlers(
 		}
 		return json.RawMessage("true"), nil
 	})
+
+	// ── Phase 8: remaining chat + message commands.
+
+	srv.Register("chat.join", func(ctx context.Context, params json.RawMessage) (json.RawMessage, error) {
+		var q actionchat.MembershipQuery
+		if err := json.Unmarshal(params, &q); err != nil { //nolint:musttag
+			return nil, fmt.Errorf("invalid chat.join params: %w", err)
+		}
+		row, err := telegram.JoinChat(ctx, api, res, q)
+		if err != nil {
+			return nil, err
+		}
+		return json.Marshal(row)
+	})
+
+	srv.Register("chat.leave", func(ctx context.Context, params json.RawMessage) (json.RawMessage, error) {
+		var q actionchat.MembershipQuery
+		if err := json.Unmarshal(params, &q); err != nil { //nolint:musttag
+			return nil, fmt.Errorf("invalid chat.leave params: %w", err)
+		}
+		row, err := telegram.LeaveChat(ctx, api, res, q)
+		if err != nil {
+			return nil, err
+		}
+		return json.Marshal(row)
+	})
+
+	srv.Register("chat.mark_read", func(ctx context.Context, params json.RawMessage) (json.RawMessage, error) {
+		var q actionchat.ReadQuery
+		if err := json.Unmarshal(params, &q); err != nil { //nolint:musttag
+			return nil, fmt.Errorf("invalid chat.mark_read params: %w", err)
+		}
+		if err := telegram.ReadChat(ctx, api, res, q); err != nil {
+			return nil, err
+		}
+		return json.RawMessage("true"), nil
+	})
+
+	srv.Register("chat.mute", func(ctx context.Context, params json.RawMessage) (json.RawMessage, error) {
+		var q actionchat.MuteQuery
+		if err := json.Unmarshal(params, &q); err != nil { //nolint:musttag
+			return nil, fmt.Errorf("invalid chat.mute params: %w", err)
+		}
+		row, err := telegram.MuteChat(ctx, api, res, q)
+		if err != nil {
+			return nil, err
+		}
+		return json.Marshal(row)
+	})
+
+	srv.Register("chat.unmute", func(ctx context.Context, params json.RawMessage) (json.RawMessage, error) {
+		var q actionchat.UnmuteQuery
+		if err := json.Unmarshal(params, &q); err != nil { //nolint:musttag
+			return nil, fmt.Errorf("invalid chat.unmute params: %w", err)
+		}
+		row, err := telegram.UnmuteChat(ctx, api, res, q)
+		if err != nil {
+			return nil, err
+		}
+		return json.Marshal(row)
+	})
+
+	// chat.folder covers both archive and unarchive — FolderQuery.Archived
+	// discriminates direction.
+	srv.Register("chat.folder", func(ctx context.Context, params json.RawMessage) (json.RawMessage, error) {
+		var q actionchat.FolderQuery
+		if err := json.Unmarshal(params, &q); err != nil { //nolint:musttag
+			return nil, fmt.Errorf("invalid chat.folder params: %w", err)
+		}
+		row, err := telegram.MoveChatToFolder(ctx, api, res, q)
+		if err != nil {
+			return nil, err
+		}
+		return json.Marshal(row)
+	})
+
+	srv.Register("msg.link", func(ctx context.Context, params json.RawMessage) (json.RawMessage, error) {
+		var q actionmessage.LinkQuery
+		if err := json.Unmarshal(params, &q); err != nil { //nolint:musttag
+			return nil, fmt.Errorf("invalid msg.link params: %w", err)
+		}
+		linkPeer, err := telegram.ResolveMessageLinkPeer(ctx, res, q)
+		if err != nil {
+			return nil, err
+		}
+		return json.Marshal(linkPeer) //nolint:musttag
+	})
+
+	srv.Register("msg.schedule_list", func(ctx context.Context, params json.RawMessage) (json.RawMessage, error) {
+		var q actionmessage.ScheduledListQuery
+		if err := json.Unmarshal(params, &q); err != nil { //nolint:musttag
+			return nil, fmt.Errorf("invalid msg.schedule_list params: %w", err)
+		}
+		rows, err := telegram.ListScheduledMessages(ctx, api, res, q)
+		if err != nil {
+			return nil, err
+		}
+		return json.Marshal(rows)
+	})
+
+	srv.Register("msg.schedule_cancel", func(ctx context.Context, params json.RawMessage) (json.RawMessage, error) {
+		var q actionmessage.CancelScheduledQuery
+		if err := json.Unmarshal(params, &q); err != nil { //nolint:musttag
+			return nil, fmt.Errorf("invalid msg.schedule_cancel params: %w", err)
+		}
+		if err := telegram.CancelScheduledMessages(ctx, api, res, q); err != nil {
+			return nil, err
+		}
+		return json.RawMessage("true"), nil
+	})
 }

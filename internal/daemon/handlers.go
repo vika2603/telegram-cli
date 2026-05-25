@@ -15,6 +15,7 @@ import (
 	actionmessage "github.com/vika2603/telegram-cli/internal/action/message"
 	actionprofile "github.com/vika2603/telegram-cli/internal/action/profile"
 	actionsearch "github.com/vika2603/telegram-cli/internal/action/search"
+	"github.com/vika2603/telegram-cli/internal/output"
 	"github.com/vika2603/telegram-cli/internal/telegram"
 	"github.com/vika2603/telegram-cli/internal/telegram/peer"
 )
@@ -52,6 +53,13 @@ func registerHandlers(
 		return json.Marshal(row)
 	})
 
+	// ChatRow / MessageRow / SearchMsgRow have a custom MarshalJSON
+	// that builds a user-facing envelope shape but lack a matching
+	// UnmarshalJSON. Marshalling them directly on the wire would lose
+	// every nested field on the client's round trip. Convert through
+	// the *Wire type defs (which strip the MarshalJSON method) so
+	// encoding/json falls back to the default field-tag serialization
+	// the client's plain Unmarshal can reverse.
 	srv.Register("chat.resolve", func(ctx context.Context, params json.RawMessage) (json.RawMessage, error) {
 		var q actionchat.ShowQuery
 		if err := json.Unmarshal(params, &q); err != nil { //nolint:musttag
@@ -61,7 +69,7 @@ func registerHandlers(
 		if err != nil {
 			return nil, err
 		}
-		return json.Marshal(row)
+		return json.Marshal(output.ChatRowWire(row))
 	})
 
 	srv.Register("chat.list", func(ctx context.Context, params json.RawMessage) (json.RawMessage, error) {
@@ -75,7 +83,7 @@ func registerHandlers(
 		if err != nil {
 			return nil, err
 		}
-		return json.Marshal(rows)
+		return json.Marshal(output.ChatRowsToWire(rows))
 	})
 
 	srv.Register("msg.list", func(ctx context.Context, params json.RawMessage) (json.RawMessage, error) {
@@ -87,7 +95,7 @@ func registerHandlers(
 		if err != nil {
 			return nil, err
 		}
-		return json.Marshal(rows)
+		return json.Marshal(output.MessageRowsToWire(rows))
 	})
 
 	// ── Phase 5: writes (text-only payloads). File uploads remain on
@@ -176,7 +184,7 @@ func registerHandlers(
 		if err != nil {
 			return nil, err
 		}
-		return json.Marshal(rows)
+		return json.Marshal(output.SearchMsgRowsToWire(rows))
 	})
 
 	srv.Register("search.chat", func(ctx context.Context, params json.RawMessage) (json.RawMessage, error) {

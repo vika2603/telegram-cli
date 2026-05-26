@@ -100,13 +100,19 @@ func newSend(f *runtime.Invocation) actionmessage.SendFunc {
 		if err != nil {
 			return nil, err
 		}
-		// Daemon fast-path is text-only; attachments / stdin uploads
-		// fall through to local mode because the daemon cannot read
-		// the client's filesystem (see internal/cli/msg/send).
-		if len(q.Attachments) == 0 && q.Stdin == nil {
+		// Daemon fast-path: text-only / no attachments. Stdin alone is
+		// not a gate (CLI plumbs IOStreams.In into every Query, but
+		// telegram.SendMessage only consumes it via Attachment.Path=="-").
+		// Mirrors canDaemonSend in internal/cli/msg/send.
+		if len(q.Attachments) == 0 {
 			if cl, _ := runtime.MaybeDialDaemon(ctx, f, acct); cl != nil {
 				defer func() { _ = cl.Close() }()
-				raw, err := cl.Call(ctx, "msg.send", q)
+				// Strip Stdin io.Reader before wire encode — JSON
+				// cannot rehydrate the interface; see canDaemonSend
+				// comment for full rationale.
+				wire := q
+				wire.Stdin = nil
+				raw, err := cl.Call(ctx, "msg.send", wire)
 				if err != nil {
 					return nil, err
 				}

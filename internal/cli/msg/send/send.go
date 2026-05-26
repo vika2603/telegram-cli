@@ -128,7 +128,14 @@ func newSend(f *runtime.Invocation) actionmessage.SendFunc {
 		if canDaemonSend(q) {
 			if cl, _ := runtime.MaybeDialDaemon(ctx, f, acct); cl != nil {
 				defer func() { _ = cl.Close() }()
-				raw, err := cl.Call(ctx, "msg.send", q)
+				// SendQuery.Stdin is io.Reader, which the JSON encoder
+				// renders as `{}` and the decoder cannot rehydrate.
+				// Strip it before sending — telegram.SendMessage only
+				// consumes Stdin via Attachment.Path == "-", which the
+				// canDaemonSend gate already excluded.
+				wire := q
+				wire.Stdin = nil
+				raw, err := cl.Call(ctx, "msg.send", wire)
 				if err != nil {
 					return nil, err
 				}
@@ -157,12 +164,16 @@ func newSend(f *runtime.Invocation) actionmessage.SendFunc {
 }
 
 // canDaemonSend reports whether a SendQuery is daemon-routable.
-// Attachments and stdin uploads require bytes the daemon cannot read
-// from the client's filesystem, so we fall back to local mode for
-// those. Schedule + Silent + Parse + ReplyTo are pure metadata and
+// Attachments require bytes the daemon cannot read from the client's
+// filesystem, so file uploads fall back to local mode. Stdin alone
+// is NOT a gate — the CLI plumbs IOStreams.In into every SendQuery
+// for use during stdin-text or stdin-file paths, but telegram.SendMessage
+// only consumes Stdin when an Attachment with Path == "-" is present,
+// and Normalize already resolves stdin-as-text into Text before this
+// point. Schedule + Silent + Parse + ReplyTo are pure metadata and
 // stay supported.
 func canDaemonSend(q actionmessage.SendQuery) bool {
-	return len(q.Attachments) == 0 && q.Stdin == nil
+	return len(q.Attachments) == 0
 }
 
 func recordSentMessages(store *account.PeerStore, peerRef, text string, rows []output.SendResultRow) {

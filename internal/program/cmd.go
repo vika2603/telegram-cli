@@ -17,8 +17,12 @@ import (
 	"github.com/vika2603/telegram-cli/internal/runtime/defaults"
 )
 
-// version is stamped at build time via -ldflags in the future; fixed for now.
-const version = "0.0.0-dev"
+// version is overridable at build time via:
+//
+//	go build -ldflags "-X github.com/vika2603/telegram-cli/internal/program.version=<value>"
+//
+// Defaults to 0.0.0-dev so plain `go build` / `go install` still works.
+var version = "0.0.0-dev"
 
 // Main constructs the Invocation + root cobra tree, dispatches to cobra, and
 // returns the exit code mapped through output.EmitError. It never calls

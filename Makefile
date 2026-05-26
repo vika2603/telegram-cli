@@ -5,9 +5,9 @@
 # implementation tag (used during the parallel daemon-* work) plus the short
 # git commit hash. Tag defaults to "dev" so a bare `make install` still works.
 
-MODEL ?= dev
+TAG ?= dev
 COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
-VERSION := 0.0.0-$(MODEL)+$(COMMIT)
+VERSION := 0.0.0-$(TAG)+$(COMMIT)
 
 LDFLAGS := -X 'github.com/vika2603/telegram-cli/internal/program.version=$(VERSION)'
 

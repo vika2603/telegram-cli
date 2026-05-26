@@ -32,9 +32,11 @@ type WithPeersFunc func(
 	fn func(ctx context.Context, api *tg.Client, pm *peers.Manager, res *peer.Resolver) error,
 ) error
 
-// WorkerOptions plumbs the live runtime into Run. The worker holds the
-// account flock via WithPeers's underlying session.Run, so a second
-// invocation while the daemon is running fails with account.ErrBusy.
+// WorkerOptions plumbs the live runtime into Run. Note the project's
+// account.lock is **not** held for the daemon's lifetime; it is only
+// taken briefly during atomic writes to account meta/session. Multiple
+// MTProto sessions per account are legal (Telegram allows it), so a
+// short-lived `tg send` while the daemon is running coexists fine.
 type WorkerOptions struct {
 	Account    *account.Account
 	WithPeers  WithPeersFunc
@@ -45,11 +47,11 @@ type WorkerOptions struct {
 // the OS service manager (launchctl/systemctl/etc.) via the hidden
 // "tg daemon run" subcommand. It:
 //
-//  1. acquires the account flock (transitively via WithPeers)
-//  2. opens a long-lived MTProto connection with an UpdateDispatcher
-//  3. appends every update to UpdatesFile(account) as ndjson
-//  4. opens a Unix socket and fans live events to connected clients
-//  5. waits for SIGTERM/SIGINT to exit cleanly
+//  1. opens a long-lived MTProto connection with an UpdateDispatcher
+//  2. appends every update to UpdatesFile(account) as ndjson, with
+//     in-process size-based rotation
+//  3. opens a Unix socket and fans live events to connected clients
+//  4. waits for SIGTERM/SIGINT to exit cleanly
 //
 // Errors during the MTProto session are returned so the service
 // manager's restart policy (KeepAlive on launchd, Restart=on-failure
@@ -85,7 +87,7 @@ func Run(ctx context.Context, opts WorkerOptions) error {
 	}
 	_ = RotateIfLarger(LogFile(opts.Account.Meta.Name), DefaultLogMaxSize)
 
-	sink, err := openUpdatesSink(UpdatesFile(opts.Account.Meta.Name))
+	sink, err := openUpdatesSink(UpdatesFile(opts.Account.Meta.Name), DefaultLogMaxSize)
 	if err != nil {
 		return err
 	}
@@ -169,26 +171,74 @@ func pumpEvents(
 	}
 }
 
-// updatesSink is a mutex-guarded append writer. The mutex is forward
-// compatible with the socket fanout — both writers can race for the
-// same file handle when a subscriber appears between Write calls.
+// updatesSink is the mutex-guarded append writer for updates.ndjson.
+// It tracks the current file size and rotates to `<path>.1` once
+// maxSize bytes have accumulated, so a long-running daemon does not
+// grow the file unbounded. maxSize <= 0 disables rotation.
 type updatesSink struct {
-	mu sync.Mutex
-	f  *os.File
+	mu      sync.Mutex
+	path    string
+	maxSize int64
+	f       *os.File
+	written int64
 }
 
-func openUpdatesSink(path string) (*updatesSink, error) {
+func openUpdatesSink(path string, maxSize int64) (*updatesSink, error) {
 	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
 	if err != nil {
 		return nil, fmt.Errorf("open updates sink: %w", err)
 	}
-	return &updatesSink{f: f}, nil
+	// Pick up the current size so a restart picks rotation right
+	// where the prior worker left off (instead of resetting to 0
+	// and accidentally letting the file grow far past maxSize).
+	var size int64
+	if info, statErr := f.Stat(); statErr == nil {
+		size = info.Size()
+	}
+	return &updatesSink{path: path, maxSize: maxSize, f: f, written: size}, nil
 }
 
 func (s *updatesSink) Write(p []byte) (int, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return s.f.Write(p)
+	n, err := s.f.Write(p)
+	if err != nil {
+		return n, err
+	}
+	s.written += int64(n)
+	if s.maxSize > 0 && s.written >= s.maxSize {
+		if rotErr := s.rotateLocked(); rotErr != nil {
+			// Rotation failure should not break the daemon's main
+			// loop; the write itself succeeded. Surface via the
+			// returned error so the worker's stderr log shows it.
+			return n, fmt.Errorf("rotate updates sink: %w", rotErr)
+		}
+	}
+	return n, nil
+}
+
+// rotateLocked is called with s.mu held. It closes the current file,
+// renames it to .1 (overwriting any prior backup), and opens a fresh
+// file at the original path.
+func (s *updatesSink) rotateLocked() error {
+	if err := s.f.Close(); err != nil {
+		return err
+	}
+	backup := s.path + ".1"
+	_ = os.Remove(backup)
+	if err := os.Rename(s.path, backup); err != nil {
+		// Reopen the original file even if rename failed so the
+		// next Write does not silently drop on a nil file.
+		s.f, _ = os.OpenFile(s.path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
+		return err
+	}
+	f, err := os.OpenFile(s.path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
+	if err != nil {
+		return err
+	}
+	s.f = f
+	s.written = 0
+	return nil
 }
 
 func (s *updatesSink) Close() error {

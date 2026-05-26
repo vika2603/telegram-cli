@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net"
 	"os"
 	"sync"
@@ -204,8 +203,16 @@ func (s *Server) untrackConn(c net.Conn) {
 // per-connection subscription set so we can clean them up when the
 // client disconnects, and it serializes writes through a single
 // json.Encoder (no concurrent writes from multiple goroutines).
-func (s *Server) handleConn(ctx context.Context, conn net.Conn) {
+//
+// The per-connection context derived here cancels on either the parent
+// context or this connection closing, so long-running handler
+// goroutines (dispatched async in dispatch()) and the streamer goroutine
+// observe disconnect promptly and stop work instead of running on a
+// dead socket.
+func (s *Server) handleConn(parentCtx context.Context, conn net.Conn) {
+	ctx, cancel := context.WithCancel(parentCtx)
 	defer func() {
+		cancel()
 		_ = conn.Close()
 		s.untrackConn(conn)
 	}()
@@ -459,8 +466,3 @@ func (c *connSubSet) closeAll(mgr *SubscriptionManager) {
 		mgr.Unsubscribe(id)
 	}
 }
-
-// Discard is the io.Writer that the bootstrap path uses when we are
-// only interested in keeping a reader busy. Kept here so tests can
-// share the singleton without importing io repeatedly.
-var Discard io.Writer = io.Discard

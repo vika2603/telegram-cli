@@ -42,12 +42,15 @@ func (s *Subscription) ResetDropped() uint64 {
 // SubscriptionManager owns all live subscriptions and is the fanout
 // point between the gotd UpdateDispatcher (single producer) and N
 // connected clients (multiple consumers). Calls are safe under
-// concurrent Subscribe/Unsubscribe/Publish.
+// concurrent Subscribe/Unsubscribe/Publish, and survive a concurrent
+// Close (post-Close Subscribe returns a closed Subscription, post-Close
+// Publish is a no-op).
 type SubscriptionManager struct {
 	mu      sync.RWMutex
 	nextID  uint64
 	subs    map[uint64]*Subscription
 	bufSize int
+	closed  bool
 }
 
 // NewSubscriptionManager constructs a manager with the given
@@ -66,7 +69,9 @@ func NewSubscriptionManager(bufSize int) *SubscriptionManager {
 
 // Subscribe registers a new subscription with the given filter and
 // returns the Subscription handle. The handle's ID is also the value
-// passed back to clients in SubscribeResult.
+// passed back to clients in SubscribeResult. If the manager has been
+// Closed the returned Subscription's channel is already closed so any
+// reader exits cleanly.
 func (m *SubscriptionManager) Subscribe(filter telegram.WatchFilter) *Subscription {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -75,6 +80,10 @@ func (m *SubscriptionManager) Subscribe(filter telegram.WatchFilter) *Subscripti
 		ID:     m.nextID,
 		Filter: filter,
 		C:      make(chan telegram.WatchEvent, m.bufSize),
+	}
+	if m.closed {
+		sub.Close()
+		return sub
 	}
 	m.subs[sub.ID] = sub
 	return sub
@@ -104,6 +113,9 @@ func (m *SubscriptionManager) Unsubscribe(id uint64) bool {
 func (m *SubscriptionManager) Publish(ev telegram.WatchEvent) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
+	if m.closed {
+		return
+	}
 	for _, sub := range m.subs {
 		if !matches(sub.Filter, ev) {
 			continue
@@ -118,9 +130,15 @@ func (m *SubscriptionManager) Publish(ev telegram.WatchEvent) {
 
 // Close terminates every subscription. Called when the daemon shuts
 // down so connected clients see the channel close and exit cleanly.
+// Safe under concurrent Subscribe/Publish — subsequent Subscribes get
+// a pre-closed channel and subsequent Publishes are dropped.
 func (m *SubscriptionManager) Close() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if m.closed {
+		return
+	}
+	m.closed = true
 	for _, sub := range m.subs {
 		sub.Close()
 	}

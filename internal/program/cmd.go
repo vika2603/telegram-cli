@@ -15,14 +15,8 @@ import (
 	"github.com/vika2603/telegram-cli/internal/output"
 	"github.com/vika2603/telegram-cli/internal/runtime"
 	"github.com/vika2603/telegram-cli/internal/runtime/defaults"
+	"github.com/vika2603/telegram-cli/internal/version"
 )
-
-// version is overridable at build time via:
-//
-//	go build -ldflags "-X github.com/vika2603/telegram-cli/internal/program.version=<value>"
-//
-// Defaults to 0.0.0-dev so plain `go build` / `go install` still works.
-var version = "0.0.0-dev"
 
 // Main constructs the Invocation + root cobra tree, dispatches to cobra, and
 // returns the exit code mapped through output.EmitError. It never calls
@@ -31,7 +25,7 @@ func Main() int {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	f := defaults.New(version)
+	f := defaults.New(version.Version)
 	rootCmd := root.New(f)
 
 	if err := rootCmd.ExecuteContext(ctx); err != nil {

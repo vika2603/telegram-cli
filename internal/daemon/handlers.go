@@ -175,6 +175,8 @@ func registerHandlers(
 
 	// ── Phase 6: search / contact / profile.
 
+	// SearchMsgRow has no custom MarshalJSON, default field tags
+	// round-trip cleanly — no wire wrapper needed.
 	srv.Register("search.msg", func(ctx context.Context, params json.RawMessage) (json.RawMessage, error) {
 		var q actionsearch.MessageQuery
 		if err := json.Unmarshal(params, &q); err != nil { //nolint:musttag
@@ -184,9 +186,11 @@ func registerHandlers(
 		if err != nil {
 			return nil, err
 		}
-		return json.Marshal(output.SearchMsgRowsToWire(rows))
+		return json.Marshal(rows)
 	})
 
+	// SearchChatRow has a custom MarshalJSON ({"peer":{...}} envelope)
+	// without matching UnmarshalJSON — go through the wire alias.
 	srv.Register("search.chat", func(ctx context.Context, params json.RawMessage) (json.RawMessage, error) {
 		var q actionsearch.ChatQuery
 		if err := json.Unmarshal(params, &q); err != nil { //nolint:musttag
@@ -196,7 +200,7 @@ func registerHandlers(
 		if err != nil {
 			return nil, err
 		}
-		return json.Marshal(rows)
+		return json.Marshal(output.SearchChatRowsToWire(rows))
 	})
 
 	srv.Register("contact.list", func(ctx context.Context, params json.RawMessage) (json.RawMessage, error) {

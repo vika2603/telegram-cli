@@ -9,7 +9,7 @@ TAG ?= dev
 COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
 VERSION := 0.0.0-$(TAG)+$(COMMIT)
 
-LDFLAGS := -X 'github.com/vika2603/telegram-cli/internal/program.version=$(VERSION)'
+LDFLAGS := -X 'github.com/vika2603/telegram-cli/internal/version.Version=$(VERSION)'
 
 .PHONY: install build test lint check
 

@@ -2,9 +2,10 @@ package output
 
 // Wire types for IPC transport.
 //
-// Several Row types (MessageRow, ChatRow, SearchMsgRow) carry custom
+// Several Row types (MessageRow, ChatRow, SearchChatRow) carry custom
 // MarshalJSON methods that produce a user-facing envelope shape
-// (`{"from":{"id":...,"username":...,...}}`) different from the
+// (`{"peer":{"id":..., "username":..., ...}}` or
+// `{"from":{"id":...,"username":...,...}}`) different from the
 // underlying struct fields (`FromID`, `FromUsername`, ...). They do
 // not carry matching UnmarshalJSON, so a naive Marshal -> Unmarshal
 // round trip drops every nested field.
@@ -18,6 +19,11 @@ package output
 // default field-tag based serialization. Unmarshal targets stay the
 // original Row types — their default Unmarshal already matches the
 // default Marshal of the wire types.
+//
+// Row types **without** a custom MarshalJSON (UserRow, ContactRow,
+// ProfileRow, SendResultRow, SearchMsgRow, ChatMembershipRow,
+// ChatMuteRow, ChatFolderRow, ScheduledMessageRow, ...) marshal and
+// unmarshal symmetrically by default and need no wire wrapper.
 
 // MessageRowWire is the IPC-transport shape of MessageRow.
 type MessageRowWire MessageRow
@@ -25,8 +31,16 @@ type MessageRowWire MessageRow
 // ChatRowWire is the IPC-transport shape of ChatRow.
 type ChatRowWire ChatRow
 
-// SearchMsgRowWire is the IPC-transport shape of SearchMsgRow.
-type SearchMsgRowWire SearchMsgRow
+// SearchChatRowWire is the IPC-transport shape of SearchChatRow. Note
+// SearchChatRow EMBEDS ChatRow; a naive `type SearchChatRowWire
+// SearchChatRow` would strip SearchChatRow.MarshalJSON but still
+// promote ChatRow.MarshalJSON via the embedded field, leaving the
+// wire shape stuck in the envelope form. Embed ChatRowWire here
+// instead so neither MarshalJSON applies.
+type SearchChatRowWire struct {
+	ChatRowWire
+	Source string `json:"source,omitempty"`
+}
 
 // MessageRowsToWire copies rows into the wire-shape slice. The cast
 // is element-by-element because Go does not permit slice-type
@@ -49,11 +63,16 @@ func ChatRowsToWire(rows []ChatRow) []ChatRowWire {
 	return out
 }
 
-// SearchMsgRowsToWire is the slice variant for SearchMsgRow.
-func SearchMsgRowsToWire(rows []SearchMsgRow) []SearchMsgRowWire {
-	out := make([]SearchMsgRowWire, len(rows))
-	for i := range rows {
-		out[i] = SearchMsgRowWire(rows[i])
+// SearchChatRowsToWire is the slice variant for SearchChatRow. The
+// cast cannot be a single type conversion because the wire shape
+// embeds ChatRowWire (not ChatRow), so build each element explicitly.
+func SearchChatRowsToWire(rows []SearchChatRow) []SearchChatRowWire {
+	out := make([]SearchChatRowWire, len(rows))
+	for i, r := range rows {
+		out[i] = SearchChatRowWire{
+			ChatRowWire: ChatRowWire(r.ChatRow),
+			Source:      r.Source,
+		}
 	}
 	return out
 }

@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/vika2603/telegram-cli/internal/telegram"
+	"github.com/vika2603/telegram-cli/internal/version"
 )
 
 // PeerRefResolver translates a raw peer reference ("@chan", "me",
@@ -220,7 +221,7 @@ func (s *Server) handleConn(ctx context.Context, conn net.Conn) {
 	// Hello goes out first so clients can confirm account/schema before
 	// sending requests.
 	hello := mustMarshalEvent("hello", HelloPayload{
-		DaemonVersion: "dev",
+		DaemonVersion: version.Version,
 		Account:       s.account,
 		Schema:        ProtocolSchema,
 	})

@@ -70,6 +70,9 @@ func New(f *runtime.Invocation, runF func(*Options) error) *cobra.Command {
 	}
 	cmd.Flags().StringSliceVar(&opts.Kinds, "kind", nil, "Filter event kinds (repeatable / comma-separated): message,edit,delete")
 	cmd.Flags().IntVar(&opts.Limit, "limit", 0, "Exit after N events (0 = stream until cancelled)")
+	_ = cmd.RegisterFlagCompletionFunc("kind", func(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
+		return []string{"message", "edit", "delete"}, cobra.ShellCompDirectiveNoFileComp
+	})
 	// Watch does NOT set NeedsClient: when a daemon is running the
 	// client never dials MTProto, so the precondition would fail
 	// gratuitously. The streaming path explicitly resolves the account

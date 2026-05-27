@@ -40,22 +40,52 @@ type Client struct {
 	readErr   atomic.Value // error
 }
 
-// DaemonReachable reports whether a daemon socket exists for account
-// and accepts a connection. Used by client code (e.g. `tg watch`) to
-// decide whether to route through the daemon or fall back to local
-// MTProto. Errors are absorbed: any failure means "unreachable".
-func DaemonReachable(account string) bool {
+// DaemonState reports what DaemonProbe found at the socket path.
+// Callers that just need a yes/no can use DaemonReachable; callers
+// that want to distinguish "never installed" from "installed but
+// daemon crashed" (so they can surface a warning) use DaemonProbe.
+type DaemonState int
+
+const (
+	// DaemonStateNotInstalled — no socket file exists. Either the
+	// account never had a daemon installed, or it was uninstalled. The
+	// expected, quiet fallback to local MTProto.
+	DaemonStateNotInstalled DaemonState = iota
+	// DaemonStateStaleSocket — socket file exists but a Dial against
+	// it fails inside the probe timeout. Indicates the daemon crashed
+	// (or was kill -9'd, or `tg daemon run` exited dirty) leaving the
+	// socket file behind. Callers should warn the user; local fallback
+	// still works.
+	DaemonStateStaleSocket
+	// DaemonStateReachable — socket file exists and accepts a dial.
+	// Daemon is alive; callers should route through it.
+	DaemonStateReachable
+)
+
+// DaemonProbe inspects the daemon socket for account and reports its
+// state. Used by client code to distinguish expected absence (no
+// socket → quiet fallback) from anomalous absence (stale socket →
+// warn). Errors during inspection are absorbed into the state value;
+// the function never returns a transport error of its own.
+func DaemonProbe(account string) DaemonState {
 	path := SocketPath(account)
 	info, err := os.Stat(path)
 	if err != nil || info.Mode()&os.ModeSocket == 0 {
-		return false
+		return DaemonStateNotInstalled
 	}
 	conn, err := net.DialTimeout("unix", path, 200*time.Millisecond)
 	if err != nil {
-		return false
+		return DaemonStateStaleSocket
 	}
 	_ = conn.Close()
-	return true
+	return DaemonStateReachable
+}
+
+// DaemonReachable is a convenience wrapper around DaemonProbe for
+// callers that only need the boolean. Backwards compatible with the
+// pre-DaemonProbe API.
+func DaemonReachable(account string) bool {
+	return DaemonProbe(account) == DaemonStateReachable
 }
 
 // Dial connects to the daemon for account and reads the Hello frame.

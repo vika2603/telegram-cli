@@ -3,6 +3,7 @@
 package daemon
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -32,7 +33,7 @@ type systemdManager struct {
 
 func newPlatformManager(accountName string) (Manager, error) {
 	if _, err := exec.LookPath("systemctl"); err != nil {
-		return nil, fmt.Errorf("systemctl not found; systemd is required on Linux (container without systemd: use nohup/tmux instead)")
+		return nil, errors.New("systemctl not found; systemd is required on Linux (container without systemd: use nohup/tmux instead)")
 	}
 	return &systemdManager{account: accountName}, nil
 }

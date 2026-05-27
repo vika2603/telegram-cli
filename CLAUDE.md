@@ -16,16 +16,7 @@ Go CLI (`tg`) — a script-friendly, JSON-first Telegram client. Single module `
 
 ## Pre-commit checks
 
-Before pushing, run all four locally and verify clean — CI runs the same set on every push, failing any one of them blocks the PR:
-
-1. `gofmt -l .` (must be empty)
-2. `go vet ./...`
-3. `golangci-lint run` (v2.11.4, same as CI)
-4. `go test ./...`
-
-### `testifylint` gotcha
-
-`require.Equal` on `float64` is rejected by golangci-lint (not visible to `go test` alone — only the lint step catches it). Use `require.InDelta(t, want, got, 0)` for exact compare or `require.InEpsilon` for relative tolerance. This bites JSON round-trip tests because `json.Unmarshal` into `map[string]any` decodes every number as `float64`.
+Run `gofmt -l .`, `go vet ./...`, `golangci-lint run` (v2.11.4), and `go test ./...` locally before pushing — CI runs the same set. On macOS also run `GOOS=linux golangci-lint run` so platform-tagged files (`systemd.go`, `windows.go`) get linted; the default run skips them.
 
 ## Error classification (important)
 

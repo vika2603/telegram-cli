@@ -135,6 +135,13 @@ func EditMessage(ctx context.Context, api *tg.Client, resolver *peer.Resolver, q
 }
 
 // ForwardMessages performs the Telegram RPC for `tg msg forward`.
+//
+// Returns the dest message id (from the Updates the server sent back),
+// NOT the source id. Multi-id forwards collapse to the first new
+// message — callers needing every dest id should switch to a slice
+// return; that's a follow-up. Falls back to the source id only if the
+// server response carries no usable update, which shouldn't happen in
+// practice but keeps the row non-empty so scripts have something.
 func ForwardMessages(ctx context.Context, api *tg.Client, resolver *peer.Resolver, q actionmessage.ForwardQuery) (output.SendResultRow, error) {
 	from, err := resolver.Resolve(ctx, q.From)
 	if err != nil {
@@ -148,10 +155,15 @@ func ForwardMessages(ctx context.Context, api *tg.Client, resolver *peer.Resolve
 	if q.Silent {
 		b.Silent()
 	}
-	if _, err := b.ForwardIDs(from.InputPeer, q.IDs[0], q.IDs[1:]...).Send(ctx); err != nil {
+	upd, err := b.ForwardIDs(from.InputPeer, q.IDs[0], q.IDs[1:]...).Send(ctx)
+	if err != nil {
 		return output.SendResultRow{}, err
 	}
-	return output.SendResultRow{Action: "forward", MessageID: q.IDs[0], ChatID: to.ID}, nil
+	rows := sentMessageRows("forward", upd)
+	if len(rows) == 0 {
+		return output.SendResultRow{Action: "forward", MessageID: q.IDs[0], ChatID: to.ID}, nil
+	}
+	return rows[0], nil
 }
 
 // DeleteMessages performs the Telegram RPC for `tg msg delete`.

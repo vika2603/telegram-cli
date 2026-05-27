@@ -62,7 +62,7 @@ func New(f *runtime.Invocation, runF func(*Options) error) *cobra.Command {
 	cmd.Flags().StringArrayVar(&opts.Files, "file", nil, `File attachment; repeat for multiple files; "-" reads stdin bytes`)
 	cmd.Flags().StringArrayVar(&opts.Names, "name", nil, "Upload filename override; repeat to match --file")
 	cmd.Flags().BoolVar(&opts.Silent, "silent", false, "Send without notification")
-	cmd.Flags().StringVar(&opts.Parse, "parse", "", "Parse mode for text or caption: html|markdown")
+	cmd.Flags().StringVar(&opts.Parse, "parse", "", "Parse mode for text or caption (only: html)")
 	command.SetMeta(cmd, command.Meta{NeedsAccount: true, NeedsClient: true})
 	output.AddJSONFlags(cmd, &opts.Exporter,
 		[]string{"action", "message_id", "chat_id", "date"})
@@ -130,7 +130,7 @@ func newSend(f *runtime.Invocation) actionmessage.SendFunc {
 		var rows []output.SendResultRow
 		err = f.WithPeers(ctx, acct, runtime.ClientOptsFrom(f, acct),
 			func(ctx context.Context, api *tg.Client, _ *peers.Manager, res *peer.Resolver) error {
-				rows, err = telegram.SendMessage(ctx, api, res, q, f.IOStreams.ErrOut)
+				rows, err = telegram.SendMessage(ctx, api, res, q)
 				if err == nil {
 					recordSentMessages(res.Store(), q.Ref.String(), q.Text, rows)
 				}

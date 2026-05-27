@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 
 	"github.com/gotd/td/telegram/peers"
 	"github.com/gotd/td/tg"
@@ -108,7 +107,7 @@ func registerHandlers(
 			return nil, fmt.Errorf("invalid msg.send params: %w", err)
 		}
 		q.Stdin = nil // never trust an io.Reader from the wire
-		rows, err := telegram.SendMessage(ctx, api, res, q, io.Discard)
+		rows, err := telegram.SendMessage(ctx, api, res, q)
 		if err != nil {
 			return nil, err
 		}
@@ -120,7 +119,7 @@ func registerHandlers(
 		if err := json.Unmarshal(params, &q); err != nil { //nolint:musttag
 			return nil, fmt.Errorf("invalid msg.edit params: %w", err)
 		}
-		row, err := telegram.EditMessage(ctx, api, res, q, io.Discard)
+		row, err := telegram.EditMessage(ctx, api, res, q)
 		if err != nil {
 			return nil, err
 		}

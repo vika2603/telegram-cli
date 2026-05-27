@@ -27,7 +27,10 @@ import (
 )
 
 // SendMessage performs the Telegram RPC for `tg msg send`.
-func SendMessage(ctx context.Context, api *tg.Client, resolver *peer.Resolver, q actionmessage.SendQuery, errOut io.Writer) ([]output.SendResultRow, error) {
+//
+// q.Parse is restricted to "" or "html" by NormalizeSend (markdown is
+// rejected at the action layer since gotd ships no markdown parser).
+func SendMessage(ctx context.Context, api *tg.Client, resolver *peer.Resolver, q actionmessage.SendQuery) ([]output.SendResultRow, error) {
 	resolved, err := resolver.Resolve(ctx, q.Ref)
 	if err != nil {
 		return nil, err
@@ -45,18 +48,13 @@ func SendMessage(ctx context.Context, api *tg.Client, resolver *peer.Resolver, q
 	}
 
 	var upd tg.UpdatesClass
-	if len(q.Attachments) > 0 {
-		upd, err = sendAttachments(ctx, b, q, errOut)
-	} else {
-		switch q.Parse {
-		case "html":
-			upd, err = b.StyledText(ctx, html.String(nil, q.Text))
-		case "markdown":
-			_, _ = fmt.Fprintln(errOut, "--parse not supported by current gotd build; sending as plain text")
-			upd, err = b.Text(ctx, q.Text)
-		default:
-			upd, err = b.Text(ctx, q.Text)
-		}
+	switch {
+	case len(q.Attachments) > 0:
+		upd, err = sendAttachments(ctx, b, q)
+	case q.Parse == "html":
+		upd, err = b.StyledText(ctx, html.String(nil, q.Text))
+	default:
+		upd, err = b.Text(ctx, q.Text)
 	}
 	if err != nil {
 		return nil, err
@@ -69,7 +67,6 @@ func sendAttachments(
 	ctx context.Context,
 	b *gotdmessage.RequestBuilder,
 	q actionmessage.SendQuery,
-	errOut io.Writer,
 ) (tg.UpdatesClass, error) {
 	docs := make([]*gotdmessage.UploadedDocumentBuilder, 0, len(q.Attachments))
 	for i, attachment := range q.Attachments {
@@ -79,7 +76,7 @@ func sendAttachments(
 		}
 		var caption []styling.StyledTextOption
 		if i == 0 {
-			caption = captionStyling(q.Text, q.Parse, errOut)
+			caption = captionStyling(q.Text, q.Parse)
 		}
 		doc := gotdmessage.File(input, caption...)
 		if attachment.Name != "" {
@@ -113,19 +110,18 @@ func uploadAttachment(
 }
 
 // EditMessage performs the Telegram RPC for `tg msg edit`.
-func EditMessage(ctx context.Context, api *tg.Client, resolver *peer.Resolver, q actionmessage.EditQuery, errOut io.Writer) (output.SendResultRow, error) {
+//
+// q.Parse is restricted to "" or "html" by NormalizeEdit; markdown is
+// rejected upstream.
+func EditMessage(ctx context.Context, api *tg.Client, resolver *peer.Resolver, q actionmessage.EditQuery) (output.SendResultRow, error) {
 	resolved, err := resolver.Resolve(ctx, q.Ref)
 	if err != nil {
 		return output.SendResultRow{}, err
 	}
 	eb := gotdmessage.NewSender(api).To(resolved.InputPeer).Edit(q.MessageID)
-	switch q.Parse {
-	case "html":
+	if q.Parse == "html" {
 		_, err = eb.StyledText(ctx, html.String(nil, q.Text))
-	case "markdown":
-		_, _ = fmt.Fprintln(errOut, "--parse not supported by current gotd build; sending as plain text")
-		_, err = eb.Text(ctx, q.Text)
-	default:
+	} else {
 		_, err = eb.Text(ctx, q.Text)
 	}
 	if err != nil {
@@ -351,19 +347,17 @@ func ResolveMessageLinkPeer(ctx context.Context, resolver *peer.Resolver, q acti
 	return actionmessage.LinkPeer{Username: resolved.Username}, nil
 }
 
-func captionStyling(caption, parse string, errOut io.Writer) []styling.StyledTextOption {
+// captionStyling renders the caption text into styling options that the
+// attachment builder consumes. parse is restricted to "" or "html" by
+// NormalizeSend; markdown is rejected before reaching this code path.
+func captionStyling(caption, parse string) []styling.StyledTextOption {
 	if caption == "" {
 		return nil
 	}
-	switch parse {
-	case "html":
+	if parse == "html" {
 		return []styling.StyledTextOption{html.String(nil, caption)}
-	case "markdown":
-		_, _ = fmt.Fprintln(errOut, "--parse not supported by current gotd build; sending as plain text")
-		return []styling.StyledTextOption{styling.Plain(caption)}
-	default:
-		return []styling.StyledTextOption{styling.Plain(caption)}
 	}
+	return []styling.StyledTextOption{styling.Plain(caption)}
 }
 
 func sentMessageRows(action string, upd tg.UpdatesClass) []output.SendResultRow {

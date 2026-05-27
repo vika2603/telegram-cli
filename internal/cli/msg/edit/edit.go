@@ -23,7 +23,7 @@ import (
 type Options struct {
 	RawMessageRef string
 	Text          string
-	Parse         string // "", "html", "markdown"
+	Parse         string // "" or "html" (markdown rejected by NormalizeEdit)
 
 	IOStreams *ui.IOStreams
 	Exporter  output.Exporter
@@ -52,7 +52,7 @@ func New(f *runtime.Invocation, runF func(*Options) error) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&opts.Text, "text", "", "New message body (required)")
-	cmd.Flags().StringVar(&opts.Parse, "parse", "", "Parse mode: html | markdown")
+	cmd.Flags().StringVar(&opts.Parse, "parse", "", "Parse mode (only: html)")
 	command.SetMeta(cmd, command.Meta{NeedsAccount: true, NeedsClient: true})
 	output.AddJSONFlags(cmd, &opts.Exporter, []string{"action", "message_id", "chat_id", "date"})
 	return cmd
@@ -97,7 +97,7 @@ func newEdit(f *runtime.Invocation) actionmessage.EditFunc {
 		var row output.SendResultRow
 		err = f.WithPeers(ctx, acct, runtime.ClientOptsFrom(f, acct),
 			func(ctx context.Context, api *tg.Client, _ *peers.Manager, res *peer.Resolver) error {
-				row, err = telegram.EditMessage(ctx, api, res, q, f.IOStreams.ErrOut)
+				row, err = telegram.EditMessage(ctx, api, res, q)
 				return err
 			})
 		return row, err

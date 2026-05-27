@@ -80,9 +80,11 @@ func Send(ctx context.Context, req SendRequest, do SendFunc) ([]output.SendResul
 // NormalizeSend resolves stdin-backed text and parses the peer ref.
 func NormalizeSend(req SendRequest) (SendQuery, error) {
 	switch req.Parse {
-	case "", "html", "markdown":
+	case "", "html":
+	case "markdown":
+		return SendQuery{}, fmt.Errorf("%w: --parse markdown is not supported (gotd has no markdown parser); use --parse html or send plain text", command.ErrUsage)
 	default:
-		return SendQuery{}, fmt.Errorf("%w: --parse must be html or markdown", command.ErrUsage)
+		return SendQuery{}, fmt.Errorf("%w: unknown --parse value %q (supported: html)", command.ErrUsage, req.Parse)
 	}
 	files := compactStrings(req.Files)
 	names := compactStrings(req.Names)
@@ -272,8 +274,12 @@ func NormalizeEdit(req EditRequest) (EditQuery, error) {
 	if req.Text == "" {
 		return EditQuery{}, fmt.Errorf("%w: --text is required", command.ErrUsage)
 	}
-	if req.Parse != "" && req.Parse != "html" && req.Parse != "markdown" {
-		return EditQuery{}, fmt.Errorf("%w: --parse must be html or markdown", command.ErrUsage)
+	switch req.Parse {
+	case "", "html":
+	case "markdown":
+		return EditQuery{}, fmt.Errorf("%w: --parse markdown is not supported (gotd has no markdown parser); use --parse html or plain text", command.ErrUsage)
+	default:
+		return EditQuery{}, fmt.Errorf("%w: unknown --parse value %q (supported: html)", command.ErrUsage, req.Parse)
 	}
 	msgRef, err := parseMessageRef(req.RawMessageRef)
 	if err != nil {

@@ -29,7 +29,7 @@ func TestNew_FlagParsing(t *testing.T) {
 		"--reply-to", "42",
 		"--silent",
 		"--schedule", "2026-04-25T09:00:00Z",
-		"--parse", "markdown",
+		"--parse", "html",
 		"--file", "/tmp/x.pdf",
 		"--file", "/tmp/y.pdf",
 		"--name", "x-renamed.pdf",
@@ -43,7 +43,7 @@ func TestNew_FlagParsing(t *testing.T) {
 	require.True(t, captured.Silent)
 	want, _ := time.Parse(time.RFC3339, "2026-04-25T09:00:00Z")
 	require.Equal(t, want, captured.Schedule)
-	require.Equal(t, "markdown", captured.Parse)
+	require.Equal(t, "html", captured.Parse)
 	require.Equal(t, []string{"/tmp/x.pdf", "/tmp/y.pdf"}, captured.Files)
 	require.Equal(t, []string{"x-renamed.pdf", "y-renamed.pdf"}, captured.Names)
 }

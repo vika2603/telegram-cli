@@ -10,9 +10,22 @@ Go CLI (`tg`) — a script-friendly, JSON-first Telegram client. Single module `
 
 - Standard: `go build ./...`, `go test ./...`, `go vet ./...`.
 - Format check is strict — CI fails on any `gofmt -l .` output. Fix with `gofmt -w .` or `goimports -local github.com/vika2603/telegram-cli -w .`.
-- Lint: `golangci-lint run`. Version pinned to **v2.11.4** in CI — install the same locally.
+- Lint: `golangci-lint run`. Version pinned to **v2.11.4** in CI — install the same locally via `go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.11.4`.
 - `.golangci.yml` sets `goimports` local prefix `github.com/vika2603/telegram-cli`. Imports from this module must sit in their own group, separated from stdlib and third-party.
 - Tests are unit-only with mocked Telegram sessions (`internal/telegram/session/fake.go`). Do **not** add tests that require real `api_id` / `api_hash` or live MTProto.
+
+## Pre-commit checks
+
+Before pushing, run all four locally and verify clean — CI runs the same set on every push, failing any one of them blocks the PR:
+
+1. `gofmt -l .` (must be empty)
+2. `go vet ./...`
+3. `golangci-lint run` (v2.11.4, same as CI)
+4. `go test ./...`
+
+### `testifylint` gotcha
+
+`require.Equal` on `float64` is rejected by golangci-lint (not visible to `go test` alone — only the lint step catches it). Use `require.InDelta(t, want, got, 0)` for exact compare or `require.InEpsilon` for relative tolerance. This bites JSON round-trip tests because `json.Unmarshal` into `map[string]any` decodes every number as `float64`.
 
 ## Error classification (important)
 

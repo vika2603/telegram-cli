@@ -69,6 +69,11 @@ func newRead(f *runtime.Invocation) actionchat.ReadFunc {
 		if err != nil {
 			return err
 		}
+		if cl, _ := runtime.MaybeDialDaemon(ctx, f, acct); cl != nil {
+			defer func() { _ = cl.Close() }()
+			_, err := cl.Call(ctx, "chat.mark_read", q)
+			return err
+		}
 		return f.WithPeers(ctx, acct, runtime.ClientOptsFrom(f, acct),
 			func(ctx context.Context, api *tg.Client, _ *peers.Manager, res *peer.Resolver) error {
 				return telegram.ReadChat(ctx, api, res, q)

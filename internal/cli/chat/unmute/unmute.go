@@ -3,6 +3,7 @@ package unmute
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/gotd/td/telegram/peers"
 	"github.com/gotd/td/tg"
@@ -65,6 +66,19 @@ func newDo(f *runtime.Invocation) actionchat.UnmuteFunc {
 		if err != nil {
 			return output.ChatMuteRow{}, err
 		}
+		if cl, _ := runtime.MaybeDialDaemon(ctx, f, acct); cl != nil {
+			defer func() { _ = cl.Close() }()
+			raw, err := cl.Call(ctx, "chat.unmute", q)
+			if err != nil {
+				return output.ChatMuteRow{}, err
+			}
+			var row output.ChatMuteRow
+			if err := json.Unmarshal(raw, &row); err != nil {
+				return output.ChatMuteRow{}, err
+			}
+			return row, nil
+		}
+
 		var row output.ChatMuteRow
 		err = f.WithPeers(ctx, acct, runtime.ClientOptsFrom(f, acct),
 			func(ctx context.Context, api *tg.Client, _ *peers.Manager, res *peer.Resolver) error {

@@ -3,6 +3,7 @@ package archive
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/gotd/td/telegram/peers"
 	"github.com/gotd/td/tg"
@@ -65,6 +66,19 @@ func newDo(f *runtime.Invocation) actionchat.FolderFunc {
 		if err != nil {
 			return output.ChatFolderRow{}, err
 		}
+		if cl, _ := runtime.MaybeDialDaemon(ctx, f, acct); cl != nil {
+			defer func() { _ = cl.Close() }()
+			raw, err := cl.Call(ctx, "chat.folder", q)
+			if err != nil {
+				return output.ChatFolderRow{}, err
+			}
+			var row output.ChatFolderRow
+			if err := json.Unmarshal(raw, &row); err != nil {
+				return output.ChatFolderRow{}, err
+			}
+			return row, nil
+		}
+
 		var row output.ChatFolderRow
 		err = f.WithPeers(ctx, acct, runtime.ClientOptsFrom(f, acct),
 			func(ctx context.Context, api *tg.Client, _ *peers.Manager, res *peer.Resolver) error {

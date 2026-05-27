@@ -64,6 +64,11 @@ func newUnblock(f *runtime.Invocation) actioncontact.PeerFunc {
 		if err != nil {
 			return err
 		}
+		if cl, _ := runtime.MaybeDialDaemon(ctx, f, acct); cl != nil {
+			defer func() { _ = cl.Close() }()
+			_, err := cl.Call(ctx, "contact.unblock", q)
+			return err
+		}
 		return f.WithPeers(ctx, acct, runtime.ClientOptsFrom(f, acct),
 			func(ctx context.Context, api *tg.Client, _ *peers.Manager, res *peer.Resolver) error {
 				return telegram.UnblockContact(ctx, api, res, q)

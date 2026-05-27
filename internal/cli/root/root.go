@@ -16,6 +16,7 @@ import (
 	"github.com/vika2603/telegram-cli/internal/cli/completion"
 	configcmd "github.com/vika2603/telegram-cli/internal/cli/config"
 	contactcmd "github.com/vika2603/telegram-cli/internal/cli/contact"
+	daemoncmd "github.com/vika2603/telegram-cli/internal/cli/daemon"
 	digestcmd "github.com/vika2603/telegram-cli/internal/cli/digest"
 	inboxcmd "github.com/vika2603/telegram-cli/internal/cli/inbox"
 	mecmd "github.com/vika2603/telegram-cli/internal/cli/me"
@@ -27,6 +28,7 @@ import (
 	replycmd "github.com/vika2603/telegram-cli/internal/cli/reply"
 	searchcmd "github.com/vika2603/telegram-cli/internal/cli/search"
 	sessioncmd "github.com/vika2603/telegram-cli/internal/cli/session"
+	watchcmd "github.com/vika2603/telegram-cli/internal/cli/watch"
 	"github.com/vika2603/telegram-cli/internal/command"
 	"github.com/vika2603/telegram-cli/internal/runtime"
 	"github.com/vika2603/telegram-cli/internal/telegram/session"
@@ -58,6 +60,7 @@ func New(f *runtime.Invocation) *cobra.Command {
 	pf.Bool("no-wait", false, "Fail on FLOOD_WAIT")
 	pf.Int("flood-wait-max", 30, "Max seconds to wait on FLOOD_WAIT")
 	pf.Bool("quiet", false, "Suppress stdout")
+	pf.Bool("no-daemon", false, "Bypass the per-account daemon and dial MTProto directly")
 
 	fixed := func(values ...string) func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
 		return func(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
@@ -79,6 +82,7 @@ func New(f *runtime.Invocation) *cobra.Command {
 	cmd.AddCommand(sessioncmd.New(f))
 	cmd.AddCommand(passwordcmd.New(f))
 	cmd.AddCommand(configcmd.New(f))
+	cmd.AddCommand(daemoncmd.New(f))
 	cmd.AddCommand(completion.New(f))
 	cmd.AddCommand(frequentCommands(f)...)
 	cmd.AddCommand(chatcmd.New(f))
@@ -120,7 +124,10 @@ func frequentCommands(f *runtime.Invocation) []*cobra.Command {
 	resolve.Short = "Resolve a user, chat, or channel"
 	resolve.GroupID = "frequent"
 
-	return []*cobra.Command{login, logout, send, reply, inbox, read, digest, resolve}
+	watch := watchcmd.New(f, nil)
+	watch.GroupID = "frequent"
+
+	return []*cobra.Command{login, logout, send, reply, inbox, read, digest, resolve, watch}
 }
 
 // newRootPreRun builds the PersistentPreRunE closure that consumes Meta
@@ -138,6 +145,7 @@ func newRootPreRun(f *runtime.Invocation) func(*cobra.Command, []string) error {
 		}
 		f.ConfigPath, _ = cmd.Flags().GetString("config")
 		f.AccountName, _ = cmd.Flags().GetString("account")
+		f.NoDaemon, _ = cmd.Flags().GetBool("no-daemon")
 
 		m := command.MetaFrom(cmd)
 		if m.AccountFromArg {

@@ -28,6 +28,37 @@ func TestSend_NormalizesStdinText(t *testing.T) {
 	require.Equal(t, "send", rows[0].Action)
 }
 
+// TestSend_RejectsMarkdownParse confirms that --parse markdown returns a
+// usage error from the action layer instead of silently falling back to
+// plain text. gotd v0.107.0 has no markdown parser, and the previous
+// soft-fallback wrote a stderr warning that the daemon path silently
+// swallowed, so users saw their literal asterisks land on Telegram.
+func TestSend_RejectsMarkdownParse(t *testing.T) {
+	_, err := actionmessage.Send(context.Background(), actionmessage.SendRequest{
+		RawRef: "@alice",
+		Text:   "*bold*",
+		Parse:  "markdown",
+	}, func(context.Context, actionmessage.SendQuery) ([]output.SendResultRow, error) {
+		t.Fatal("send function must not run when --parse is rejected")
+		return nil, nil
+	})
+	require.ErrorIs(t, err, command.ErrUsage)
+	require.Contains(t, err.Error(), "markdown")
+}
+
+func TestEdit_RejectsMarkdownParse(t *testing.T) {
+	_, err := actionmessage.Edit(context.Background(), actionmessage.EditRequest{
+		RawMessageRef: "@alice:1",
+		Text:          "*new*",
+		Parse:         "markdown",
+	}, func(context.Context, actionmessage.EditQuery) (output.SendResultRow, error) {
+		t.Fatal("edit function must not run when --parse is rejected")
+		return output.SendResultRow{}, nil
+	})
+	require.ErrorIs(t, err, command.ErrUsage)
+	require.Contains(t, err.Error(), "markdown")
+}
+
 func TestSend_RejectsConflictingStdin(t *testing.T) {
 	_, err := actionmessage.Send(context.Background(), actionmessage.SendRequest{
 		RawRef: "@alice",

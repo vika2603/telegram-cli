@@ -3,6 +3,7 @@ package link
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/gotd/td/telegram/peers"
@@ -65,6 +66,19 @@ func newResolve(f *runtime.Invocation) actionmessage.LinkResolveFunc {
 		if err != nil {
 			return actionmessage.LinkPeer{}, err
 		}
+		if cl, _ := runtime.MaybeDialDaemon(ctx, f, acct); cl != nil {
+			defer func() { _ = cl.Close() }()
+			raw, err := cl.Call(ctx, "msg.link", q)
+			if err != nil {
+				return actionmessage.LinkPeer{}, err
+			}
+			var out actionmessage.LinkPeer
+			if err := json.Unmarshal(raw, &out); err != nil { //nolint:musttag
+				return actionmessage.LinkPeer{}, err
+			}
+			return out, nil
+		}
+
 		var out actionmessage.LinkPeer
 		err = f.WithPeers(ctx, acct, runtime.ClientOptsFrom(f, acct),
 			func(ctx context.Context, _ *tg.Client, _ *peers.Manager, res *peer.Resolver) error {

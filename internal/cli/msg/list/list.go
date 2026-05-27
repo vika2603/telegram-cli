@@ -3,6 +3,7 @@ package list
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/gotd/td/telegram/peers"
 	"github.com/gotd/td/tg"
@@ -89,6 +90,27 @@ func newFetch(f *runtime.Invocation) actionmessage.ListFunc {
 		if err != nil {
 			return nil, err
 		}
+		// Daemon fast-path: forward the validated query over IPC. The
+		// daemon's session.Run is already paid for, so this is the
+		// difference between a 1.5 s dial and a 50 ms RPC. Recent-peer
+		// bookkeeping still happens locally so per-cli-process state
+		// stays consistent.
+		if cl, _ := runtime.MaybeDialDaemon(ctx, f, acct); cl != nil {
+			defer func() { _ = cl.Close() }()
+			raw, err := cl.Call(ctx, "msg.list", q)
+			if err != nil {
+				return nil, err
+			}
+			var rows []output.MessageRow
+			if err := json.Unmarshal(raw, &rows); err != nil {
+				return nil, err
+			}
+			if store, err := account.OpenRecentStore(acct.Meta.Name); err == nil {
+				recordRecentMessages(store, q.Ref.String(), rows)
+			}
+			return rows, nil
+		}
+
 		var rows []output.MessageRow
 		err = f.WithPeers(ctx, acct, runtime.ClientOptsFrom(f, acct),
 			func(ctx context.Context, api *tg.Client, _ *peers.Manager, res *peer.Resolver) error {

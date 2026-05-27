@@ -3,6 +3,7 @@ package msg
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/gotd/td/telegram/peers"
 	"github.com/gotd/td/tg"
@@ -103,6 +104,19 @@ func newFetch(f *runtime.Invocation) actionsearch.MessageFunc {
 		if err != nil {
 			return nil, err
 		}
+		if cl, _ := runtime.MaybeDialDaemon(ctx, f, acct); cl != nil {
+			defer func() { _ = cl.Close() }()
+			raw, err := cl.Call(ctx, "search.msg", q)
+			if err != nil {
+				return nil, err
+			}
+			var rows []output.SearchMsgRow
+			if err := json.Unmarshal(raw, &rows); err != nil {
+				return nil, err
+			}
+			return rows, nil
+		}
+
 		var rows []output.SearchMsgRow
 		err = f.WithPeers(ctx, acct, runtime.ClientOptsFrom(f, acct),
 			func(ctx context.Context, api *tg.Client, _ *peers.Manager, res *peer.Resolver) error {

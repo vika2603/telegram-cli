@@ -3,6 +3,7 @@ package chat
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/gotd/td/telegram/peers"
 	"github.com/gotd/td/tg"
@@ -77,6 +78,19 @@ func newFetch(f *runtime.Invocation) actionsearch.ChatFunc {
 		if err != nil {
 			return nil, err
 		}
+		if cl, _ := runtime.MaybeDialDaemon(ctx, f, acct); cl != nil {
+			defer func() { _ = cl.Close() }()
+			raw, err := cl.Call(ctx, "search.chat", q)
+			if err != nil {
+				return nil, err
+			}
+			var rows []output.SearchChatRow
+			if err := json.Unmarshal(raw, &rows); err != nil {
+				return nil, err
+			}
+			return rows, nil
+		}
+
 		var rows []output.SearchChatRow
 		err = f.WithPeers(ctx, acct, runtime.ClientOptsFrom(f, acct),
 			func(ctx context.Context, api *tg.Client, _ *peers.Manager, _ *peer.Resolver) error {

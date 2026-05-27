@@ -10,9 +10,13 @@ Go CLI (`tg`) — a script-friendly, JSON-first Telegram client. Single module `
 
 - Standard: `go build ./...`, `go test ./...`, `go vet ./...`.
 - Format check is strict — CI fails on any `gofmt -l .` output. Fix with `gofmt -w .` or `goimports -local github.com/vika2603/telegram-cli -w .`.
-- Lint: `golangci-lint run`. Version pinned to **v2.11.4** in CI — install the same locally.
+- Lint: `golangci-lint run`. Version pinned to **v2.11.4** in CI — install the same locally via `go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.11.4`.
 - `.golangci.yml` sets `goimports` local prefix `github.com/vika2603/telegram-cli`. Imports from this module must sit in their own group, separated from stdlib and third-party.
 - Tests are unit-only with mocked Telegram sessions (`internal/telegram/session/fake.go`). Do **not** add tests that require real `api_id` / `api_hash` or live MTProto.
+
+## Pre-commit checks
+
+Run `gofmt -l .`, `go vet ./...`, `golangci-lint run` (v2.11.4), and `go test ./...` locally before pushing — CI runs the same set. On macOS also run `GOOS=linux golangci-lint run` so platform-tagged files (`systemd.go`, `windows.go`) get linted; the default run skips them.
 
 ## Error classification (important)
 

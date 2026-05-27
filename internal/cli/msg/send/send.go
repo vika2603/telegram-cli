@@ -3,6 +3,7 @@ package send
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"strconv"
@@ -82,7 +83,7 @@ func New(f *runtime.Invocation, runF func(*Options) error) *cobra.Command {
 	cmd.Flags().IntVar(&opts.ReplyTo, "reply-to", 0, "Reply to message ID")
 	cmd.Flags().BoolVar(&opts.Silent, "silent", false, "Send without notification")
 	cmd.Flags().StringVar(&scheduleRaw, "schedule", "", "Schedule delivery (RFC3339)")
-	cmd.Flags().StringVar(&opts.Parse, "parse", "", "Parse mode for text or caption: html|markdown")
+	cmd.Flags().StringVar(&opts.Parse, "parse", "", "Parse mode for text or caption (only: html)")
 
 	command.SetMeta(cmd, command.Meta{NeedsAccount: true, NeedsClient: true})
 	output.AddJSONFlags(cmd, &opts.Exporter,
@@ -114,16 +115,45 @@ func Run(ctx context.Context, opts *Options) error {
 }
 
 // newSend returns the production Send closure that calls the Telegram API.
+//
+// Daemon fast-path applies only when the payload is pure text — file
+// attachments and stdin require byte streams the IPC socket does not
+// carry yet, so those fall through to the local WithPeers path.
 func newSend(f *runtime.Invocation) actionmessage.SendFunc {
 	return func(ctx context.Context, q actionmessage.SendQuery) ([]output.SendResultRow, error) {
 		acct, err := f.Account("")
 		if err != nil {
 			return nil, err
 		}
+		if canDaemonSend(q) {
+			if cl, _ := runtime.MaybeDialDaemon(ctx, f, acct); cl != nil {
+				defer func() { _ = cl.Close() }()
+				// SendQuery.Stdin is io.Reader, which the JSON encoder
+				// renders as `{}` and the decoder cannot rehydrate.
+				// Strip it before sending — telegram.SendMessage only
+				// consumes Stdin via Attachment.Path == "-", which the
+				// canDaemonSend gate already excluded.
+				wire := q
+				wire.Stdin = nil
+				raw, err := cl.Call(ctx, "msg.send", wire)
+				if err != nil {
+					return nil, err
+				}
+				var rows []output.SendResultRow
+				if err := json.Unmarshal(raw, &rows); err != nil {
+					return nil, err
+				}
+				if store, err := account.OpenRecentStore(acct.Meta.Name); err == nil {
+					recordSentMessages(store, q.Ref.String(), q.Text, rows)
+				}
+				return rows, nil
+			}
+		}
+
 		var rows []output.SendResultRow
 		err = f.WithPeers(ctx, acct, runtime.ClientOptsFrom(f, acct),
 			func(ctx context.Context, api *tg.Client, _ *peers.Manager, res *peer.Resolver) error {
-				rows, err = telegram.SendMessage(ctx, api, res, q, f.IOStreams.ErrOut)
+				rows, err = telegram.SendMessage(ctx, api, res, q)
 				if err == nil {
 					recordSentMessages(res.Store(), q.Ref.String(), q.Text, rows)
 				}
@@ -131,6 +161,19 @@ func newSend(f *runtime.Invocation) actionmessage.SendFunc {
 			})
 		return rows, err
 	}
+}
+
+// canDaemonSend reports whether a SendQuery is daemon-routable.
+// Attachments require bytes the daemon cannot read from the client's
+// filesystem, so file uploads fall back to local mode. Stdin alone
+// is NOT a gate — the CLI plumbs IOStreams.In into every SendQuery
+// for use during stdin-text or stdin-file paths, but telegram.SendMessage
+// only consumes Stdin when an Attachment with Path == "-" is present,
+// and Normalize already resolves stdin-as-text into Text before this
+// point. Schedule + Silent + Parse + ReplyTo are pure metadata and
+// stay supported.
+func canDaemonSend(q actionmessage.SendQuery) bool {
+	return len(q.Attachments) == 0
 }
 
 func recordSentMessages(store *account.PeerStore, peerRef, text string, rows []output.SendResultRow) {

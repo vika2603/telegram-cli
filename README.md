@@ -57,6 +57,31 @@ Pass `--qr` to `auth login` for QR login instead.
 | `tg config path` | Print the resolved config path. |
 | `tg config show` | Print merged config with secrets redacted. |
 
+### Daemon
+
+A per-account background service that holds a long-lived MTProto session
+so subsequent commands skip the dial / auth-resume cost (~1 s → ~0.25 s)
+and `tg watch` can stream real-time updates over a Unix socket instead
+of opening its own connection. Registration uses the host's native
+service manager: launchd on macOS, systemd-user on Linux. The daemon is
+optional — every command still works without one. Add `--no-daemon` to
+any command to force a fresh MTProto session even when a daemon is
+reachable.
+
+| Command | Purpose |
+| --- | --- |
+| `tg daemon install` | Register the per-account daemon with the host service manager. `--force` reinstalls; `--log-file` / `--log-max-mb` tune logging. |
+| `tg daemon uninstall` | Remove the service registration. Keeps `daemon.log` and `updates.ndjson` so a re-install can pick them up. |
+| `tg daemon start` / `tg daemon stop` | Ask the OS to start or stop the service. |
+| `tg daemon status` | JSON-emitting status (installed / running / pid / log + updates paths). |
+| `tg daemon logs [-f] [-n N]` | Tail the daemon log; `-f` follows. |
+
+Daemon artifacts live under `~/.config/tg/accounts/<account>/daemon/`:
+`daemon.log` (service stdout+stderr, rotated at 10 MB by default),
+`updates.ndjson` (append-only stream of every MTProto update — tailable
+even without a connected subscriber), and `daemon.sock` (Unix socket
+client commands route through when present).
+
 ### Chats, Messages, Search
 
 | Command | Purpose |
@@ -82,6 +107,7 @@ Pass `--qr` to `auth login` for QR login instead.
 | `tg msg schedule-list <ref>` | List scheduled messages. |
 | `tg msg schedule-cancel <ref> <id>...` | Cancel scheduled messages. |
 | `tg msg link <msg-ref>` | Print the public `t.me` link for a message when available. |
+| `tg watch [<ref>...]` | Stream new messages, edits, and deletes as ndjson until cancelled. `--kind=message,edit,delete` filters event kinds; `--limit N` exits after N events. When a daemon is running, routes through its socket; otherwise opens a foreground MTProto session. |
 | `tg search msg <query>` | Search messages globally, or use `--in <ref>` for one chat. |
 | `tg search chat <query>` | Search chats, users, channels, and bots. |
 

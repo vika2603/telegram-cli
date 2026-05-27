@@ -3,7 +3,6 @@ package pin
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/gotd/td/telegram/peers"
 	"github.com/gotd/td/tg"
@@ -12,6 +11,7 @@ import (
 	actionmessage "github.com/vika2603/telegram-cli/internal/action/message"
 	"github.com/vika2603/telegram-cli/internal/cli/complete"
 	"github.com/vika2603/telegram-cli/internal/command"
+	"github.com/vika2603/telegram-cli/internal/output"
 	"github.com/vika2603/telegram-cli/internal/runtime"
 	"github.com/vika2603/telegram-cli/internal/telegram"
 	"github.com/vika2603/telegram-cli/internal/telegram/peer"
@@ -25,6 +25,7 @@ type Options struct {
 	Unpin         bool
 
 	IOStreams *ui.IOStreams
+	Exporter  output.Exporter
 
 	// Do is the closure that performs the actual Telegram call. Production
 	// code sets it via newDo; tests stub it directly.
@@ -61,10 +62,15 @@ func newCmd(f *runtime.Invocation, runF func(*Options) error, use, short string,
 	}
 	cmd.Flags().BoolVar(&opts.Silent, "silent", false, "Do not notify recipients")
 	command.SetMeta(cmd, command.Meta{NeedsAccount: true, NeedsClient: true})
+	output.AddJSONFlags(cmd, &opts.Exporter, []string{"action", "message_id"})
 	return cmd
 }
 
-// Run dispatches the normalized request and renders the result.
+// Run dispatches the normalized request and renders the result. Output is
+// a one-row SendResultRow with Action="pin" or "unpin", matching the
+// shape every other write verb (send/edit/forward/react) emits. The
+// human path picks the same shape so --json and the default TTY layout
+// share columns.
 func Run(ctx context.Context, opts *Options) error {
 	result, err := actionmessage.Pin(ctx, actionmessage.PinRequest{
 		RawMessageRef: opts.RawMessageRef,
@@ -74,15 +80,28 @@ func Run(ctx context.Context, opts *Options) error {
 	if err != nil {
 		return err
 	}
-	_, _ = fmt.Fprintf(opts.IOStreams.Out, "%s\t%d\n", result.Verb, result.MessageID)
-	return nil
+	action := "pin"
+	if opts.Unpin {
+		action = "unpin"
+	}
+	row := output.SendResultRow{Action: action, MessageID: result.MessageID}
+	if opts.Exporter != nil {
+		return opts.Exporter.Write(opts.IOStreams, row)
+	}
+	return output.RenderSendResults(opts.IOStreams, []output.SendResultRow{row})
 }
 
 // newDo returns the production Do closure that calls the Telegram API.
+// Used by both "tg msg pin" and "tg msg unpin" (q.Unpin discriminates).
 func newDo(f *runtime.Invocation) actionmessage.PinFunc {
 	return func(ctx context.Context, q actionmessage.PinQuery) error {
 		acct, err := f.Account("")
 		if err != nil {
+			return err
+		}
+		if cl, _ := runtime.MaybeDialDaemon(ctx, f, acct); cl != nil {
+			defer func() { _ = cl.Close() }()
+			_, err := cl.Call(ctx, "msg.pin", q)
 			return err
 		}
 		return f.WithPeers(ctx, acct, runtime.ClientOptsFrom(f, acct),

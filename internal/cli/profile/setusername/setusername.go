@@ -3,6 +3,7 @@ package setusername
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/gotd/td/telegram/peers"
@@ -74,6 +75,19 @@ func newUpdate(f *runtime.Invocation) actionprofile.SetUsernameFunc {
 		if err != nil {
 			return output.ProfileRow{}, err
 		}
+		if cl, _ := runtime.MaybeDialDaemon(ctx, f, acct); cl != nil {
+			defer func() { _ = cl.Close() }()
+			raw, err := cl.Call(ctx, "profile.set_username", map[string]string{"username": u})
+			if err != nil {
+				return output.ProfileRow{}, err
+			}
+			var row output.ProfileRow
+			if err := json.Unmarshal(raw, &row); err != nil {
+				return output.ProfileRow{}, err
+			}
+			return row, nil
+		}
+
 		var row output.ProfileRow
 		err = f.WithPeers(ctx, acct, runtime.ClientOptsFrom(f, acct),
 			func(ctx context.Context, api *tg.Client, _ *peers.Manager, _ *peer.Resolver) error {

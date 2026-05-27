@@ -3,7 +3,7 @@
 package daemon
 
 import (
-	"fmt"
+	"errors"
 )
 
 // Windows service registration is not yet implemented. The interface
@@ -25,19 +25,19 @@ func newPlatformManager(accountName string) (Manager, error) {
 func (*windowsManager) Platform() string { return "windows (unsupported)" }
 
 func (m *windowsManager) Install(Config) error {
-	return fmt.Errorf("daemon install on windows is not yet implemented")
+	return errors.New("daemon install on windows is not yet implemented")
 }
 func (m *windowsManager) Uninstall() error {
-	return fmt.Errorf("daemon uninstall on windows is not yet implemented")
+	return errors.New("daemon uninstall on windows is not yet implemented")
 }
 func (m *windowsManager) Start() error {
-	return fmt.Errorf("daemon start on windows is not yet implemented")
+	return errors.New("daemon start on windows is not yet implemented")
 }
 func (m *windowsManager) Stop() error {
-	return fmt.Errorf("daemon stop on windows is not yet implemented")
+	return errors.New("daemon stop on windows is not yet implemented")
 }
 func (m *windowsManager) Restart() error {
-	return fmt.Errorf("daemon restart on windows is not yet implemented")
+	return errors.New("daemon restart on windows is not yet implemented")
 }
 func (m *windowsManager) Status() (*Status, error) {
 	return &Status{Platform: m.Platform(), Account: m.account}, nil

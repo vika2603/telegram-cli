@@ -2,7 +2,7 @@
 
 package daemon
 
-import "fmt"
+import "errors"
 
 // Catch-all for unsupported OSes (FreeBSD, OpenBSD, etc.). Returning a
 // stub Manager lets the CLI still print a usable error from Install
@@ -28,7 +28,7 @@ func (m *unsupportedManager) Status() (*Status, error) {
 }
 
 func errUnsupported() error {
-	return fmt.Errorf("daemon management is not supported on this OS")
+	return errors.New("daemon management is not supported on this OS")
 }
 
 func CheckLinger() (enabled bool, user string) { return false, "" }

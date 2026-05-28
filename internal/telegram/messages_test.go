@@ -169,6 +169,58 @@ func TestMessageToRow_PopulatesForwardAndEntities(t *testing.T) {
 	require.Equal(t, "https://t.me/src/11", row.Forward.Link)
 }
 
+// TestMessageToRow_PopulatesEditDateGroupedReactions exercises the
+// three agent-CLI fields layered on top of PR #2: EditDate, GroupedID,
+// and a Reactions list with one self-reacted emoji and one custom
+// emoji to cover both kinds the gotd schema knows about.
+func TestMessageToRow_PopulatesEditDateGroupedReactions(t *testing.T) {
+	entities := msgpeer.NewEntities(nil, nil, nil)
+	m := &tg.Message{
+		ID:      100,
+		Date:    int(time.Date(2026, 4, 23, 12, 0, 0, 0, time.UTC).Unix()),
+		PeerID:  &tg.PeerUser{UserID: 7},
+		Message: "hi",
+	}
+	m.SetEditDate(int(time.Date(2026, 4, 23, 13, 0, 0, 0, time.UTC).Unix()))
+	m.SetGroupedID(1234567890)
+	reactions := tg.MessageReactions{}
+	rc1 := tg.ReactionCount{Reaction: &tg.ReactionEmoji{Emoticon: "👍"}, Count: 5}
+	rc1.SetChosenOrder(0)
+	rc2 := tg.ReactionCount{Reaction: &tg.ReactionCustomEmoji{DocumentID: 555}, Count: 1}
+	reactions.Results = []tg.ReactionCount{rc1, rc2}
+	m.SetReactions(reactions)
+
+	row := messageToRow(m, entities, "@u")
+	require.Equal(t, "2026-04-23T13:00:00Z", row.EditDate)
+	require.Equal(t, int64(1234567890), row.GroupedID)
+	require.Len(t, row.Reactions, 2)
+	require.Equal(t, "emoji", row.Reactions[0].Kind)
+	require.Equal(t, "👍", row.Reactions[0].Emoji)
+	require.Equal(t, 5, row.Reactions[0].Count)
+	require.True(t, row.Reactions[0].SelfReacted)
+	require.Equal(t, "custom_emoji", row.Reactions[1].Kind)
+	require.Equal(t, int64(555), row.Reactions[1].CustomEmojiID)
+	require.False(t, row.Reactions[1].SelfReacted)
+}
+
+// TestMessageToRow_OmitsUnsetEditDateGroupedReactions asserts that a
+// message without those optional fields produces a zero MessageRow
+// triple — no spurious "1970-01-01" edit_date from a misread zero
+// value, no GroupedID, no empty Reactions slice.
+func TestMessageToRow_OmitsUnsetEditDateGroupedReactions(t *testing.T) {
+	entities := msgpeer.NewEntities(nil, nil, nil)
+	m := &tg.Message{
+		ID:      101,
+		Date:    int(time.Date(2026, 4, 23, 12, 0, 0, 0, time.UTC).Unix()),
+		PeerID:  &tg.PeerUser{UserID: 7},
+		Message: "hi",
+	}
+	row := messageToRow(m, entities, "@u")
+	require.Empty(t, row.EditDate)
+	require.Zero(t, row.GroupedID)
+	require.Nil(t, row.Reactions)
+}
+
 func TestMessageToRow_FallsBackToPeerForChannelPost(t *testing.T) {
 	entities := msgpeer.NewEntities(
 		nil,

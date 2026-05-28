@@ -165,6 +165,8 @@ func searchMessageElemToRow(el msgquery.Elem, fallback peer.Resolved) (output.Se
 		// same way `tg msg list` populates them. Previously this path
 		// rolled its own row and dropped every one of those fields.
 		inner := messageToRow(m, el.Entities, "")
+		row.EditDate = inner.EditDate
+		row.GroupedID = inner.GroupedID
 		row.FromID = inner.FromID
 		row.FromRef = inner.FromRef
 		row.FromKind = inner.FromKind
@@ -175,6 +177,7 @@ func searchMessageElemToRow(el msgquery.Elem, fallback peer.Resolved) (output.Se
 		row.Entities = inner.Entities
 		row.Buttons = inner.Buttons
 		row.Forward = inner.Forward
+		row.Reactions = inner.Reactions
 		row.HasMedia = inner.HasMedia
 		row.MediaKind = inner.MediaKind
 		row.Views = inner.Views

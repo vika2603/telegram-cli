@@ -91,6 +91,59 @@ func TestRenderMessages_TTYDoesNotTruncateLongRefs(t *testing.T) {
 	require.Contains(t, stdout.String(), ref)
 }
 
+// TestMessageRow_MarshalJSON_EditDateGroupedReactions guards the
+// agent-CLI fields added on top of PR #2's forward/entities/buttons:
+// EditDate (cache key for "did this change since last poll?"),
+// GroupedID (album discriminator so N-photo posts are not seen as
+// N independent messages), and Reactions (engagement signal).
+func TestMessageRow_MarshalJSON_EditDateGroupedReactions(t *testing.T) {
+	row := output.MessageRow{
+		ID:        9,
+		Date:      "2026-04-23T12:00:00Z",
+		EditDate:  "2026-04-23T13:00:00Z",
+		GroupedID: 1234567890,
+		Text:      "hi",
+		Reactions: []output.ReactionCount{
+			{Kind: "emoji", Emoji: "👍", Count: 5, SelfReacted: true},
+			{Kind: "emoji", Emoji: "🚀", Count: 2},
+			{Kind: "custom_emoji", CustomEmojiID: 555, Count: 1},
+		},
+	}
+	b, err := json.Marshal(row)
+	require.NoError(t, err)
+
+	var got map[string]any
+	require.NoError(t, json.Unmarshal(b, &got))
+
+	require.Equal(t, "2026-04-23T13:00:00Z", got["edit_date"])
+	require.InDelta(t, 1234567890.0, got["grouped_id"], 0)
+	reactions := got["reactions"].([]any)
+	require.Len(t, reactions, 3)
+	r0 := reactions[0].(map[string]any)
+	require.Equal(t, "emoji", r0["kind"])
+	require.Equal(t, "👍", r0["emoji"])
+	require.InDelta(t, 5.0, r0["count"], 0)
+	require.Equal(t, true, r0["self_reacted"])
+	r2 := reactions[2].(map[string]any)
+	require.Equal(t, "custom_emoji", r2["kind"])
+	require.InDelta(t, 555.0, r2["custom_emoji_id"], 0)
+}
+
+// TestMessageRow_MarshalJSON_OmitsEditDateGroupedReactions asserts the
+// three new fields are properly omitempty so old shaped rows are byte
+// compatible with the pre-feature output.
+func TestMessageRow_MarshalJSON_OmitsEditDateGroupedReactions(t *testing.T) {
+	row := output.MessageRow{ID: 1, Date: "2026-04-23T12:00:00Z", Text: "hi"}
+	b, err := json.Marshal(row)
+	require.NoError(t, err)
+
+	var got map[string]any
+	require.NoError(t, json.Unmarshal(b, &got))
+	require.NotContains(t, got, "edit_date")
+	require.NotContains(t, got, "grouped_id")
+	require.NotContains(t, got, "reactions")
+}
+
 func TestMessageRow_MarshalJSON_EntitiesForwardButtons(t *testing.T) {
 	row := output.MessageRow{
 		ID:   1,

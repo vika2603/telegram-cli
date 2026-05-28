@@ -15,7 +15,9 @@ import (
 type MessageRow struct {
 	ID           int             `json:"id"`
 	Ref          string          `json:"ref,omitempty"`
-	Date         string          `json:"date"` // RFC3339
+	Date         string          `json:"date"`                // RFC3339
+	EditDate     string          `json:"edit_date,omitempty"` // RFC3339; set when the message has been edited
+	GroupedID    int64           `json:"grouped_id,omitempty"`
 	FromID       int64           `json:"from_id,omitempty"`
 	FromRef      string          `json:"from_ref,omitempty"`
 	FromKind     string          `json:"from_kind,omitempty"`
@@ -26,10 +28,25 @@ type MessageRow struct {
 	Entities     []MessageEntity `json:"entities,omitempty"`
 	Buttons      []MessageButton `json:"buttons,omitempty"`
 	Forward      *ForwardInfo    `json:"forward,omitempty"`
+	Reactions    []ReactionCount `json:"reactions,omitempty"`
 	HasMedia     bool            `json:"has_media,omitempty"`
 	MediaKind    string          `json:"media_kind,omitempty"` // "photo" | "video" | "document" | "voice" | "audio" | "sticker" | "poll" | "web_page" | "other"
 	Views        int             `json:"views,omitempty"`
 	IsPinned     bool            `json:"is_pinned,omitempty"`
+}
+
+// ReactionCount is one entry in a message's reactions list. Kind
+// distinguishes the underlying reaction type so agents can branch
+// without parsing the emoji string. SelfReacted is derived from
+// tg.ReactionCount.ChosenOrder being set — it answers "did the
+// current account react with this?" with a single boolean instead of
+// the ordering integer the server returns.
+type ReactionCount struct {
+	Kind          string `json:"kind"`                      // "emoji" | "custom_emoji" | "paid" | "empty"
+	Emoji         string `json:"emoji,omitempty"`           // for Kind=="emoji"
+	CustomEmojiID int64  `json:"custom_emoji_id,omitempty"` // for Kind=="custom_emoji"
+	Count         int    `json:"count"`
+	SelfReacted   bool   `json:"self_reacted,omitempty"`
 }
 
 // MessageEntity is a flattened representation of a Telegram message entity.
@@ -60,18 +77,21 @@ type ForwardInfo struct {
 
 func (r MessageRow) MarshalJSON() ([]byte, error) {
 	type messageRowJSON struct {
-		Ref      string          `json:"ref,omitempty"`
-		ID       int             `json:"id,omitempty"`
-		Date     string          `json:"date,omitempty"`
-		From     *PeerObject     `json:"from,omitempty"`
-		Text     string          `json:"text,omitempty"`
-		Entities []MessageEntity `json:"entities,omitempty"`
-		Buttons  []MessageButton `json:"buttons,omitempty"`
-		Forward  *ForwardInfo    `json:"forward,omitempty"`
-		Media    *MediaObject    `json:"media,omitempty"`
-		ReplyTo  int             `json:"reply_to,omitempty"`
-		Views    int             `json:"views,omitempty"`
-		IsPinned bool            `json:"is_pinned,omitempty"`
+		Ref       string          `json:"ref,omitempty"`
+		ID        int             `json:"id,omitempty"`
+		Date      string          `json:"date,omitempty"`
+		EditDate  string          `json:"edit_date,omitempty"`
+		GroupedID int64           `json:"grouped_id,omitempty"`
+		From      *PeerObject     `json:"from,omitempty"`
+		Text      string          `json:"text,omitempty"`
+		Entities  []MessageEntity `json:"entities,omitempty"`
+		Buttons   []MessageButton `json:"buttons,omitempty"`
+		Forward   *ForwardInfo    `json:"forward,omitempty"`
+		Reactions []ReactionCount `json:"reactions,omitempty"`
+		Media     *MediaObject    `json:"media,omitempty"`
+		ReplyTo   int             `json:"reply_to,omitempty"`
+		Views     int             `json:"views,omitempty"`
+		IsPinned  bool            `json:"is_pinned,omitempty"`
 	}
 	var from *PeerObject
 	if r.FromID != 0 || r.FromRef != "" || r.FromTitle != "" || r.FromUsername != "" || r.FromKind != "" {
@@ -83,18 +103,21 @@ func (r MessageRow) MarshalJSON() ([]byte, error) {
 		media = &MediaObject{Type: r.MediaKind}
 	}
 	return json.Marshal(messageRowJSON{
-		Ref:      r.Ref,
-		ID:       r.ID,
-		Date:     r.Date,
-		From:     from,
-		Text:     r.Text,
-		Entities: r.Entities,
-		Buttons:  r.Buttons,
-		Forward:  r.Forward,
-		Media:    media,
-		ReplyTo:  r.ReplyToID,
-		Views:    r.Views,
-		IsPinned: r.IsPinned,
+		Ref:       r.Ref,
+		ID:        r.ID,
+		Date:      r.Date,
+		EditDate:  r.EditDate,
+		GroupedID: r.GroupedID,
+		From:      from,
+		Text:      r.Text,
+		Entities:  r.Entities,
+		Buttons:   r.Buttons,
+		Forward:   r.Forward,
+		Reactions: r.Reactions,
+		Media:     media,
+		ReplyTo:   r.ReplyToID,
+		Views:     r.Views,
+		IsPinned:  r.IsPinned,
 	})
 }
 
@@ -105,13 +128,16 @@ func (r MessageRow) MarshalJSON() ([]byte, error) {
 // surfaces those without making the caller open the chat.
 func MessageSummaryFromRow(r MessageRow) MessageSummary {
 	s := MessageSummary{
-		Ref:      r.Ref,
-		ID:       r.ID,
-		Date:     r.Date,
-		Text:     r.Text,
-		Forward:  r.Forward,
-		Entities: r.Entities,
-		Buttons:  r.Buttons,
+		Ref:       r.Ref,
+		ID:        r.ID,
+		Date:      r.Date,
+		EditDate:  r.EditDate,
+		GroupedID: r.GroupedID,
+		Text:      r.Text,
+		Forward:   r.Forward,
+		Entities:  r.Entities,
+		Buttons:   r.Buttons,
+		Reactions: r.Reactions,
 	}
 	if r.FromID != 0 || r.FromRef != "" || r.FromTitle != "" || r.FromUsername != "" || r.FromKind != "" {
 		p := peerObject(r.FromRef, r.FromID, r.FromKind, r.FromTitle, r.FromUsername)

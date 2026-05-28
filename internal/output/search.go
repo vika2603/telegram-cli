@@ -19,6 +19,8 @@ type SearchMsgRow struct {
 	// Message identification
 	MessageID int    `json:"message_id"`
 	Date      string `json:"date"`
+	EditDate  string `json:"edit_date,omitempty"`
+	GroupedID int64  `json:"grouped_id,omitempty"`
 
 	// Sender
 	FromID       int64  `json:"from_id,omitempty"`
@@ -38,6 +40,7 @@ type SearchMsgRow struct {
 	Entities  []MessageEntity `json:"entities,omitempty"`
 	Buttons   []MessageButton `json:"buttons,omitempty"`
 	Forward   *ForwardInfo    `json:"forward,omitempty"`
+	Reactions []ReactionCount `json:"reactions,omitempty"`
 
 	// Media
 	HasMedia  bool   `json:"has_media,omitempty"`

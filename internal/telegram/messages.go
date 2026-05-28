@@ -72,6 +72,12 @@ func messageToRow(m *tg.Message, entities msgpeer.Entities, baseRef string) outp
 		Text:     m.Message,
 		IsPinned: m.Pinned,
 	}
+	if ed, ok := m.GetEditDate(); ok && ed > 0 {
+		row.EditDate = time.Unix(int64(ed), 0).UTC().Format(time.RFC3339)
+	}
+	if gid, ok := m.GetGroupedID(); ok && gid != 0 {
+		row.GroupedID = gid
+	}
 	if media, ok := m.GetMedia(); ok && media != nil {
 		row.HasMedia = true
 		row.MediaKind = searchMessageMediaKind(media)
@@ -100,7 +106,47 @@ func messageToRow(m *tg.Message, entities msgpeer.Entities, baseRef string) outp
 	if rm, ok := m.GetReplyMarkup(); ok {
 		row.Buttons = extractButtons(rm)
 	}
+	if reactions, ok := m.GetReactions(); ok {
+		row.Reactions = extractReactions(reactions)
+	}
 	return row
+}
+
+// extractReactions flattens tg.MessageReactions into a stable
+// output.ReactionCount slice. Empty input yields nil so omitempty
+// drops the field; the alternative (empty slice) survives MarshalJSON
+// as `"reactions":[]` and pollutes scripts. Reaction kinds the gotd
+// schema knows about are bucketed via Kind for agents that want to
+// branch without parsing strings.
+func extractReactions(r tg.MessageReactions) []output.ReactionCount {
+	if len(r.Results) == 0 {
+		return nil
+	}
+	out := make([]output.ReactionCount, 0, len(r.Results))
+	for _, rc := range r.Results {
+		item := output.ReactionCount{Count: rc.Count}
+		if _, hasOrder := rc.GetChosenOrder(); hasOrder {
+			item.SelfReacted = true
+		}
+		switch v := rc.Reaction.(type) {
+		case *tg.ReactionEmoji:
+			item.Kind = "emoji"
+			item.Emoji = v.Emoticon
+		case *tg.ReactionCustomEmoji:
+			item.Kind = "custom_emoji"
+			item.CustomEmojiID = v.DocumentID
+		case *tg.ReactionEmpty:
+			item.Kind = "empty"
+		default:
+			// Newer reaction kinds (e.g. paid star reactions) may exist
+			// in future gotd versions; surface them as "unknown" so the
+			// reaction is still counted, then add a typed case here
+			// once gotd is bumped.
+			item.Kind = "unknown"
+		}
+		out = append(out, item)
+	}
+	return out
 }
 
 func fillMessageSender(row *output.MessageRow, p tg.PeerClass, entities msgpeer.Entities) {

@@ -48,7 +48,7 @@ func TestSearchMsgRow_MarshalJSON_SurfacesPR2Fields(t *testing.T) {
 		ChatID:       -100,
 		ChatTitle:    "News",
 		Text:         "see attached",
-		ReplyToID:    77,
+		ReplyTo:      &output.ReplyInfo{MessageID: 77},
 		Entities: []output.MessageEntity{
 			{Type: "bold", Text: "see"},
 		},
@@ -72,7 +72,8 @@ func TestSearchMsgRow_MarshalJSON_SurfacesPR2Fields(t *testing.T) {
 	require.NoError(t, json.Unmarshal(raw, &got))
 
 	require.InDelta(t, 99.0, got["message_id"], 0)
-	require.InDelta(t, 77.0, got["reply_to_id"], 0)
+	require.NotNil(t, got["reply_to"])
+	require.InDelta(t, 77.0, got["reply_to"].(map[string]any)["message_id"], 0)
 	require.InDelta(t, 500.0, got["views"], 0)
 	require.Equal(t, true, got["is_pinned"])
 	require.Equal(t, true, got["has_media"])
@@ -96,7 +97,7 @@ func TestSearchMsgRow_MarshalJSON_OmitsEmpty(t *testing.T) {
 	var got map[string]any
 	require.NoError(t, json.Unmarshal(raw, &got))
 
-	for _, k := range []string{"entities", "buttons", "forward", "reply_to_id",
+	for _, k := range []string{"entities", "buttons", "forward", "reply_to",
 		"views", "is_pinned", "has_media", "from_username"} {
 		_, present := got[k]
 		require.False(t, present, "key %q should be omitted on empty row", k)

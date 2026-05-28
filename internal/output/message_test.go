@@ -37,7 +37,7 @@ func TestRenderMessages_TTYRendersMessageFeed(t *testing.T) {
 			FromTitle:    "Ada Lovelace",
 			FromUsername: "ada",
 			Text:         "hello from the feed",
-			ReplyToID:    9,
+			ReplyTo:      &output.ReplyInfo{MessageID: 9},
 		},
 		{
 			ID:        11,
@@ -89,6 +89,59 @@ func TestRenderMessages_TTYDoesNotTruncateLongRefs(t *testing.T) {
 	rows := []output.MessageRow{{ID: 77, Ref: ref, Date: "2026-04-23T12:00:00Z", Text: "hello"}}
 	require.NoError(t, output.RenderMessages(ios, rows))
 	require.Contains(t, stdout.String(), ref)
+}
+
+// TestMessageRow_MarshalJSON_ReplyToObject guards the breaking
+// shape change to reply_to: was `reply_to: <int>`, now `reply_to:
+// {message_id, peer_id, forum_topic, top_id, quote_text, ...}`. The
+// new shape carries everything agents need to reconstruct comment
+// threads, cross-chat reply targets, forum topics, and quote
+// excerpts — previously only the integer message id was exposed.
+func TestMessageRow_MarshalJSON_ReplyToObject(t *testing.T) {
+	row := output.MessageRow{
+		ID:   77,
+		Date: "2026-04-23T12:00:00Z",
+		Text: "thread comment",
+		ReplyTo: &output.ReplyInfo{
+			MessageID:     42,
+			PeerID:        -1001234567890,
+			ForumTopic:    true,
+			TopID:         100,
+			QuoteText:     "the important bit",
+			QuoteEntities: []output.MessageEntity{{Type: "bold", Text: "important"}},
+			QuoteOffset:   4,
+			QuoteIsManual: true,
+		},
+	}
+	b, err := json.Marshal(row)
+	require.NoError(t, err)
+
+	var got map[string]any
+	require.NoError(t, json.Unmarshal(b, &got))
+
+	require.NotNil(t, got["reply_to"], "reply_to must be present as an object")
+	rt := got["reply_to"].(map[string]any)
+	require.InDelta(t, 42.0, rt["message_id"], 0)
+	require.InDelta(t, -1001234567890.0, rt["peer_id"], 0)
+	require.Equal(t, true, rt["forum_topic"])
+	require.InDelta(t, 100.0, rt["top_id"], 0)
+	require.Equal(t, "the important bit", rt["quote_text"])
+	require.InDelta(t, 4.0, rt["quote_offset"], 0)
+	require.Equal(t, true, rt["quote_is_manual"])
+	require.NotNil(t, rt["quote_entities"])
+}
+
+// TestMessageRow_MarshalJSON_ReplyToOmitsWhenAbsent asserts no
+// spurious reply_to key on a plain message — the field is a pointer
+// with omitempty so nil drops it entirely.
+func TestMessageRow_MarshalJSON_ReplyToOmitsWhenAbsent(t *testing.T) {
+	row := output.MessageRow{ID: 1, Date: "2026-04-23T12:00:00Z", Text: "hi"}
+	b, err := json.Marshal(row)
+	require.NoError(t, err)
+
+	var got map[string]any
+	require.NoError(t, json.Unmarshal(b, &got))
+	require.NotContains(t, got, "reply_to")
 }
 
 // TestMessageRow_MarshalJSON_EditDateGroupedReactions guards the

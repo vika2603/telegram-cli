@@ -23,7 +23,7 @@ type MessageRow struct {
 	FromKind     string          `json:"from_kind,omitempty"`
 	FromTitle    string          `json:"from_title,omitempty"`
 	FromUsername string          `json:"from_username,omitempty"`
-	ReplyToID    int             `json:"reply_to_id,omitempty"`
+	ReplyTo      *ReplyInfo      `json:"reply_to,omitempty"`
 	Text         string          `json:"text,omitempty"`
 	Entities     []MessageEntity `json:"entities,omitempty"`
 	Buttons      []MessageButton `json:"buttons,omitempty"`
@@ -65,6 +65,30 @@ type MessageButton struct {
 	Type string `json:"type,omitempty"` // "url" | "switch_inline" | "callback" | "web_app" | ...
 }
 
+// ReplyInfo describes the message-reply header. A bare reply to an
+// in-chat message carries only MessageID; everything else is set in
+// the richer cases:
+//
+//   - PeerID is set when the reply targets a message in a different
+//     peer (discussion-group reply to a channel post is the classic
+//     example). Agents that follow comment threads back to the source
+//     channel branch on this.
+//   - ForumTopic + TopID together describe whether the reply is the
+//     entry into a forum topic and which topic it belongs to.
+//   - QuoteText / QuoteEntities / QuoteOffset carry the "reply to
+//     selection" excerpt the sender highlighted. QuoteIsManual
+//     distinguishes a sender-picked quote from one Telegram inferred.
+type ReplyInfo struct {
+	MessageID     int             `json:"message_id"`
+	PeerID        int64           `json:"peer_id,omitempty"`
+	ForumTopic    bool            `json:"forum_topic,omitempty"`
+	TopID         int             `json:"top_id,omitempty"`
+	QuoteText     string          `json:"quote_text,omitempty"`
+	QuoteEntities []MessageEntity `json:"quote_entities,omitempty"`
+	QuoteOffset   int             `json:"quote_offset,omitempty"`
+	QuoteIsManual bool            `json:"quote_is_manual,omitempty"`
+}
+
 // ForwardInfo describes the origin of a forwarded message.
 type ForwardInfo struct {
 	From          *PeerObject `json:"from,omitempty"`
@@ -89,7 +113,7 @@ func (r MessageRow) MarshalJSON() ([]byte, error) {
 		Forward   *ForwardInfo    `json:"forward,omitempty"`
 		Reactions []ReactionCount `json:"reactions,omitempty"`
 		Media     *MediaObject    `json:"media,omitempty"`
-		ReplyTo   int             `json:"reply_to,omitempty"`
+		ReplyTo   *ReplyInfo      `json:"reply_to,omitempty"`
 		Views     int             `json:"views,omitempty"`
 		IsPinned  bool            `json:"is_pinned,omitempty"`
 	}
@@ -115,7 +139,7 @@ func (r MessageRow) MarshalJSON() ([]byte, error) {
 		Forward:   r.Forward,
 		Reactions: r.Reactions,
 		Media:     media,
-		ReplyTo:   r.ReplyToID,
+		ReplyTo:   r.ReplyTo,
 		Views:     r.Views,
 		IsPinned:  r.IsPinned,
 	})
@@ -134,6 +158,7 @@ func MessageSummaryFromRow(r MessageRow) MessageSummary {
 		EditDate:  r.EditDate,
 		GroupedID: r.GroupedID,
 		Text:      r.Text,
+		ReplyTo:   r.ReplyTo,
 		Forward:   r.Forward,
 		Entities:  r.Entities,
 		Buttons:   r.Buttons,
@@ -265,8 +290,8 @@ func messageHeader(r MessageRow) string {
 	if when := shortMessageDate(r.Date); when != "" {
 		parts = append(parts, when)
 	}
-	if r.ReplyToID > 0 {
-		parts = append(parts, "reply "+strconv.Itoa(r.ReplyToID))
+	if r.ReplyTo != nil && r.ReplyTo.MessageID > 0 {
+		parts = append(parts, "reply "+strconv.Itoa(r.ReplyTo.MessageID))
 	}
 	if r.Forward != nil {
 		if label := forwardLabel(r.Forward); label != "" {

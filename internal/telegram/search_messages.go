@@ -157,21 +157,39 @@ func searchMessageElemToRow(el msgquery.Elem, fallback peer.Resolved) (output.Se
 		MessageID: el.Msg.GetID(),
 		Date:      time.Unix(int64(el.Msg.GetDate()), 0).UTC().Format(time.RFC3339),
 	}
-	if from, ok := el.Msg.GetFromID(); ok {
+
+	if m, ok := el.Msg.(*tg.Message); ok {
+		// Reuse messageToRow so PR #2's forward / entities / buttons and
+		// the rest of the message metadata (reply target, views, pinned,
+		// resolved sender ref / kind / title / username) populate the
+		// same way `tg msg list` populates them. Previously this path
+		// rolled its own row and dropped every one of those fields.
+		inner := messageToRow(m, el.Entities, "")
+		row.FromID = inner.FromID
+		row.FromRef = inner.FromRef
+		row.FromKind = inner.FromKind
+		row.FromTitle = inner.FromTitle
+		row.FromUsername = inner.FromUsername
+		row.Text = inner.Text
+		row.ReplyToID = inner.ReplyToID
+		row.Entities = inner.Entities
+		row.Buttons = inner.Buttons
+		row.Forward = inner.Forward
+		row.HasMedia = inner.HasMedia
+		row.MediaKind = inner.MediaKind
+		row.Views = inner.Views
+		row.IsPinned = inner.IsPinned
+	} else if from, ok := el.Msg.GetFromID(); ok {
+		// MessageService and friends carry only the sender id.
 		row.FromID = peerID(from)
 	}
+
 	if fallback.ID != 0 {
 		row.ChatID = fallback.ID
 		row.ChatTitle = fallback.Title
 		row.ChatKind = fallback.Kind
 	} else {
 		row.ChatID, row.ChatKind, row.ChatTitle = searchMessagePeerDetails(el.Msg.GetPeerID(), el.Entities)
-	}
-	if m, ok := el.Msg.(*tg.Message); ok {
-		row.Text = m.Message
-		if media, ok := m.GetMedia(); ok && media != nil {
-			row.MediaKind = searchMessageMediaKind(media)
-		}
 	}
 	if row.ChatID == 0 {
 		row.ChatID = peerID(el.Msg.GetPeerID())

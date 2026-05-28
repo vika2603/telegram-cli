@@ -60,7 +60,11 @@ func New(f *runtime.Invocation, runF func(*Options) error) *cobra.Command {
 	cmd.Flags().IntVar(&opts.MinID, "min-id", 0, "Stop once a message id <= this is reached (incremental sync)")
 	command.SetMeta(cmd, command.Meta{NeedsAccount: true, NeedsClient: true})
 	output.AddJSONFlags(cmd, &opts.Exporter,
-		[]string{"ref", "id", "date", "from", "text", "entities", "buttons", "forward", "media", "reply_to", "views", "is_pinned"})
+		[]string{
+			"ref", "id", "date", "edit_date", "grouped_id",
+			"from", "text", "entities", "buttons", "forward", "reactions",
+			"media", "reply_to", "views", "is_pinned",
+		})
 	return cmd
 }
 

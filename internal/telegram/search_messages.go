@@ -173,7 +173,7 @@ func searchMessageElemToRow(el msgquery.Elem, fallback peer.Resolved) (output.Se
 		row.FromTitle = inner.FromTitle
 		row.FromUsername = inner.FromUsername
 		row.Text = inner.Text
-		row.ReplyToID = inner.ReplyToID
+		row.ReplyTo = inner.ReplyTo
 		row.Entities = inner.Entities
 		row.Buttons = inner.Buttons
 		row.Forward = inner.Forward

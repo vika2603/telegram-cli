@@ -36,7 +36,7 @@ type SearchMsgRow struct {
 
 	// Content
 	Text      string          `json:"text,omitempty"`
-	ReplyToID int             `json:"reply_to_id,omitempty"`
+	ReplyTo   *ReplyInfo      `json:"reply_to,omitempty"`
 	Entities  []MessageEntity `json:"entities,omitempty"`
 	Buttons   []MessageButton `json:"buttons,omitempty"`
 	Forward   *ForwardInfo    `json:"forward,omitempty"`

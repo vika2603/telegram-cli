@@ -21,6 +21,7 @@ type MessageSummary struct {
 	From      *PeerObject     `json:"from,omitempty"`
 	Text      string          `json:"text,omitempty"`
 	Media     *MediaObject    `json:"media,omitempty"`
+	ReplyTo   *ReplyInfo      `json:"reply_to,omitempty"`
 	Forward   *ForwardInfo    `json:"forward,omitempty"`
 	Entities  []MessageEntity `json:"entities,omitempty"`
 	Buttons   []MessageButton `json:"buttons,omitempty"`

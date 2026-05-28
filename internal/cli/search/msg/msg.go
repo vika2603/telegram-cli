@@ -73,7 +73,7 @@ func New(f *runtime.Invocation, runF func(*Options) error) *cobra.Command {
 			"message_id", "date", "edit_date", "grouped_id",
 			"from_id", "from_ref", "from_kind", "from_title", "from_username",
 			"chat_id", "chat_title", "chat_kind",
-			"text", "reply_to_id", "entities", "buttons", "forward", "reactions",
+			"text", "reply_to", "entities", "buttons", "forward", "reactions",
 			"has_media", "media_kind",
 			"views", "is_pinned",
 		})

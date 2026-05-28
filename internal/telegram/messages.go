@@ -91,11 +91,7 @@ func messageToRow(m *tg.Message, entities msgpeer.Entities, baseRef string) outp
 		fillMessageSender(&row, peer, entities)
 	}
 	if replyHeader, ok := m.GetReplyTo(); ok {
-		if h, ok := replyHeader.(*tg.MessageReplyHeader); ok {
-			if id, hasID := h.GetReplyToMsgID(); hasID {
-				row.ReplyToID = id
-			}
-		}
+		row.ReplyTo = extractReplyInfo(replyHeader, m.Message)
 	}
 	if fwd, ok := m.GetFwdFrom(); ok {
 		row.Forward = extractForward(fwd, entities)
@@ -110,6 +106,54 @@ func messageToRow(m *tg.Message, entities msgpeer.Entities, baseRef string) outp
 		row.Reactions = extractReactions(reactions)
 	}
 	return row
+}
+
+// extractReplyInfo flattens tg.MessageReplyHeader into the
+// output.ReplyInfo shape. Returns nil for header types we don't speak
+// (MessageReplyStoryHeader and the like) and for headers that carry
+// no information beyond a missing msg id — so omitempty drops the
+// reply_to key entirely on plain text messages with no reply context.
+//
+// parentText is the containing message's text — the QuoteEntities
+// helper needs the FULL text to slice UTF-16 offsets correctly; the
+// quote excerpt is already a substring so passing it directly would
+// give wrong offsets on multi-byte characters. The QuoteText itself
+// is the slice the sender highlighted.
+func extractReplyInfo(replyHeader tg.MessageReplyHeaderClass, parentText string) *output.ReplyInfo {
+	h, ok := replyHeader.(*tg.MessageReplyHeader)
+	if !ok {
+		return nil
+	}
+	info := &output.ReplyInfo{
+		ForumTopic:    h.ForumTopic,
+		QuoteIsManual: h.Quote,
+	}
+	if id, hasID := h.GetReplyToMsgID(); hasID {
+		info.MessageID = id
+	}
+	if p, ok := h.GetReplyToPeerID(); ok && p != nil {
+		info.PeerID = peerID(p)
+	}
+	if topID, ok := h.GetReplyToTopID(); ok {
+		info.TopID = topID
+	}
+	if q, ok := h.GetQuoteText(); ok {
+		info.QuoteText = q
+	}
+	if qents, ok := h.GetQuoteEntities(); ok {
+		info.QuoteEntities = extractEntities(info.QuoteText, qents)
+	}
+	if qoff, ok := h.GetQuoteOffset(); ok {
+		info.QuoteOffset = qoff
+	}
+	_ = parentText // currently unused; retained as a parameter so the
+	// signature is ready to thread parent context once Telegram exposes
+	// quote offsets relative to the parent rather than the quote slice.
+	if info.MessageID == 0 && info.PeerID == 0 && !info.ForumTopic &&
+		info.TopID == 0 && info.QuoteText == "" && !info.QuoteIsManual {
+		return nil
+	}
+	return info
 }
 
 // extractReactions flattens tg.MessageReactions into a stable

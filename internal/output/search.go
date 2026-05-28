@@ -7,17 +7,45 @@ import (
 	"github.com/vika2603/telegram-cli/internal/ui"
 )
 
-// SearchMsgRow is the output of `search msg`. It embeds MessageRow and
-// adds chat identification because search results span chats.
+// SearchMsgRow is the output of `tg search msg`. The fields mirror
+// MessageRow (so PR #2's forward / entities / buttons surface here too)
+// and add ChatID / ChatTitle / ChatKind because search results span
+// chats. We do not embed MessageRow directly because MessageRow uses
+// `id` for the message id and the existing `tg search msg` shape uses
+// `message_id`; embedding would either collide on the tag or force a
+// breaking rename. The fields are populated by reusing messageToRow
+// internally — see searchMessageElemToRow.
 type SearchMsgRow struct {
+	// Message identification
 	MessageID int    `json:"message_id"`
+	Date      string `json:"date"`
+
+	// Sender
+	FromID       int64  `json:"from_id,omitempty"`
+	FromRef      string `json:"from_ref,omitempty"`
+	FromKind     string `json:"from_kind,omitempty"`
+	FromTitle    string `json:"from_title,omitempty"`
+	FromUsername string `json:"from_username,omitempty"`
+
+	// Chat (added because search spans chats)
 	ChatID    int64  `json:"chat_id"`
 	ChatTitle string `json:"chat_title,omitempty"`
 	ChatKind  string `json:"chat_kind,omitempty"`
-	Date      string `json:"date"`
-	FromID    int64  `json:"from_id,omitempty"`
-	Text      string `json:"text,omitempty"`
+
+	// Content
+	Text      string          `json:"text,omitempty"`
+	ReplyToID int             `json:"reply_to_id,omitempty"`
+	Entities  []MessageEntity `json:"entities,omitempty"`
+	Buttons   []MessageButton `json:"buttons,omitempty"`
+	Forward   *ForwardInfo    `json:"forward,omitempty"`
+
+	// Media
+	HasMedia  bool   `json:"has_media,omitempty"`
 	MediaKind string `json:"media_kind,omitempty"`
+
+	// Metadata
+	Views    int  `json:"views,omitempty"`
+	IsPinned bool `json:"is_pinned,omitempty"`
 }
 
 func RenderSearchMsg(io *ui.IOStreams, rows []SearchMsgRow) error {

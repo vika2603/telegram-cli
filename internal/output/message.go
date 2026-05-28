@@ -98,12 +98,20 @@ func (r MessageRow) MarshalJSON() ([]byte, error) {
 	})
 }
 
+// MessageSummaryFromRow projects a MessageRow into the compact summary
+// embedded in ChatRow.LastMessage (i.e. `tg inbox`'s `last` field).
+// Forward / entities / buttons are copied through so the inbox preview
+// of a forwarded post or a message with formatting / inline buttons
+// surfaces those without making the caller open the chat.
 func MessageSummaryFromRow(r MessageRow) MessageSummary {
 	s := MessageSummary{
-		Ref:  r.Ref,
-		ID:   r.ID,
-		Date: r.Date,
-		Text: r.Text,
+		Ref:      r.Ref,
+		ID:       r.ID,
+		Date:     r.Date,
+		Text:     r.Text,
+		Forward:  r.Forward,
+		Entities: r.Entities,
+		Buttons:  r.Buttons,
 	}
 	if r.FromID != 0 || r.FromRef != "" || r.FromTitle != "" || r.FromUsername != "" || r.FromKind != "" {
 		p := peerObject(r.FromRef, r.FromID, r.FromKind, r.FromTitle, r.FromUsername)

@@ -144,6 +144,48 @@ func TestMessageRow_MarshalJSON_OmitsEmptyForwardAndEntities(t *testing.T) {
 	require.NotContains(t, got, "forward")
 }
 
+// TestMessageSummaryFromRow_CopiesPR2Fields guards the bug-fix: tg
+// inbox's `last` field is a MessageSummary derived from MessageRow via
+// this helper. The summary used to drop forward / entities / buttons,
+// so a forwarded channel post or a message with formatting silently
+// looked like plain text in the inbox preview. Verify all three flow
+// through.
+func TestMessageSummaryFromRow_CopiesPR2Fields(t *testing.T) {
+	row := output.MessageRow{
+		ID:   42,
+		Ref:  "@chan:42",
+		Date: "2026-04-23T12:00:00Z",
+		Text: "see this",
+		Entities: []output.MessageEntity{
+			{Type: "bold", Text: "see"},
+		},
+		Buttons: []output.MessageButton{
+			{Row: 0, Text: "Go", URL: "https://x.com", Type: "url"},
+		},
+		Forward: &output.ForwardInfo{
+			FromName:      "Original",
+			ChannelPostID: 7,
+			Link:          "https://t.me/src/7",
+		},
+	}
+	got := output.MessageSummaryFromRow(row)
+	require.Equal(t, row.Entities, got.Entities)
+	require.Equal(t, row.Buttons, got.Buttons)
+	require.NotNil(t, got.Forward)
+	require.Equal(t, "https://t.me/src/7", got.Forward.Link)
+}
+
+// TestMessageSummaryFromRow_OmitsEmpty asserts the empty case stays
+// empty — adding the three new fields must not cause spurious keys to
+// appear on a bare summary.
+func TestMessageSummaryFromRow_OmitsEmpty(t *testing.T) {
+	row := output.MessageRow{ID: 1, Date: "2026-04-23T12:00:00Z", Text: "hi"}
+	got := output.MessageSummaryFromRow(row)
+	require.Nil(t, got.Entities)
+	require.Nil(t, got.Buttons)
+	require.Nil(t, got.Forward)
+}
+
 func TestRenderMessages_TTYShowsForwardLabel(t *testing.T) {
 	ios, _, stdout, _ := ui.Test()
 	ios.SetStdoutTTY(true)

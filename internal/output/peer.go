@@ -13,12 +13,15 @@ type PeerObject struct {
 // MessageSummary is the compact nested JSON shape used for last-message and
 // write-result payloads.
 type MessageSummary struct {
-	Ref   string       `json:"ref,omitempty"`
-	ID    int          `json:"id,omitempty"`
-	Date  string       `json:"date,omitempty"`
-	From  *PeerObject  `json:"from,omitempty"`
-	Text  string       `json:"text,omitempty"`
-	Media *MediaObject `json:"media,omitempty"`
+	Ref      string          `json:"ref,omitempty"`
+	ID       int             `json:"id,omitempty"`
+	Date     string          `json:"date,omitempty"`
+	From     *PeerObject     `json:"from,omitempty"`
+	Text     string          `json:"text,omitempty"`
+	Media    *MediaObject    `json:"media,omitempty"`
+	Forward  *ForwardInfo    `json:"forward,omitempty"`
+	Entities []MessageEntity `json:"entities,omitempty"`
+	Buttons  []MessageButton `json:"buttons,omitempty"`
 }
 
 // MediaObject is the nested JSON shape for message media metadata.

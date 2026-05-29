@@ -324,10 +324,12 @@ type RemoteError struct {
 	Detail   map[string]any
 }
 
-// Error returns the human-readable message; the daemon already
-// includes the code-prefixed form (e.g. "flood_wait: msg send to
-// @alice: flood wait: 30 seconds") if it wanted, so we don't
-// re-prefix here.
+// Error returns the daemon's message verbatim. We deliberately do
+// NOT prefix the code (the pre-RemoteError client did
+// "code: message") so daemon-routed errors render identically to
+// local errors in human mode — output.EmitError prints
+// "error: <message>" for both. The code travels separately via
+// RemoteCode for the JSON envelope.
 func (e *RemoteError) Error() string { return e.Message }
 
 // RemoteCode lets status.Code short-circuit to the wire code instead

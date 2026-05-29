@@ -30,7 +30,13 @@ func MapExitCode(err error) int {
 	if err != nil {
 		var rc RemoteExitCoded
 		if errors.As(err, &rc) {
-			return rc.RemoteExitCode()
+			// Guard against a 0 leaking out of an error frame — a
+			// non-nil error must never map to the success exit code.
+			// Fall through to the normal mapping (default 1) if the
+			// remote side somehow reported 0.
+			if ec := rc.RemoteExitCode(); ec > 0 {
+				return ec
+			}
 		}
 		// Raw gotd FLOOD_WAIT — same rationale as in code.go.
 		if _, ok := telegramsession.AsFloodWait(err); ok {

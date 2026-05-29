@@ -76,3 +76,26 @@ func TestMapExitCode_Drop3(t *testing.T) {
 		require.Equal(t, c.want, MapExitCode(c.err))
 	}
 }
+
+// fakeRemoteExitError is a stand-in for daemon.RemoteError (which
+// status can't import — daemon imports status, not the reverse).
+type fakeRemoteExitError struct {
+	msg      string
+	exitCode int
+}
+
+func (e fakeRemoteExitError) Error() string       { return e.msg }
+func (e fakeRemoteExitError) RemoteExitCode() int { return e.exitCode }
+
+func TestMapExitCode_RemoteExitCodeHonored(t *testing.T) {
+	require.Equal(t, 6, MapExitCode(fakeRemoteExitError{msg: "flood", exitCode: 6}))
+	require.Equal(t, 4, MapExitCode(fakeRemoteExitError{msg: "not found", exitCode: 4}))
+}
+
+// TestMapExitCode_RemoteExitCodeZeroFallsThrough guards the defensive
+// check: a non-nil error frame that somehow reports exit_code 0 must
+// NOT map to the success code. It falls through to the default
+// mapping (1) instead.
+func TestMapExitCode_RemoteExitCodeZeroFallsThrough(t *testing.T) {
+	require.Equal(t, 1, MapExitCode(fakeRemoteExitError{msg: "weird", exitCode: 0}))
+}

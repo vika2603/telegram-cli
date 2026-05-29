@@ -65,19 +65,16 @@ type MessageButton struct {
 	Type string `json:"type,omitempty"` // "url" | "switch_inline" | "callback" | "web_app" | ...
 }
 
-// ReplyInfo describes the message-reply header. A bare reply to an
-// in-chat message carries only MessageID; everything else is set in
-// the richer cases:
+// ReplyInfo describes the message-reply header. A bare in-chat reply
+// carries only MessageID; the richer fields cover the rest:
 //
-//   - PeerID is set when the reply targets a message in a different
-//     peer (discussion-group reply to a channel post is the classic
-//     example). Agents that follow comment threads back to the source
-//     channel branch on this.
-//   - ForumTopic + TopID together describe whether the reply is the
-//     entry into a forum topic and which topic it belongs to.
-//   - QuoteText / QuoteEntities / QuoteOffset carry the "reply to
-//     selection" excerpt the sender highlighted. QuoteIsManual
-//     distinguishes a sender-picked quote from one Telegram inferred.
+//   - PeerID: the reply targets a message in a different peer (e.g. a
+//     discussion-group reply to a channel post).
+//   - ForumTopic + TopID: whether the reply enters a forum topic, and
+//     which topic it belongs to.
+//   - QuoteText / QuoteEntities / QuoteOffset: the excerpt the sender
+//     highlighted. QuoteIsManual marks a sender-picked quote versus
+//     one Telegram inferred.
 type ReplyInfo struct {
 	MessageID     int             `json:"message_id"`
 	PeerID        int64           `json:"peer_id,omitempty"`

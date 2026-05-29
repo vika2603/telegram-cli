@@ -169,11 +169,8 @@ func TestMessageToRow_PopulatesForwardAndEntities(t *testing.T) {
 	require.Equal(t, "https://t.me/src/11", row.Forward.Link)
 }
 
-// TestExtractReplyInfo_QuoteAndForumTopic exercises the rich
-// MessageReplyHeader paths: a sender-picked quote (with entities and
-// offset), a forum topic reply (ForumTopic + TopID), and a
-// cross-chat reply (ReplyToPeerID). Bare in-chat replies are
-// covered indirectly by the messageToRow tests below.
+// TestExtractReplyInfo_QuoteAndForumTopic covers the rich header
+// paths: sender-picked quote, forum topic reply, and cross-chat reply.
 func TestExtractReplyInfo_QuoteAndForumTopic(t *testing.T) {
 	h := &tg.MessageReplyHeader{
 		Quote:      true,
@@ -188,7 +185,7 @@ func TestExtractReplyInfo_QuoteAndForumTopic(t *testing.T) {
 		&tg.MessageEntityBold{Offset: 0, Length: 9},
 	})
 
-	info := extractReplyInfo(h, "ignored parent text")
+	info := extractReplyInfo(h)
 	require.NotNil(t, info)
 	require.Equal(t, 42, info.MessageID)
 	// peerID flips channel ids to the bot-api negative form.
@@ -202,15 +199,14 @@ func TestExtractReplyInfo_QuoteAndForumTopic(t *testing.T) {
 	require.Equal(t, "bold", info.QuoteEntities[0].Type)
 }
 
-// TestExtractReplyInfo_BareReplyKeepsOnlyID confirms the minimal
-// case: plain in-chat reply produces a ReplyInfo with only
-// MessageID set. The omitempty tags on the other fields hide them
-// from the JSON output.
+// TestExtractReplyInfo_BareReplyKeepsOnlyID confirms a plain in-chat
+// reply yields a ReplyInfo with only MessageID set; omitempty hides
+// the rest from the JSON output.
 func TestExtractReplyInfo_BareReplyKeepsOnlyID(t *testing.T) {
 	h := &tg.MessageReplyHeader{}
 	h.SetReplyToMsgID(9)
 
-	info := extractReplyInfo(h, "")
+	info := extractReplyInfo(h)
 	require.NotNil(t, info)
 	require.Equal(t, 9, info.MessageID)
 	require.Zero(t, info.PeerID)
@@ -221,12 +217,11 @@ func TestExtractReplyInfo_BareReplyKeepsOnlyID(t *testing.T) {
 	require.Empty(t, info.QuoteEntities)
 }
 
-// TestExtractReplyInfo_EmptyHeaderReturnsNil asserts a header with
-// nothing useful (no msg id, no peer, no quote, no forum) collapses
-// to nil so messageToRow's `if info := ...; info != nil` check drops
-// the field instead of emitting an all-zero object.
+// TestExtractReplyInfo_EmptyHeaderReturnsNil asserts an empty header
+// collapses to nil so reply_to is dropped rather than emitted as an
+// all-zero object.
 func TestExtractReplyInfo_EmptyHeaderReturnsNil(t *testing.T) {
-	require.Nil(t, extractReplyInfo(&tg.MessageReplyHeader{}, ""))
+	require.Nil(t, extractReplyInfo(&tg.MessageReplyHeader{}))
 }
 
 // TestMessageToRow_PopulatesEditDateGroupedReactions exercises the

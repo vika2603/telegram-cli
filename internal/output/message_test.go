@@ -91,12 +91,9 @@ func TestRenderMessages_TTYDoesNotTruncateLongRefs(t *testing.T) {
 	require.Contains(t, stdout.String(), ref)
 }
 
-// TestMessageRow_MarshalJSON_ReplyToObject guards the breaking
-// shape change to reply_to: was `reply_to: <int>`, now `reply_to:
-// {message_id, peer_id, forum_topic, top_id, quote_text, ...}`. The
-// new shape carries everything agents need to reconstruct comment
-// threads, cross-chat reply targets, forum topics, and quote
-// excerpts — previously only the integer message id was exposed.
+// TestMessageRow_MarshalJSON_ReplyToObject guards the shape change to
+// reply_to: was `reply_to: <int>`, now an object with message_id,
+// peer_id, forum_topic, top_id, quote_text, and friends.
 func TestMessageRow_MarshalJSON_ReplyToObject(t *testing.T) {
 	row := output.MessageRow{
 		ID:   77,
@@ -131,9 +128,8 @@ func TestMessageRow_MarshalJSON_ReplyToObject(t *testing.T) {
 	require.NotNil(t, rt["quote_entities"])
 }
 
-// TestMessageRow_MarshalJSON_ReplyToOmitsWhenAbsent asserts no
-// spurious reply_to key on a plain message — the field is a pointer
-// with omitempty so nil drops it entirely.
+// TestMessageRow_MarshalJSON_ReplyToOmitsWhenAbsent asserts a plain
+// message emits no reply_to key (nil pointer + omitempty).
 func TestMessageRow_MarshalJSON_ReplyToOmitsWhenAbsent(t *testing.T) {
 	row := output.MessageRow{ID: 1, Date: "2026-04-23T12:00:00Z", Text: "hi"}
 	b, err := json.Marshal(row)

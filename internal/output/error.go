@@ -7,6 +7,7 @@ import (
 	"io"
 
 	"github.com/vika2603/telegram-cli/internal/program/status"
+	"github.com/vika2603/telegram-cli/internal/telegram/session"
 )
 
 // ErrorDetailer is implemented by error types that want to surface
@@ -35,9 +36,8 @@ func EmitError(stderr io.Writer, mode string, err error) int {
 			"code":    status.Code(err),
 			"message": err.Error(),
 		}
-		var d ErrorDetailer
-		if errors.As(err, &d) {
-			for k, v := range d.ErrorDetail() {
+		mergeDetail := func(detail map[string]any) {
+			for k, v := range detail {
 				// Don't let detailers overwrite the base shape — code
 				// and message stay authoritative.
 				if k == "code" || k == "message" {
@@ -45,6 +45,16 @@ func EmitError(stderr io.Writer, mode string, err error) int {
 				}
 				errObj[k] = v
 			}
+		}
+		var d ErrorDetailer
+		if errors.As(err, &d) {
+			mergeDetail(d.ErrorDetail())
+		} else if fwe, ok := session.AsFloodWait(err); ok {
+			// Fallback for raw gotd FLOOD_WAIT errors that never went
+			// through ApplyFloodPolicy and so carry no typed
+			// ErrorDetailer on the chain. AsFloodWait synthesises a
+			// FloodWaitError so retry_after_seconds still surfaces.
+			mergeDetail(fwe.ErrorDetail())
 		}
 		obj := map[string]any{
 			"error":     errObj,

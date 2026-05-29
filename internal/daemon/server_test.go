@@ -2,6 +2,7 @@ package daemon_test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net"
 	"os"
@@ -14,6 +15,7 @@ import (
 	"github.com/vika2603/telegram-cli/internal/daemon"
 	"github.com/vika2603/telegram-cli/internal/output"
 	"github.com/vika2603/telegram-cli/internal/telegram"
+	"github.com/vika2603/telegram-cli/internal/telegram/session"
 )
 
 // withServer spins up a real Server bound to a temp Unix socket and
@@ -131,7 +133,9 @@ func TestServer_SubscribeWithUnknownRefReturnsError(t *testing.T) {
 		Refs: []string{"@nonsense"},
 	})
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "resolve_failed")
+	var rem *daemon.RemoteError
+	require.ErrorAs(t, err, &rem)
+	require.Equal(t, "resolve_failed", rem.Code)
 }
 
 func TestServer_RefsWithoutResolverIsErrored(t *testing.T) {
@@ -170,5 +174,56 @@ func TestServer_UnknownMethodIsErrored(t *testing.T) {
 
 	_, err := cl.Call(context.Background(), "fly_to_the_moon", nil)
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "unknown_method")
+	var rem *daemon.RemoteError
+	require.ErrorAs(t, err, &rem)
+	require.Equal(t, "unknown_method", rem.Code)
+}
+
+// TestServer_HandlerErrorPropagatesCodeAndDetail guards the
+// IPC error contract: when a registered handler returns an error
+// that implements ErrorDetailer (and is recognised by status.Code),
+// the daemon must classify it AND propagate the detail map through
+// the wire so the client sees the same envelope the local path
+// would have surfaced.
+//
+// Inlines the server setup to get a handle on *daemon.Server (the
+// shared `withServer` helper only exposes the SubscriptionManager).
+func TestServer_HandlerErrorPropagatesCodeAndDetail(t *testing.T) {
+	dir, err := os.MkdirTemp("/tmp", "tgd")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = os.RemoveAll(dir) })
+	sock := filepath.Join(dir, "d.sock")
+
+	mgr := daemon.NewSubscriptionManager(8)
+	srv := daemon.NewServer("alice", sock, mgr, nil)
+	require.NoError(t, srv.Listen())
+
+	srv.Register("rate_blow_up", func(_ context.Context, _ json.RawMessage) (json.RawMessage, error) {
+		return nil, &session.FloodWaitError{Seconds: 17}
+	})
+
+	ctx, cancel := context.WithCancel(context.Background())
+	doneCh := make(chan struct{})
+	go func() {
+		_ = srv.Serve(ctx)
+		close(doneCh)
+	}()
+	t.Cleanup(func() {
+		cancel()
+		_ = srv.Close()
+		<-doneCh
+		mgr.Close()
+	})
+
+	cl := dialClient(t, sock)
+	defer func() { _ = cl.Close() }()
+
+	_, err = cl.Call(context.Background(), "rate_blow_up", nil)
+	require.Error(t, err)
+	var rem *daemon.RemoteError
+	require.ErrorAs(t, err, &rem)
+	require.Equal(t, "flood_wait", rem.Code, "code must come from status.Code(err), not the generic method_failed")
+	require.Equal(t, 6, rem.ExitCode, "exit code must come from status.MapExitCode")
+	require.NotNil(t, rem.Detail)
+	require.InDelta(t, float64(17), rem.Detail["retry_after_seconds"], 0)
 }

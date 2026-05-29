@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/gotd/td/tgerr"
 	"github.com/stretchr/testify/require"
 
 	"github.com/vika2603/telegram-cli/internal/command"
@@ -65,6 +66,34 @@ func TestEmitError_floodWaitSurfacesRetryAfter(t *testing.T) {
 	require.Equal(t, "flood_wait", obj.Error.Code)
 	require.Equal(t, 42, obj.Error.RetryAfterSeconds)
 	require.Equal(t, 6, obj.ExitCode)
+}
+
+// TestEmitError_rawGotdFloodWaitSurfacesRetryAfter exercises the
+// fallback path that classifies raw *tgerr.Error FLOOD_WAITs (the
+// shape gotd actually surfaces on every call path that doesn't go
+// through ApplyFloodPolicy — which is most of them). Without this
+// fallback the code would be "unknown" and retry_after_seconds
+// would be absent.
+func TestEmitError_rawGotdFloodWaitSurfacesRetryAfter(t *testing.T) {
+	// Build a raw gotd FLOOD_WAIT exactly the way the server would.
+	raw := tgerr.New(420, "FLOOD_WAIT_13")
+	wrapped := fmt.Errorf("messages.search: %w", raw)
+
+	var buf bytes.Buffer
+	code := EmitError(&buf, "json", wrapped)
+	require.Equal(t, 6, code, "raw gotd FLOOD_WAIT must map to exit 6")
+
+	var obj struct {
+		Error struct {
+			Code              string `json:"code"`
+			Message           string `json:"message"`
+			RetryAfterSeconds int    `json:"retry_after_seconds"`
+		} `json:"error"`
+		ExitCode int `json:"exit_code"`
+	}
+	require.NoError(t, json.Unmarshal(bytes.TrimSpace(buf.Bytes()), &obj))
+	require.Equal(t, "flood_wait", obj.Error.Code, "must classify as flood_wait, not unknown")
+	require.Equal(t, 13, obj.Error.RetryAfterSeconds, "must extract seconds from FLOOD_WAIT_<N>")
 }
 
 // TestEmitError_nonDetailerOmitsField asserts no spurious key on

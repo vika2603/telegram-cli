@@ -11,7 +11,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/vika2603/telegram-cli/internal/program/status"
 	"github.com/vika2603/telegram-cli/internal/telegram"
+	"github.com/vika2603/telegram-cli/internal/telegram/session"
 	"github.com/vika2603/telegram-cli/internal/version"
 )
 
@@ -325,7 +327,11 @@ func (s *Server) dispatch(
 				result, err := h(ctx, req.Params)
 				s.metrics.RecordRPC(req.Method, time.Since(start), err)
 				if err != nil {
-					_ = writeFrame(errorFrame(req.ID, "method_failed", 1, err.Error()))
+					// Use the same code / exit_code mapping the local
+					// path uses, and propagate any ErrorDetailer detail
+					// (e.g. flood-wait retry_after_seconds) so the wire
+					// envelope matches the local path.
+					_ = writeFrame(errorFrameFromErr(req.ID, err))
 					return
 				}
 				_ = writeFrame(Frame{ID: req.ID, Result: result})
@@ -410,6 +416,35 @@ func errorFrame(id uint64, code string, exitCode int, msg string) Frame {
 		Code:     code,
 		ExitCode: exitCode,
 		Message:  msg,
+	}}
+}
+
+// errorFrameFromErr packages a Go error into a FrameError using the
+// same status.Code / status.MapExitCode mapping the local error path
+// uses, plus the ErrorDetailer detail map if one is attached. This is
+// the bridge between handler errors and the IPC wire so the daemon
+// path matches the local path's JSON envelope byte-for-byte.
+//
+// Mirrors the fallback in output.EmitError: when the handler returned
+// a raw gotd FLOOD_WAIT (no ApplyFloodPolicy wrap), session.AsFloodWait
+// still surfaces retry_after_seconds so daemon-routed FLOOD_WAITs
+// don't lose the typed detail.
+func errorFrameFromErr(id uint64, err error) Frame {
+	var detail map[string]any
+	var d interface{ ErrorDetail() map[string]any }
+	switch {
+	case errors.As(err, &d):
+		detail = d.ErrorDetail()
+	default:
+		if fwe, ok := session.AsFloodWait(err); ok {
+			detail = fwe.ErrorDetail()
+		}
+	}
+	return Frame{ID: id, Error: &FrameError{
+		Code:     status.Code(err),
+		ExitCode: status.MapExitCode(err),
+		Message:  err.Error(),
+		Detail:   detail,
 	}}
 }
 

@@ -197,7 +197,12 @@ func (c *Client) Call(ctx context.Context, method string, params any) (json.RawM
 			return nil, errors.New("daemon closed connection")
 		}
 		if f.Error != nil {
-			return nil, fmt.Errorf("%s: %s", f.Error.Code, f.Error.Message)
+			return nil, &RemoteError{
+				Code:     f.Error.Code,
+				ExitCode: f.Error.ExitCode,
+				Message:  f.Error.Message,
+				Detail:   f.Error.Detail,
+			}
 		}
 		return f.Result, nil
 	}
@@ -303,3 +308,38 @@ func (c *Client) readLoop() {
 	}
 	_ = c.Close()
 }
+
+// RemoteError is the typed error returned by Client.Call when the
+// daemon's handler returned an error. It preserves the structured
+// envelope the daemon emitted (Code / ExitCode / Detail) so the
+// client-side EmitError can render the same JSON shape the local
+// path would have rendered. status.Code / status.MapExitCode and
+// output.EmitError pick up the typed fields via the RemoteCoded /
+// RemoteExitCoded / ErrorDetailer interfaces, all satisfied here
+// via structural typing.
+type RemoteError struct {
+	Code     string
+	ExitCode int
+	Message  string
+	Detail   map[string]any
+}
+
+// Error returns the human-readable message; the daemon already
+// includes the code-prefixed form (e.g. "flood_wait: msg send to
+// @alice: flood wait: 30 seconds") if it wanted, so we don't
+// re-prefix here.
+func (e *RemoteError) Error() string { return e.Message }
+
+// RemoteCode lets status.Code short-circuit to the wire code instead
+// of trying to recognise the error via errors.Is on local sentinels
+// the remote side may not have exported.
+func (e *RemoteError) RemoteCode() string { return e.Code }
+
+// RemoteExitCode mirrors RemoteCode for the exit-code mapping.
+func (e *RemoteError) RemoteExitCode() int { return e.ExitCode }
+
+// ErrorDetail surfaces the daemon's structured detail map so
+// output.EmitError merges it into the JSON error object exactly the
+// way the local path would have. nil-safe: a remote error without
+// detail just returns nil.
+func (e *RemoteError) ErrorDetail() map[string]any { return e.Detail }

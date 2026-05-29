@@ -3,6 +3,8 @@ package session
 import (
 	"errors"
 	"fmt"
+
+	"github.com/gotd/td/tgerr"
 )
 
 var (
@@ -38,3 +40,35 @@ func (e *FloodWaitError) ErrorDetail() map[string]any {
 }
 
 var ErrFloodWait = errors.New("flood wait")
+
+// AsFloodWait normalises the two shapes a flood-wait can take in this
+// codebase into a single typed *FloodWaitError:
+//
+//  1. *FloodWaitError already wrapped on the error chain — produced
+//     by ApplyFloodPolicy at some session boundary.
+//  2. Raw *tgerr.Error of type FLOOD_WAIT — gotd's surface. Most
+//     telegram-layer entry points do NOT route through
+//     ApplyFloodPolicy today, so the raw form is what `status` and
+//     `output` see in practice.
+//
+// Used by status.Code / status.MapExitCode / output.EmitError so the
+// JSON envelope classifies and decorates a flood-wait the same way
+// regardless of which call path produced it. Returns (nil, false)
+// for anything else.
+func AsFloodWait(err error) (*FloodWaitError, bool) {
+	if err == nil {
+		return nil, false
+	}
+	var typed *FloodWaitError
+	if errors.As(err, &typed) {
+		return typed, true
+	}
+	if d, ok := tgerr.AsFloodWait(err); ok {
+		sec := int(d.Seconds())
+		if sec == 0 {
+			sec = 1
+		}
+		return &FloodWaitError{Seconds: sec}, true
+	}
+	return nil, false
+}

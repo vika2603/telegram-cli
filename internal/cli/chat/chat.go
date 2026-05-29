@@ -12,6 +12,7 @@ import (
 	"github.com/vika2603/telegram-cli/internal/cli/chat/mute"
 	"github.com/vika2603/telegram-cli/internal/cli/chat/read"
 	"github.com/vika2603/telegram-cli/internal/cli/chat/show"
+	"github.com/vika2603/telegram-cli/internal/cli/chat/topics"
 	"github.com/vika2603/telegram-cli/internal/cli/chat/unarchive"
 	"github.com/vika2603/telegram-cli/internal/cli/chat/unmute"
 	"github.com/vika2603/telegram-cli/internal/runtime"
@@ -33,5 +34,6 @@ func New(f *runtime.Invocation) *cobra.Command {
 	cmd.AddCommand(unmute.New(f, nil))
 	cmd.AddCommand(archive.New(f, nil))
 	cmd.AddCommand(unarchive.New(f, nil))
+	cmd.AddCommand(topics.New(f, nil))
 	return cmd
 }

@@ -155,6 +155,32 @@ func TestSend_RejectsRandomIDWithMultipleAttachments(t *testing.T) {
 	require.Contains(t, err.Error(), "random-id")
 }
 
+func TestForward_RandomIDPassesThroughSingle(t *testing.T) {
+	_, err := actionmessage.Forward(context.Background(), actionmessage.ForwardRequest{
+		RawMessageRefs: []string{"@alice:1"},
+		RawTo:          "@bob",
+		RandomID:       99,
+	}, func(_ context.Context, q actionmessage.ForwardQuery) (output.SendResultRow, error) {
+		require.Equal(t, int64(99), q.RandomID)
+		require.Equal(t, []int{1}, q.IDs)
+		return output.SendResultRow{Action: "forward", MessageID: 1}, nil
+	})
+	require.NoError(t, err)
+}
+
+func TestForward_RejectsRandomIDWithMultiple(t *testing.T) {
+	_, err := actionmessage.Forward(context.Background(), actionmessage.ForwardRequest{
+		RawMessageRefs: []string{"@alice:1", "@alice:2"},
+		RawTo:          "@bob",
+		RandomID:       99,
+	}, func(context.Context, actionmessage.ForwardQuery) (output.SendResultRow, error) {
+		t.Fatal("forward must not run when --random-id conflicts with multiple messages")
+		return output.SendResultRow{}, nil
+	})
+	require.ErrorIs(t, err, command.ErrUsage)
+	require.Contains(t, err.Error(), "random-id")
+}
+
 func TestDownload_NormalizesMessageRef(t *testing.T) {
 	row, err := actionmessage.Download(context.Background(), actionmessage.DownloadRequest{
 		RawMessageRef: "@alice:42",

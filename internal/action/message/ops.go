@@ -305,6 +305,7 @@ type ForwardRequest struct {
 	RawMessageRefs []string
 	RawTo          string
 	Silent         bool
+	RandomID       int64
 }
 
 // ForwardQuery is the normalized payload passed to Telegram.
@@ -313,6 +314,10 @@ type ForwardQuery struct {
 	To     ref.Ref
 	IDs    []int
 	Silent bool
+	// RandomID is the dedup key (see SendQuery.RandomID). forwardMessages
+	// assigns one id per forwarded message, so a single key only maps to a
+	// single-message forward; NormalizeForward rejects it for multiple.
+	RandomID int64
 }
 
 // ForwardFunc forwards messages.
@@ -343,7 +348,13 @@ func NormalizeForward(req ForwardRequest) (ForwardQuery, error) {
 	if err != nil {
 		return ForwardQuery{}, fmt.Errorf("%w: %s", command.ErrUsage, err.Error())
 	}
-	return ForwardQuery{From: from, To: to, IDs: ids, Silent: req.Silent}, nil
+	// forwardMessages needs one distinct random_id per message, so a single
+	// --random-id can only key a single-message forward (same constraint as
+	// an album in NormalizeSend).
+	if req.RandomID != 0 && len(ids) > 1 {
+		return ForwardQuery{}, fmt.Errorf("%w: --random-id is not supported when forwarding multiple messages", command.ErrUsage)
+	}
+	return ForwardQuery{From: from, To: to, IDs: ids, Silent: req.Silent, RandomID: req.RandomID}, nil
 }
 
 // DeleteRequest is the raw request for `tg msg delete`.

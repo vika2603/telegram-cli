@@ -161,7 +161,17 @@ func ForwardMessages(ctx context.Context, api *tg.Client, resolver *peer.Resolve
 	if err != nil {
 		return output.SendResultRow{}, err
 	}
-	b := gotdmessage.NewSender(api).To(to.InputPeer)
+	sender := gotdmessage.NewSender(api)
+	if q.RandomID != 0 {
+		// Same seeding trick as SendMessage: gotd derives the per-message
+		// forward random_id from the sender's rand source, so feed it the
+		// bytes that decode back to q.RandomID. NormalizeForward guarantees
+		// a single message here, so only 8 bytes are consumed.
+		var buf bin.Buffer
+		buf.PutLong(q.RandomID)
+		sender = sender.WithRand(bytes.NewReader(buf.Buf))
+	}
+	b := sender.To(to.InputPeer)
 	if q.Silent {
 		b.Silent()
 	}

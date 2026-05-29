@@ -146,6 +146,13 @@ func newRootPreRun(f *runtime.Invocation) func(*cobra.Command, []string) error {
 		f.ConfigPath, _ = cmd.Flags().GetString("config")
 		f.AccountName, _ = cmd.Flags().GetString("account")
 		f.NoDaemon, _ = cmd.Flags().GetBool("no-daemon")
+		// Only treat --flood-wait-max as an override when explicitly set;
+		// the flag's default (30) must not shadow env/file config.
+		if cmd.Flags().Changed("flood-wait-max") {
+			if v, err := cmd.Flags().GetInt("flood-wait-max"); err == nil {
+				f.FloodWaitMax = &v
+			}
+		}
 
 		m := command.MetaFrom(cmd)
 		if m.AccountFromArg {

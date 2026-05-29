@@ -28,9 +28,12 @@ func ClientOptsFrom(f *Invocation, acct *account.Account) session.Options {
 	if f != nil && f.AppVersion != "" {
 		appVersion = f.AppVersion
 	}
+	mode, maxSec := floodPolicyFrom(f)
 	return session.Options{
-		APIID:   acct.Meta.APIID,
-		APIHash: acct.Meta.APIHash,
+		APIID:       acct.Meta.APIID,
+		APIHash:     acct.Meta.APIHash,
+		FloodMode:   mode,
+		FloodMaxSec: maxSec,
 		Device: session.DeviceOptions{
 			Model:          "tg CLI",
 			SystemVersion:  fmt.Sprintf("%s/%s", goruntime.GOOS, goruntime.GOARCH),
@@ -39,4 +42,30 @@ func ClientOptsFrom(f *Invocation, acct *account.Account) session.Options {
 			LangCode:       "en",
 		},
 	}
+}
+
+// floodPolicyFrom resolves the flood-wait mode + cap with the standard
+// precedence: --flood-wait-max flag (cap only) > env/file config >
+// hard defaults (fail mode, 30s cap). The env > file > default merge is
+// already done inside f.Config(); this layer applies the flag on top.
+//
+// Config errors are swallowed — a malformed config must not stop a
+// command from running; it just falls back to the safe defaults.
+func floodPolicyFrom(f *Invocation) (session.FloodMode, int) {
+	mode := session.FloodFail
+	maxSec := 30
+	if f != nil && f.Config != nil {
+		if cfg, err := f.Config(); err == nil && cfg != nil {
+			if cfg.FloodWait.Mode != nil && *cfg.FloodWait.Mode == "wait" {
+				mode = session.FloodWait
+			}
+			if cfg.FloodWait.MaxSeconds != nil {
+				maxSec = *cfg.FloodWait.MaxSeconds
+			}
+		}
+	}
+	if f != nil && f.FloodWaitMax != nil {
+		maxSec = *f.FloodWaitMax
+	}
+	return mode, maxSec
 }

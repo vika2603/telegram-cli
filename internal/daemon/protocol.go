@@ -58,10 +58,15 @@ type Frame struct {
 
 // FrameError is the JSON shape of an RPC error. Mirrors the status
 // code + exit code contract the CLI surfaces from local commands.
+// Detail is the structured per-error payload an output.ErrorDetailer
+// would attach in the local path (e.g. retry_after_seconds for a
+// FLOOD_WAIT). Carrying it through the IPC frame keeps the daemon
+// path byte-equivalent to the local path on the wire.
 type FrameError struct {
-	Code     string `json:"code"`
-	ExitCode int    `json:"exit_code"`
-	Message  string `json:"message"`
+	Code     string         `json:"code"`
+	ExitCode int            `json:"exit_code"`
+	Message  string         `json:"message"`
+	Detail   map[string]any `json:"detail,omitempty"`
 }
 
 // HelloPayload is the first frame the daemon pushes on every new

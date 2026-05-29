@@ -41,6 +41,23 @@ func TestEmitError_humanShape(t *testing.T) {
 	require.False(t, json.Valid(buf.Bytes()), "human mode must not be valid JSON")
 }
 
+func TestEmitError_humanCancelIsQuiet(t *testing.T) {
+	var buf bytes.Buffer
+	// Ctrl+C mid-prompt surfaces as a wrapped command.ErrCancel; the human
+	// path must exit 130 without printing a noisy "error: ..." line (the
+	// terminal already showed "^C").
+	code := EmitError(&buf, "human", fmt.Errorf("read api_id: %w", command.ErrCancel))
+	require.Equal(t, 130, code)
+	require.Empty(t, buf.String())
+}
+
+func TestEmitError_jsonCancelStillEmits(t *testing.T) {
+	var buf bytes.Buffer
+	code := EmitError(&buf, "json", fmt.Errorf("read api_id: %w", command.ErrCancel))
+	require.Equal(t, 130, code)
+	require.True(t, json.Valid(bytes.TrimSpace(buf.Bytes())), "json mode still emits a structured record")
+}
+
 // TestEmitError_floodWaitSurfacesRetryAfter guards the structured
 // flood-wait detail: when a *session.FloodWaitError reaches EmitError
 // in JSON mode, the seconds are surfaced as a typed

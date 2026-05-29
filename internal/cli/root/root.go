@@ -32,6 +32,7 @@ import (
 	"github.com/vika2603/telegram-cli/internal/command"
 	"github.com/vika2603/telegram-cli/internal/runtime"
 	"github.com/vika2603/telegram-cli/internal/telegram/session"
+	"github.com/vika2603/telegram-cli/internal/ui"
 )
 
 // New constructs the root command tree. Invocation is injected for
@@ -135,6 +136,13 @@ func frequentCommands(f *runtime.Invocation) []*cobra.Command {
 // stay cobra-free.
 func newRootPreRun(f *runtime.Invocation) func(*cobra.Command, []string) error {
 	return func(cmd *cobra.Command, _ []string) error {
+		// Make interactive prompts abortable: the root context is cancelled
+		// on SIGINT/SIGTERM (see program.Main), so wiring it into the
+		// prompter lets Ctrl+C break out of a blocking prompt (e.g. mid
+		// `tg login`) instead of hanging on a read the handler swallowed.
+		if sp, ok := f.Prompter.(*ui.SystemPrompter); ok {
+			sp.Ctx = cmd.Context()
+		}
 		if v, err := cmd.Flags().GetString("color"); err == nil {
 			switch v {
 			case "always":

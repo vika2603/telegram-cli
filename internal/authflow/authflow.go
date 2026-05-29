@@ -184,7 +184,7 @@ func DoLoginWithOptions(ctx context.Context, f *runtime.Invocation, opts LoginOp
 		}
 		// Interactive prompt when no creds from any source.
 		if apiID == 0 || apiHash == "" {
-			promptID, promptHash, perr := PromptAPICredentials(InvocationIO(f))
+			promptID, promptHash, perr := PromptAPICredentials(ctx, InvocationIO(f))
 			if perr != nil {
 				return perr
 			}
@@ -206,7 +206,7 @@ func DoLoginWithOptions(ctx context.Context, f *runtime.Invocation, opts LoginOp
 	sessionOpts.Logger = log
 	sessionOpts.APIID = apiID
 	sessionOpts.APIHash = apiHash
-	authr, display, err := PickAuth(InvocationIO(f), opts.QR)
+	authr, display, err := PickAuth(ctx, InvocationIO(f), opts.QR)
 	if err != nil {
 		return err
 	}
@@ -221,7 +221,7 @@ func DoLoginWithOptions(ctx context.Context, f *runtime.Invocation, opts LoginOp
 // SESSION_PASSWORD_NEEDED; a nil authr is acceptable when the account has no
 // 2FA, but the QR flow will fail with a clear error if 2FA is required and no
 // password source is available.
-func PickAuth(ios *ui.IOStreams, qr bool) (account.UserAuthenticator, account.QRDisplay, error) {
+func PickAuth(ctx context.Context, ios *ui.IOStreams, qr bool) (account.UserAuthenticator, account.QRDisplay, error) {
 	if ios == nil {
 		ios = ui.System()
 	}
@@ -235,7 +235,7 @@ func PickAuth(ios *ui.IOStreams, qr bool) (account.UserAuthenticator, account.QR
 		}
 		if ios.IsStdinTTY() {
 			// IsStdinTTY guards the only error path inside newTTYAuth.
-			a, _ := newTTYAuth(ios)
+			a, _ := newTTYAuth(ctx, ios)
 			return a, d, nil
 		}
 		return nil, d, nil
@@ -245,7 +245,7 @@ func PickAuth(ios *ui.IOStreams, qr bool) (account.UserAuthenticator, account.QR
 		return newEnvAuth(), nil, nil
 	}
 	if ios.IsStdinTTY() {
-		a, err := newTTYAuth(ios)
+		a, err := newTTYAuth(ctx, ios)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -256,11 +256,19 @@ func PickAuth(ios *ui.IOStreams, qr bool) (account.UserAuthenticator, account.QR
 
 // PromptAPICredentials reads api_id and api_hash interactively. Fails fast
 // with ErrPrecondition when stdin is not a TTY.
-func PromptAPICredentials(ios *ui.IOStreams) (int, string, error) {
+func PromptAPICredentials(ctx context.Context, ios *ui.IOStreams) (int, string, error) {
 	if !ios.IsStdinTTY() {
 		return 0, "", fmt.Errorf("%w: api_id/api_hash not set and stdin is not a terminal; pass --api-id/--api-hash or set TG_API_ID/TG_API_HASH", command.ErrPrecondition)
 	}
-	prompter := &ui.SystemPrompter{IO: ios}
+	// ctx rides on the prompter (like http.Request) so a SIGINT mid-prompt
+	// aborts the blocking read. contextcheck wants ctx threaded as a param
+	// into the read path, but that would mean adding ctx to the whole
+	// Prompter interface and its many call sites/tests; the field carries it
+	// instead, so suppress the interprocedural false positive here.
+	return readAPICredentials(&ui.SystemPrompter{IO: ios, Ctx: ctx}) //nolint:contextcheck // ctx is honored via the prompter field
+}
+
+func readAPICredentials(prompter *ui.SystemPrompter) (int, string, error) {
 	line, err := prompter.Input("Telegram api_id (integer, from https://my.telegram.org)", "")
 	if err != nil {
 		return 0, "", fmt.Errorf("read api_id: %w", err)
@@ -286,11 +294,11 @@ type ttyAuth struct {
 	prompter ui.Prompter
 }
 
-func newTTYAuth(ios *ui.IOStreams) (*ttyAuth, error) {
+func newTTYAuth(ctx context.Context, ios *ui.IOStreams) (*ttyAuth, error) {
 	if !ios.IsStdinTTY() {
 		return nil, fmt.Errorf("%w: stdin is not a terminal", command.ErrPrecondition)
 	}
-	return &ttyAuth{io: ios, prompter: &ui.SystemPrompter{IO: ios}}, nil
+	return &ttyAuth{io: ios, prompter: &ui.SystemPrompter{IO: ios, Ctx: ctx}}, nil
 }
 
 func (t *ttyAuth) Phone(_ context.Context) (string, error) {

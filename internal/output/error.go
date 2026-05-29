@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/vika2603/telegram-cli/internal/command"
 	"github.com/vika2603/telegram-cli/internal/program/status"
 	"github.com/vika2603/telegram-cli/internal/telegram/session"
 )
@@ -31,6 +32,12 @@ func EmitError(stderr io.Writer, mode string, err error) int {
 		return 0
 	}
 	code := status.MapExitCode(err)
+	// A user cancellation (Ctrl+C / SIGINT) is not worth shouting about in a
+	// terminal — the shell already echoed "^C". Exit quietly with 130.
+	// JSON mode still emits the structured record so scripts can detect it.
+	if mode != "json" && errors.Is(err, command.ErrCancel) {
+		return code
+	}
 	if mode == "json" {
 		errObj := map[string]any{
 			"code":    status.Code(err),

@@ -2,6 +2,7 @@ package ui
 
 import (
 	"bufio"
+	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -20,8 +21,22 @@ type Prompter interface {
 	Input(prompt, defaultValue string) (string, error)
 }
 
-// SystemPrompter is the production Prompter.
-type SystemPrompter struct{ IO *IOStreams }
+// SystemPrompter is the production Prompter. Ctx, when set, makes the
+// blocking stdin reads abortable: cancelling it (e.g. SIGINT via the
+// root's signal.NotifyContext) unblocks an in-flight prompt with
+// command.ErrCancel instead of hanging forever on a read the signal
+// handler has already swallowed.
+type SystemPrompter struct {
+	IO  *IOStreams
+	Ctx context.Context
+}
+
+func (p *SystemPrompter) promptCtx() context.Context {
+	if p.Ctx != nil {
+		return p.Ctx
+	}
+	return context.Background()
+}
 
 func (p *SystemPrompter) ensurePromptable() error {
 	if p == nil || p.IO == nil {
@@ -42,14 +57,41 @@ func (p *SystemPrompter) Password(prompt string) (string, error) {
 		return "", err
 	}
 	if f, ok := p.IO.In.(interface{ Fd() uintptr }); ok && p.IO.IsStdinTTY() {
-		b, err := term.ReadPassword(int(f.Fd()))
+		s, err := readPasswordLine(p.promptCtx(), int(f.Fd()))
 		_, _ = fmt.Fprintln(p.IO.ErrOut)
-		if err != nil {
-			return "", err
-		}
-		return strings.TrimRight(string(b), "\r\n"), nil
+		return s, err
 	}
-	return readPromptLine(p.IO.In)
+	return readPromptLine(p.promptCtx(), p.IO.In)
+}
+
+// readPasswordLine reads a masked line, racing the blocking terminal read
+// against ctx so a SIGINT mid-prompt unblocks it (term.ReadPassword keeps
+// ISIG enabled, so Ctrl+C still fires a signal). On cancel we restore the
+// pre-prompt terminal state — the goroutine stays parked on the read but the
+// process is exiting — so echo isn't left disabled.
+func readPasswordLine(ctx context.Context, fd int) (string, error) {
+	oldState, _ := term.GetState(fd)
+	type result struct {
+		b   []byte
+		err error
+	}
+	ch := make(chan result, 1)
+	go func() {
+		b, err := term.ReadPassword(fd)
+		ch <- result{b, err}
+	}()
+	select {
+	case <-ctx.Done():
+		if oldState != nil {
+			_ = term.Restore(fd, oldState)
+		}
+		return "", fmt.Errorf("%w: input cancelled", command.ErrCancel)
+	case r := <-ch:
+		if r.err != nil {
+			return "", r.err
+		}
+		return strings.TrimRight(string(r.b), "\r\n"), nil
+	}
 }
 
 func (p *SystemPrompter) Input(prompt, defaultValue string) (string, error) {
@@ -63,7 +105,7 @@ func (p *SystemPrompter) Input(prompt, defaultValue string) (string, error) {
 	if _, err := fmt.Fprintf(p.IO.ErrOut, "%s: ", label); err != nil {
 		return "", err
 	}
-	value, err := readPromptLine(p.IO.In)
+	value, err := readPromptLine(p.promptCtx(), p.IO.In)
 	if err != nil {
 		return "", err
 	}
@@ -85,7 +127,7 @@ func (p *SystemPrompter) Confirm(prompt string, defaultAns bool) (bool, error) {
 		if _, err := fmt.Fprint(p.IO.ErrOut, prompt+suffix); err != nil {
 			return false, err
 		}
-		value, err := readPromptLine(p.IO.In)
+		value, err := readPromptLine(p.promptCtx(), p.IO.In)
 		if err != nil {
 			return false, err
 		}
@@ -104,12 +146,30 @@ func (p *SystemPrompter) Confirm(prompt string, defaultAns bool) (bool, error) {
 	}
 }
 
-func readPromptLine(r interface{ Read([]byte) (int, error) }) (string, error) {
-	line, err := bufio.NewReader(r).ReadString('\n')
-	if err != nil && line == "" {
-		return "", err
+func readPromptLine(ctx context.Context, r interface{ Read([]byte) (int, error) }) (string, error) {
+	type lineResult struct {
+		s   string
+		err error
 	}
-	return strings.TrimRight(line, "\r\n"), nil
+	// os.Stdin reads are not context-aware, so do the blocking read in a
+	// goroutine and race it against ctx. On cancel we return immediately;
+	// the goroutine stays parked on the read but the process is exiting, so
+	// the leak is harmless.
+	ch := make(chan lineResult, 1)
+	go func() {
+		line, err := bufio.NewReader(r).ReadString('\n')
+		if err != nil && line == "" {
+			ch <- lineResult{"", err}
+			return
+		}
+		ch <- lineResult{strings.TrimRight(line, "\r\n"), nil}
+	}()
+	select {
+	case <-ctx.Done():
+		return "", fmt.Errorf("%w: input cancelled", command.ErrCancel)
+	case res := <-ch:
+		return res.s, res.err
+	}
 }
 
 // StubPrompter dispenses canned answers in order. Every method pops the

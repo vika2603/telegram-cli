@@ -107,7 +107,7 @@ func Run(ctx context.Context, cmd *cobra.Command, opts *Options) error {
 		ReadMeta:   account.ReadMeta,
 		AddAccount: account.AddAccount,
 		PromptAPICredentials: func() (int, string, error) {
-			return authflow.PromptAPICredentials(authflow.InvocationIO(opts.F))
+			return authflow.PromptAPICredentials(ctx, authflow.InvocationIO(opts.F))
 		},
 		DoLogin: opts.DoLogin,
 	})

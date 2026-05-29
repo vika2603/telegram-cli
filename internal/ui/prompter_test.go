@@ -1,10 +1,14 @@
 package ui_test
 
 import (
+	"context"
+	"io"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/vika2603/telegram-cli/internal/command"
 	"github.com/vika2603/telegram-cli/internal/ui"
 )
 
@@ -61,4 +65,32 @@ func TestSystemPrompter_RequiresPromptableStdin(t *testing.T) {
 
 	_, err := (&ui.SystemPrompter{IO: ios}).Input("Name", "")
 	require.Error(t, err)
+}
+
+func TestSystemPrompter_InputCancelledByContext(t *testing.T) {
+	// A pipe with no writer blocks the read forever, mimicking a user who
+	// started `tg login` and walked away mid-prompt.
+	pr, pw := io.Pipe()
+	t.Cleanup(func() { _ = pw.Close() })
+
+	ios, _, _, _ := ui.Test()
+	ios.SetStdinTTY(true)
+	ios.In = io.NopCloser(pr)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	p := &ui.SystemPrompter{IO: ios, Ctx: ctx}
+
+	done := make(chan error, 1)
+	go func() {
+		_, err := p.Input("Name", "")
+		done <- err
+	}()
+
+	cancel() // SIGINT-equivalent: the root cancels the prompt's context.
+	select {
+	case err := <-done:
+		require.ErrorIs(t, err, command.ErrCancel)
+	case <-time.After(2 * time.Second):
+		t.Fatal("Input did not unblock after context cancel")
+	}
 }

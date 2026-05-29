@@ -32,6 +32,12 @@ func buildTelegramClientWithHandler(acct *account.Account, opts Options, handler
 		SessionStorage: sess,
 		UpdateHandler:  handler,
 		Device:         deviceConfig(opts.Device),
+		Middlewares: []telegram.Middleware{
+			// Apply the configured FLOOD_WAIT policy to every RPC.
+			// Without this the policy / config knobs are inert and
+			// every FLOOD_WAIT surfaces raw.
+			FloodWaitMiddleware(opts.FloodMode, opts.FloodMaxSec),
+		},
 	}
 	b.tgCl = telegram.NewClient(opts.APIID, opts.APIHash, tgOpts)
 	return b, nil

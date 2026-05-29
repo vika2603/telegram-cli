@@ -43,6 +43,14 @@ type Invocation struct {
 	// must not race with a background process.
 	NoDaemon bool
 
+	// FloodWaitMax mirrors the --flood-wait-max root flag, but only when
+	// the user explicitly set it (the flag defaults to 30, so a plain
+	// int can't tell "user passed 30" apart from "default 30"). nil
+	// means "not set by flag" — ClientOptsFrom then uses the env/file/
+	// default config value. Non-nil takes precedence, completing the
+	// flag > env > file > default chain for the flood-wait cap.
+	FloodWaitMax *int
+
 	Config  func() (*config.Config, error)
 	Logger  func() (*zap.Logger, func(), error)
 	Account func(name string) (*account.Account, error)

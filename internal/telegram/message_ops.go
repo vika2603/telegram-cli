@@ -1,8 +1,8 @@
 package telegram
 
 import (
-	"bytes"
 	"context"
+	"encoding/binary"
 	"fmt"
 	"io"
 	"os"
@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gotd/td/bin"
 	"github.com/gotd/td/telegram/downloader"
 	gotdmessage "github.com/gotd/td/telegram/message"
 	"github.com/gotd/td/telegram/message/html"
@@ -28,6 +27,58 @@ import (
 	"github.com/vika2603/telegram-cli/internal/telegram/peer"
 )
 
+// randomIDReader feeds gotd's message sender a deterministic stream of
+// random_ids derived from seed (the --random-id idempotency key). gotd reads
+// one int64 per message it sends, so:
+//   - a single-message send/forward consumes only the first value, which is
+//     seed itself, so the wire random_id equals --random-id;
+//   - an album or multi-message forward consumes one value per item, each a
+//     distinct splitmix64 step from seed.
+//
+// Reusing the same seed on a retry reproduces the same id(s), so the server
+// dedupes every item.
+func randomIDReader(seed int64) io.Reader {
+	return &seededRandReader{seed: seed, state: uint64(seed), first: true, pos: 8}
+}
+
+type seededRandReader struct {
+	seed  int64
+	state uint64
+	first bool
+	buf   [8]byte
+	pos   int // index of the next unread byte in buf; 8 means empty
+}
+
+func (r *seededRandReader) Read(p []byte) (int, error) {
+	n := 0
+	for n < len(p) {
+		if r.pos == 8 {
+			v := uint64(r.seed)
+			if r.first {
+				r.first = false
+			} else {
+				v = nextSplitmix64(&r.state)
+			}
+			binary.LittleEndian.PutUint64(r.buf[:], v)
+			r.pos = 0
+		}
+		c := copy(p[n:], r.buf[r.pos:])
+		n += c
+		r.pos += c
+	}
+	return n, nil
+}
+
+// nextSplitmix64 advances state and returns the next value of the splitmix64
+// sequence — a small, well-distributed deterministic generator.
+func nextSplitmix64(state *uint64) uint64 {
+	*state += 0x9E3779B97F4A7C15
+	z := *state
+	z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9
+	z = (z ^ (z >> 27)) * 0x94D049BB133111EB
+	return z ^ (z >> 31)
+}
+
 // SendMessage performs the Telegram RPC for `tg msg send`.
 //
 // q.Parse is restricted to "" or "html" by NormalizeSend (markdown is
@@ -39,16 +90,7 @@ func SendMessage(ctx context.Context, api *tg.Client, resolver *peer.Resolver, q
 	}
 	sender := gotdmessage.NewSender(api)
 	if q.RandomID != 0 {
-		// gotd only fills RandomID when it's still 0, deriving it from the
-		// sender's rand source. Feed that source the exact bytes gotd's
-		// crypto.RandInt64 decodes (bin.Buffer.Long, the inverse of
-		// PutLong) so the wire random_id equals q.RandomID — letting a
-		// retry with the same key dedupe server-side. NormalizeSend has
-		// already rejected the multi-media case that would read past these
-		// 8 bytes.
-		var buf bin.Buffer
-		buf.PutLong(q.RandomID)
-		sender = sender.WithRand(bytes.NewReader(buf.Buf))
+		sender = sender.WithRand(randomIDReader(q.RandomID))
 	}
 	b := sender.To(resolved.InputPeer)
 	if q.Silent {
@@ -163,13 +205,7 @@ func ForwardMessages(ctx context.Context, api *tg.Client, resolver *peer.Resolve
 	}
 	sender := gotdmessage.NewSender(api)
 	if q.RandomID != 0 {
-		// Same seeding trick as SendMessage: gotd derives the per-message
-		// forward random_id from the sender's rand source, so feed it the
-		// bytes that decode back to q.RandomID. NormalizeForward guarantees
-		// a single message here, so only 8 bytes are consumed.
-		var buf bin.Buffer
-		buf.PutLong(q.RandomID)
-		sender = sender.WithRand(bytes.NewReader(buf.Buf))
+		sender = sender.WithRand(randomIDReader(q.RandomID))
 	}
 	b := sender.To(to.InputPeer)
 	if q.Silent {

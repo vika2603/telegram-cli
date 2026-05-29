@@ -57,7 +57,7 @@ func New(f *runtime.Invocation, runF func(*Options) error) *cobra.Command {
 		return complete.PeerRefs(f)(cmd, args, toComplete)
 	})
 	cmd.Flags().BoolVar(&opts.Silent, "silent", false, "Do not notify recipients")
-	cmd.Flags().Int64Var(&opts.RandomID, "random-id", 0, "Idempotency key (int64) for a single-message forward; reusing it on retry dedupes server-side")
+	cmd.Flags().Int64Var(&opts.RandomID, "random-id", 0, "Idempotency key (int64): reusing it on retry dedupes the forward server-side")
 	command.SetMeta(cmd, command.Meta{NeedsAccount: true, NeedsClient: true})
 	output.AddJSONFlags(cmd, &opts.Exporter, []string{"action", "message_id", "chat_id", "date"})
 	return cmd

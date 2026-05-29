@@ -117,11 +117,6 @@ func NormalizeSend(req SendRequest) (SendQuery, error) {
 	if err != nil {
 		return SendQuery{}, err
 	}
-	// A single --random-id can't key an album: gotd assigns one random id
-	// per media item, so there is no single dedup key to reuse on retry.
-	if req.RandomID != 0 && len(attachments) > 1 {
-		return SendQuery{}, fmt.Errorf("%w: --random-id is not supported with multiple attachments", command.ErrUsage)
-	}
 	parsed, err := ref.ParseRef(req.RawRef)
 	if err != nil {
 		return SendQuery{}, fmt.Errorf("%w: %s", command.ErrUsage, err.Error())
@@ -315,8 +310,8 @@ type ForwardQuery struct {
 	IDs    []int
 	Silent bool
 	// RandomID is the dedup key (see SendQuery.RandomID). forwardMessages
-	// assigns one id per forwarded message, so a single key only maps to a
-	// single-message forward; NormalizeForward rejects it for multiple.
+	// assigns one id per forwarded message; the key seeds a deterministic
+	// sequence so multi-message forwards stay idempotent on retry too.
 	RandomID int64
 }
 
@@ -347,12 +342,6 @@ func NormalizeForward(req ForwardRequest) (ForwardQuery, error) {
 	to, err := ref.ParseRef(req.RawTo)
 	if err != nil {
 		return ForwardQuery{}, fmt.Errorf("%w: %s", command.ErrUsage, err.Error())
-	}
-	// forwardMessages needs one distinct random_id per message, so a single
-	// --random-id can only key a single-message forward (same constraint as
-	// an album in NormalizeSend).
-	if req.RandomID != 0 && len(ids) > 1 {
-		return ForwardQuery{}, fmt.Errorf("%w: --random-id is not supported when forwarding multiple messages", command.ErrUsage)
 	}
 	return ForwardQuery{From: from, To: to, IDs: ids, Silent: req.Silent, RandomID: req.RandomID}, nil
 }

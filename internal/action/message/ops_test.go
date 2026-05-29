@@ -136,7 +136,7 @@ func TestSend_RandomIDPassesThrough(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestSend_RejectsRandomIDWithMultipleAttachments(t *testing.T) {
+func TestSend_RandomIDWithAlbumPassesThrough(t *testing.T) {
 	dir := t.TempDir()
 	a := filepath.Join(dir, "a.bin")
 	b := filepath.Join(dir, "b.bin")
@@ -147,12 +147,12 @@ func TestSend_RejectsRandomIDWithMultipleAttachments(t *testing.T) {
 		RawRef:   "@alice",
 		Files:    []string{a, b},
 		RandomID: 42,
-	}, func(context.Context, actionmessage.SendQuery) ([]output.SendResultRow, error) {
-		t.Fatal("send function must not run when --random-id conflicts with an album")
-		return nil, nil
+	}, func(_ context.Context, q actionmessage.SendQuery) ([]output.SendResultRow, error) {
+		require.Equal(t, int64(42), q.RandomID)
+		require.Len(t, q.Attachments, 2)
+		return []output.SendResultRow{{Action: "send", MessageID: 1}}, nil
 	})
-	require.ErrorIs(t, err, command.ErrUsage)
-	require.Contains(t, err.Error(), "random-id")
+	require.NoError(t, err)
 }
 
 func TestForward_RandomIDPassesThroughSingle(t *testing.T) {
@@ -168,17 +168,17 @@ func TestForward_RandomIDPassesThroughSingle(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestForward_RejectsRandomIDWithMultiple(t *testing.T) {
+func TestForward_RandomIDWithMultiplePassesThrough(t *testing.T) {
 	_, err := actionmessage.Forward(context.Background(), actionmessage.ForwardRequest{
 		RawMessageRefs: []string{"@alice:1", "@alice:2"},
 		RawTo:          "@bob",
 		RandomID:       99,
-	}, func(context.Context, actionmessage.ForwardQuery) (output.SendResultRow, error) {
-		t.Fatal("forward must not run when --random-id conflicts with multiple messages")
-		return output.SendResultRow{}, nil
+	}, func(_ context.Context, q actionmessage.ForwardQuery) (output.SendResultRow, error) {
+		require.Equal(t, int64(99), q.RandomID)
+		require.Equal(t, []int{1, 2}, q.IDs)
+		return output.SendResultRow{Action: "forward", MessageID: 1}, nil
 	})
-	require.ErrorIs(t, err, command.ErrUsage)
-	require.Contains(t, err.Error(), "random-id")
+	require.NoError(t, err)
 }
 
 func TestDownload_NormalizesMessageRef(t *testing.T) {

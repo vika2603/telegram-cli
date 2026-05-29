@@ -35,6 +35,7 @@ type Options struct {
 	Silent   bool
 	Schedule time.Time
 	Parse    string
+	RandomID int64
 
 	Exporter  output.Exporter
 	IOStreams *ui.IOStreams
@@ -84,6 +85,7 @@ func New(f *runtime.Invocation, runF func(*Options) error) *cobra.Command {
 	cmd.Flags().BoolVar(&opts.Silent, "silent", false, "Send without notification")
 	cmd.Flags().StringVar(&scheduleRaw, "schedule", "", "Schedule delivery (RFC3339)")
 	cmd.Flags().StringVar(&opts.Parse, "parse", "", "Parse mode for text or caption (only: html)")
+	cmd.Flags().Int64Var(&opts.RandomID, "random-id", 0, "Idempotency key (int64): reusing it on retry dedupes the send server-side")
 
 	command.SetMeta(cmd, command.Meta{NeedsAccount: true, NeedsClient: true})
 	output.AddJSONFlags(cmd, &opts.Exporter,
@@ -102,6 +104,7 @@ func Run(ctx context.Context, opts *Options) error {
 		Silent:   opts.Silent,
 		Schedule: opts.Schedule,
 		Parse:    opts.Parse,
+		RandomID: opts.RandomID,
 		Stdin:    opts.Stdin,
 	}, opts.Send)
 	if err != nil {

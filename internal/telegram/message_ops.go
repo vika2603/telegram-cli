@@ -1,6 +1,7 @@
 package telegram
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -9,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gotd/td/bin"
 	"github.com/gotd/td/telegram/downloader"
 	gotdmessage "github.com/gotd/td/telegram/message"
 	"github.com/gotd/td/telegram/message/html"
@@ -36,6 +38,18 @@ func SendMessage(ctx context.Context, api *tg.Client, resolver *peer.Resolver, q
 		return nil, err
 	}
 	sender := gotdmessage.NewSender(api)
+	if q.RandomID != 0 {
+		// gotd only fills RandomID when it's still 0, deriving it from the
+		// sender's rand source. Feed that source the exact bytes gotd's
+		// crypto.RandInt64 decodes (bin.Buffer.Long, the inverse of
+		// PutLong) so the wire random_id equals q.RandomID — letting a
+		// retry with the same key dedupe server-side. NormalizeSend has
+		// already rejected the multi-media case that would read past these
+		// 8 bytes.
+		var buf bin.Buffer
+		buf.PutLong(q.RandomID)
+		sender = sender.WithRand(bytes.NewReader(buf.Buf))
+	}
 	b := sender.To(resolved.InputPeer)
 	if q.Silent {
 		b.Silent()

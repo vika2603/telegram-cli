@@ -124,6 +124,37 @@ func TestSend_RejectsMismatchedNames(t *testing.T) {
 	require.ErrorIs(t, err, command.ErrUsage)
 }
 
+func TestSend_RandomIDPassesThrough(t *testing.T) {
+	_, err := actionmessage.Send(context.Background(), actionmessage.SendRequest{
+		RawRef:   "@alice",
+		Text:     "hi",
+		RandomID: 7654321,
+	}, func(_ context.Context, q actionmessage.SendQuery) ([]output.SendResultRow, error) {
+		require.Equal(t, int64(7654321), q.RandomID)
+		return []output.SendResultRow{{Action: "send", MessageID: 1}}, nil
+	})
+	require.NoError(t, err)
+}
+
+func TestSend_RejectsRandomIDWithMultipleAttachments(t *testing.T) {
+	dir := t.TempDir()
+	a := filepath.Join(dir, "a.bin")
+	b := filepath.Join(dir, "b.bin")
+	require.NoError(t, os.WriteFile(a, []byte("a"), 0600))
+	require.NoError(t, os.WriteFile(b, []byte("b"), 0600))
+
+	_, err := actionmessage.Send(context.Background(), actionmessage.SendRequest{
+		RawRef:   "@alice",
+		Files:    []string{a, b},
+		RandomID: 42,
+	}, func(context.Context, actionmessage.SendQuery) ([]output.SendResultRow, error) {
+		t.Fatal("send function must not run when --random-id conflicts with an album")
+		return nil, nil
+	})
+	require.ErrorIs(t, err, command.ErrUsage)
+	require.Contains(t, err.Error(), "random-id")
+}
+
 func TestDownload_NormalizesMessageRef(t *testing.T) {
 	row, err := actionmessage.Download(context.Background(), actionmessage.DownloadRequest{
 		RawMessageRef: "@alice:42",

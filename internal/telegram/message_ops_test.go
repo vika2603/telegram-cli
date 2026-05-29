@@ -1,15 +1,32 @@
 package telegram
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"testing"
 
+	"github.com/gotd/td/bin"
+	"github.com/gotd/td/crypto"
 	"github.com/gotd/td/tg"
 	"github.com/stretchr/testify/require"
 
 	"github.com/vika2603/telegram-cli/internal/output"
 )
+
+// TestRandomIDSeedRoundTrips locks the contract SendMessage relies on: the
+// bytes fed to the sender's rand source (bin.Buffer.PutLong) decode back to
+// the exact random_id via gotd's crypto.RandInt64 (bin.Buffer.Long), so a
+// --random-id reused on retry produces the same wire value and dedupes.
+func TestRandomIDSeedRoundTrips(t *testing.T) {
+	for _, id := range []int64{1, 42, 7654321, -1, 9223372036854775807, -9223372036854775808} {
+		var buf bin.Buffer
+		buf.PutLong(id)
+		got, err := crypto.RandInt64(bytes.NewReader(buf.Buf))
+		require.NoError(t, err)
+		require.Equal(t, id, got)
+	}
+}
 
 func TestSentMessagesDedupesUpdateMessageID(t *testing.T) {
 	rows := sentMessages(&tg.Updates{Updates: []tg.UpdateClass{

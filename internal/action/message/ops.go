@@ -25,6 +25,7 @@ type SendRequest struct {
 	Silent   bool
 	Schedule time.Time
 	Parse    string
+	RandomID int64
 	Stdin    io.Reader
 }
 
@@ -37,7 +38,12 @@ type SendQuery struct {
 	Silent      bool
 	Schedule    time.Time
 	Parse       string
-	Stdin       io.Reader
+	// RandomID, when non-zero, is the message dedup key Telegram uses to
+	// drop duplicate sends. Reusing the same value across retries makes a
+	// resend idempotent. Zero means "let the client pick a fresh random
+	// id" (the default, non-idempotent behavior).
+	RandomID int64
+	Stdin    io.Reader
 }
 
 // Attachment is one file sent by `tg msg send --file`.
@@ -111,6 +117,11 @@ func NormalizeSend(req SendRequest) (SendQuery, error) {
 	if err != nil {
 		return SendQuery{}, err
 	}
+	// A single --random-id can't key an album: gotd assigns one random id
+	// per media item, so there is no single dedup key to reuse on retry.
+	if req.RandomID != 0 && len(attachments) > 1 {
+		return SendQuery{}, fmt.Errorf("%w: --random-id is not supported with multiple attachments", command.ErrUsage)
+	}
 	parsed, err := ref.ParseRef(req.RawRef)
 	if err != nil {
 		return SendQuery{}, fmt.Errorf("%w: %s", command.ErrUsage, err.Error())
@@ -123,6 +134,7 @@ func NormalizeSend(req SendRequest) (SendQuery, error) {
 		Silent:      req.Silent,
 		Schedule:    req.Schedule,
 		Parse:       req.Parse,
+		RandomID:    req.RandomID,
 		Stdin:       req.Stdin,
 	}, nil
 }

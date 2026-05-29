@@ -51,9 +51,11 @@ type WatchFilter struct {
 // reading from out until ctx is cancelled. Buffered channels are
 // recommended so a slow consumer does not block gotd's dispatcher.
 //
-// resolveRef builds the baseRef passed to messageToRow so message refs
-// look like @username:NNN when possible. A nil resolveRef falls back to
-// an empty baseRef, in which case messageToRow uses numeric IDs.
+// resolveRef builds the baseRef passed to messageToRow so message refs are
+// replyable (e.g. @username:NNN or u:ID:HASH:NNN). A nil resolveRef falls
+// back to entityBaseRef, which derives the ref from the access hashes the
+// update already carries. Callers inject a resolveRef only when they can
+// resolve peers the update omits (e.g. a gaps-manager-backed session).
 func RegisterWatchHandlers(
 	disp tg.UpdateDispatcher,
 	filter WatchFilter,
@@ -61,7 +63,7 @@ func RegisterWatchHandlers(
 	out chan<- WatchEvent,
 ) {
 	if resolveRef == nil {
-		resolveRef = func(tg.PeerClass, msgpeer.Entities) string { return "" }
+		resolveRef = entityBaseRef
 	}
 
 	emit := func(ctx context.Context, ev WatchEvent) error {
@@ -131,6 +133,38 @@ func RegisterWatchHandlers(
 		}
 		return emit(ctx, WatchEvent{Kind: EventDeleteMessages, Rows: rows})
 	})
+}
+
+// entityBaseRef derives the conversation peer's baseRef from the access
+// hashes carried by the update's entities, mirroring fillMessageSender.
+// Warm peers (the common case: the update includes the peer) yield a
+// fully replyable ref; cold peers the update omits fall back to a
+// hash-less ref that still names the peer but cannot be replied to until
+// the access hash is resolved out of band.
+func entityBaseRef(p tg.PeerClass, ents msgpeer.Entities) string {
+	switch v := p.(type) {
+	case *tg.PeerUser:
+		kind := "user"
+		if u, ok := ents.User(v.UserID); ok {
+			if u.Bot {
+				kind = "bot"
+			}
+			return output.PreferredPeerRef(kind, u.Username, u.ID, u.AccessHash, false)
+		}
+		return output.PreferredPeerRef(kind, "", v.UserID, 0, false)
+	case *tg.PeerChat:
+		return output.PreferredPeerRef("chat", "", v.ChatID, 0, false)
+	case *tg.PeerChannel:
+		kind := "channel"
+		if c, ok := ents.Channel(v.ChannelID); ok {
+			if !c.Broadcast {
+				kind = "chat"
+			}
+			return output.PreferredPeerRef(kind, c.Username, c.ID, c.AccessHash, true)
+		}
+		return output.PreferredPeerRef(kind, "", v.ChannelID, 0, true)
+	}
+	return ""
 }
 
 func (f WatchFilter) acceptKind(k WatchEventKind) bool {

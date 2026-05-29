@@ -17,13 +17,13 @@ import (
 )
 
 func TestNew_NilManagerIsError(t *testing.T) {
-	_, err := peer.New(nil, nil, 0)
+	_, err := peer.New(nil, nil, 0, nil)
 	require.Error(t, err)
 }
 
 func TestResolve_SelfReturnsSelfID(t *testing.T) {
 	mgr := peers.Options{}.Build(tg.NewClient(stubInvoker{}))
-	r, err := peer.New(mgr, nil, 123)
+	r, err := peer.New(mgr, nil, 123, nil)
 	require.NoError(t, err)
 
 	got, err := r.Resolve(context.Background(), ref.Ref{Kind: ref.RefKindMe})
@@ -34,7 +34,7 @@ func TestResolve_SelfReturnsSelfID(t *testing.T) {
 
 func TestResolve_InvalidKindIsUsage(t *testing.T) {
 	mgr := peers.Options{}.Build(tg.NewClient(stubInvoker{}))
-	r, err := peer.New(mgr, nil, 1)
+	r, err := peer.New(mgr, nil, 1, nil)
 	require.NoError(t, err)
 
 	_, err = r.Resolve(context.Background(), ref.Ref{Kind: ref.RefKindInvalid})
@@ -94,7 +94,7 @@ func TestNormalizeInputPeerID_matchesChatListConvention(t *testing.T) {
 
 func TestResolve_IDMissAsksPeerManager(t *testing.T) {
 	mgr := peers.Options{}.Build(tg.NewClient(stubInvoker{}))
-	r, err := peer.New(mgr, nil, 1)
+	r, err := peer.New(mgr, nil, 1, nil)
 	require.NoError(t, err)
 
 	_, err = r.Resolve(context.Background(), ref.Ref{Kind: ref.RefKindID, ID: 42})
@@ -108,7 +108,7 @@ func TestResolve_IDFallsBackToGotdPeerManager(t *testing.T) {
 	require.NoError(t, mgr.Apply(context.Background(), []tg.UserClass{
 		&tg.User{ID: 42, AccessHash: 9001, FirstName: "Ada", Username: "ada"},
 	}, nil))
-	r, err := peer.New(mgr, nil, 1)
+	r, err := peer.New(mgr, nil, 1, nil)
 	require.NoError(t, err)
 
 	got, err := r.Resolve(context.Background(), ref.Ref{Kind: ref.RefKindID, ID: 42})
@@ -121,7 +121,7 @@ func TestResolve_IDFallsBackToGotdPeerManager(t *testing.T) {
 
 func TestResolve_DirectPeerRefs(t *testing.T) {
 	mgr := peers.Options{}.Build(tg.NewClient(stubInvoker{}))
-	r, err := peer.New(mgr, nil, 1)
+	r, err := peer.New(mgr, nil, 1, nil)
 	require.NoError(t, err)
 
 	user, err := r.Resolve(context.Background(), ref.Ref{Kind: ref.RefKindPeer, Value: "user", ID: 42, AccessHash: 9001})
@@ -138,4 +138,21 @@ func TestResolve_DirectPeerRefs(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, int64(-1_000_000_000_100), channel.ID)
 	require.IsType(t, &tg.InputPeerChannel{}, channel.InputPeer)
+}
+
+func TestResolve_ColdPeerWithoutAPIFallsBackToBareRef(t *testing.T) {
+	// A hash-less user ref (u:ID:0, as emitted by `tg watch` for a cold DM)
+	// triggers cold-peer recovery, but with a nil api there is nothing to
+	// recover from. Resolution must still succeed with the bare InputPeer
+	// rather than erroring, so the caller can surface a clear downstream
+	// failure instead of a resolve-time crash.
+	mgr := peers.Options{}.Build(tg.NewClient(stubInvoker{}))
+	r, err := peer.New(mgr, nil, 1, nil)
+	require.NoError(t, err)
+
+	got, err := r.Resolve(context.Background(), ref.Ref{Kind: ref.RefKindPeer, Value: "user", ID: 42, AccessHash: 0})
+	require.NoError(t, err)
+	require.Equal(t, int64(42), got.ID)
+	require.Equal(t, int64(0), got.AccessHash)
+	require.IsType(t, &tg.InputPeerUser{}, got.InputPeer)
 }

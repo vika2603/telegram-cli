@@ -33,7 +33,7 @@ func DefaultResolver(
 	_ = ctx
 	_ = acct
 	mgr := peers.Options{}.Build(api)
-	return peer.New(mgr, nil, 0)
+	return peer.New(mgr, nil, 0, api)
 }
 
 // DefaultWithPeers wraps session.Run with peers.Manager + peer.Resolver
@@ -54,7 +54,7 @@ func DefaultWithPeers(
 			return err
 		}
 		selfID := cl.Self().ID
-		res, err := peer.New(mgr, store, selfID)
+		res, err := peer.New(mgr, store, selfID, api)
 		if err != nil {
 			return err
 		}

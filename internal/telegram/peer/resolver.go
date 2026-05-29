@@ -10,6 +10,7 @@ import (
 
 	"github.com/gotd/td/constant"
 	"github.com/gotd/td/telegram/peers"
+	"github.com/gotd/td/telegram/query"
 	"github.com/gotd/td/tg"
 	gotdtgerr "github.com/gotd/td/tgerr"
 
@@ -37,15 +38,17 @@ type Resolver struct {
 	mgr    *peers.Manager
 	store  *account.PeerStore
 	selfID int64
+	api    *tg.Client
 }
 
 // New builds a Resolver. mgr must be non-nil; store may be nil (completion
-// recording disabled).
-func New(mgr *peers.Manager, store *account.PeerStore, selfID int64) (*Resolver, error) {
+// recording disabled). api may be nil, which disables cold-peer recovery
+// (resolving a hash-less user/channel ref falls back to the bare ref).
+func New(mgr *peers.Manager, store *account.PeerStore, selfID int64, api *tg.Client) (*Resolver, error) {
 	if mgr == nil {
 		return nil, errors.New("telegram peer: manager is nil")
 	}
-	return &Resolver{mgr: mgr, store: store, selfID: selfID}, nil
+	return &Resolver{mgr: mgr, store: store, selfID: selfID, api: api}, nil
 }
 
 func (r *Resolver) Store() *account.PeerStore {
@@ -72,6 +75,18 @@ func (r *Resolver) Resolve(ctx context.Context, target ref.Ref) (Resolved, error
 		out, err = r.resolveID(ctx, target.ID)
 	case ref.RefKindPeer:
 		out, err = resolveDirectPeer(target)
+		if err == nil && out.AccessHash == 0 && (out.Kind == "user" || out.Kind == "channel") {
+			// A hash-less peer ref (e.g. u:ID:0 emitted by `tg watch` for a
+			// cold DM that arrived without entities) cannot be addressed
+			// directly. Recover the access hash from the dialog list, where
+			// the peer surfaces with a usable InputPeer once a conversation
+			// exists. See https://core.telegram.org/api/min — the *FromMessage
+			// constructors don't apply to private chats (no container peer),
+			// so the dialog list is the recovery path for cold DM users.
+			if rec, ok := r.recoverColdPeer(ctx, out.Kind, target.ID); ok {
+				out = rec
+			}
+		}
 	case ref.RefKindPhone:
 		out, err = r.resolvePhone(ctx, target.Value)
 	case ref.RefKindTMeLink:
@@ -113,6 +128,83 @@ func resolveDirectPeer(target ref.Ref) (Resolved, error) {
 	default:
 		return Resolved{}, fmt.Errorf("%w: unsupported peer ref kind %q", command.ErrUsage, target.Value)
 	}
+}
+
+// coldPeerDialogScanCap bounds how many dialogs recoverColdPeer walks before
+// giving up. A peer that just messaged you sits at the top of the dialog list,
+// so the first batch almost always hits; the cap keeps a miss from paging the
+// entire dialog history (and from a runaway RPC / flood-wait spiral).
+const coldPeerDialogScanCap = 200
+
+// recoverColdPeer walks the dialog list to find the access hash for a peer
+// whose ref carried none (a cold user/channel). The dialog Elem's Peer is an
+// InputPeer that already includes the access hash, so a match yields a
+// directly addressable Resolved. Returns ok=false when api is nil, the scan
+// cap is hit, or the peer has no dialog.
+func (r *Resolver) recoverColdPeer(ctx context.Context, kind string, rawID int64) (Resolved, bool) {
+	if r.api == nil {
+		return Resolved{}, false
+	}
+	iter := query.GetDialogs(r.api).BatchSize(100).Iter()
+	scanned := 0
+	for iter.Next(ctx) {
+		el := iter.Value()
+		switch p := el.Peer.(type) {
+		case *tg.InputPeerUser:
+			if kind == "user" && p.UserID == rawID && p.AccessHash != 0 {
+				out := Resolved{
+					InputPeer:  &tg.InputPeerUser{UserID: p.UserID, AccessHash: p.AccessHash},
+					Kind:       "user",
+					ID:         p.UserID,
+					AccessHash: p.AccessHash,
+				}
+				if u, ok := el.Entities.User(p.UserID); ok {
+					out.Username = u.Username
+					out.Title = userTitleFromUser(u)
+					if u.Bot {
+						out.Kind = "bot"
+					}
+				}
+				return out, true
+			}
+		case *tg.InputPeerChannel:
+			if kind == "channel" && p.ChannelID == rawID && p.AccessHash != 0 {
+				out := Resolved{
+					InputPeer:  &tg.InputPeerChannel{ChannelID: p.ChannelID, AccessHash: p.AccessHash},
+					Kind:       "channel",
+					ID:         -1_000_000_000_000 - p.ChannelID,
+					AccessHash: p.AccessHash,
+				}
+				if c, ok := el.Entities.Channel(p.ChannelID); ok {
+					out.Username = c.Username
+					out.Title = c.Title
+					if !c.Broadcast {
+						out.Kind = "chat"
+					}
+				}
+				return out, true
+			}
+		}
+		scanned++
+		if scanned >= coldPeerDialogScanCap {
+			break
+		}
+	}
+	return Resolved{}, false
+}
+
+func userTitleFromUser(u *tg.User) string {
+	switch {
+	case u.FirstName != "" && u.LastName != "":
+		return u.FirstName + " " + u.LastName
+	case u.FirstName != "":
+		return u.FirstName
+	case u.LastName != "":
+		return u.LastName
+	case u.Username != "":
+		return "@" + u.Username
+	}
+	return fmt.Sprintf("user#%d", u.ID)
 }
 
 func (r *Resolver) resolveSelf() Resolved {

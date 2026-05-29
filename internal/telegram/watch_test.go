@@ -176,6 +176,41 @@ func TestRegisterWatchHandlers_ResolveRefIsCalledForBaseRef(t *testing.T) {
 	require.Equal(t, "@src:7", got[0].Row.Ref)
 }
 
+func TestRegisterWatchHandlers_NilResolveRefDerivesReplyableRef(t *testing.T) {
+	disp := tg.NewUpdateDispatcher()
+	events := make(chan WatchEvent, 8)
+	RegisterWatchHandlers(disp, WatchFilter{}, nil, events)
+
+	// Channel with a username -> @username:msgID.
+	require.NoError(t, disp.Handle(context.Background(), &tg.Updates{
+		Updates: []tg.UpdateClass{&tg.UpdateNewChannelMessage{Message: &tg.Message{
+			ID: 7, PeerID: &tg.PeerChannel{ChannelID: 99}, Message: "x",
+		}}},
+		Chats: []tg.ChatClass{&tg.Channel{ID: 99, AccessHash: 990, Username: "src", Broadcast: true}},
+	}))
+
+	// Private chat with a known user (access hash present) -> u:ID:HASH:msgID.
+	require.NoError(t, disp.Handle(context.Background(), &tg.Updates{
+		Updates: []tg.UpdateClass{&tg.UpdateNewMessage{Message: &tg.Message{
+			ID: 8, PeerID: &tg.PeerUser{UserID: 555}, Message: "y",
+		}}},
+		Users: []tg.UserClass{&tg.User{ID: 555, AccessHash: 4242}},
+	}))
+
+	// Cold channel the update omits -> hash-less ref that still names the peer.
+	require.NoError(t, disp.Handle(context.Background(), &tg.Updates{
+		Updates: []tg.UpdateClass{&tg.UpdateNewChannelMessage{Message: &tg.Message{
+			ID: 9, PeerID: &tg.PeerChannel{ChannelID: 42}, Message: "z",
+		}}},
+	}))
+
+	got := drainEvents(events)
+	require.Len(t, got, 3)
+	require.Equal(t, "@src:7", got[0].Row.Ref)
+	require.Equal(t, "u:555:4242:8", got[1].Row.Ref)
+	require.Equal(t, "c:42:0:9", got[2].Row.Ref)
+}
+
 // drainEvents reads everything from ch until quiet for 200ms.
 func drainEvents(ch <-chan WatchEvent) []WatchEvent {
 	var out []WatchEvent

@@ -54,6 +54,9 @@ func New(f *runtime.Invocation, runF func(*ListOptions) error) *cobra.Command {
 	output.AddJSONFlags(cmd, &opts.Exporter,
 		[]string{"id", "title", "icon_color", "icon_emoji_id", "top_message", "unread_count", "closed", "hidden", "pinned"})
 	cmd.AddCommand(newCreate(f, nil))
+	cmd.AddCommand(newEdit(f, nil))
+	cmd.AddCommand(newDeleteTopic(f, nil))
+	cmd.AddCommand(newPinTopic(f, nil))
 	return cmd
 }
 

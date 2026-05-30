@@ -11,6 +11,7 @@ import (
 	actionchat "github.com/vika2603/telegram-cli/internal/action/chat"
 	"github.com/vika2603/telegram-cli/internal/command"
 	"github.com/vika2603/telegram-cli/internal/output"
+	"github.com/vika2603/telegram-cli/internal/ref"
 	"github.com/vika2603/telegram-cli/internal/telegram/peer"
 )
 
@@ -98,6 +99,86 @@ func CreateForumTopic(ctx context.Context, api *tg.Client, resolver *peer.Resolv
 		row.ID = msgs[0].MessageID
 	}
 	return row, nil
+}
+
+// EditForumTopic performs the RPC for `tg chat topics edit`. Only the fields
+// the caller set (non-nil) are sent, so an edit changes title/closed/hidden
+// independently.
+func EditForumTopic(ctx context.Context, api *tg.Client, resolver *peer.Resolver, q actionchat.EditTopicQuery) (output.TopicRow, error) {
+	inCh, err := topicChannel(ctx, resolver, q.Ref)
+	if err != nil {
+		return output.TopicRow{}, err
+	}
+	req := &tg.ChannelsEditForumTopicRequest{Channel: inCh, TopicID: q.TopicID}
+	row := output.TopicRow{ID: q.TopicID}
+	if q.Title != nil {
+		req.SetTitle(*q.Title)
+		row.Title = *q.Title
+	}
+	if q.Closed != nil {
+		req.SetClosed(*q.Closed)
+		row.Closed = *q.Closed
+	}
+	if q.Hidden != nil {
+		req.SetHidden(*q.Hidden)
+		row.Hidden = *q.Hidden
+	}
+	if _, err := api.ChannelsEditForumTopic(ctx, req); err != nil {
+		return output.TopicRow{}, mapForumErr(err)
+	}
+	return row, nil
+}
+
+// DeleteForumTopic performs the RPC for `tg chat topics delete`. It deletes
+// the topic's message history; deleteTopicHistory returns the remaining
+// offset, so loop (bounded) until it's drained.
+func DeleteForumTopic(ctx context.Context, api *tg.Client, resolver *peer.Resolver, q actionchat.DeleteTopicQuery) error {
+	inCh, err := topicChannel(ctx, resolver, q.Ref)
+	if err != nil {
+		return err
+	}
+	for range 100 {
+		aff, err := api.ChannelsDeleteTopicHistory(ctx, &tg.ChannelsDeleteTopicHistoryRequest{
+			Channel:  inCh,
+			TopMsgID: q.TopicID,
+		})
+		if err != nil {
+			return mapForumErr(err)
+		}
+		if aff.Offset <= 0 {
+			return nil
+		}
+	}
+	return nil
+}
+
+// PinForumTopic performs the RPC for `tg chat topics pin`.
+func PinForumTopic(ctx context.Context, api *tg.Client, resolver *peer.Resolver, q actionchat.PinTopicQuery) (output.TopicRow, error) {
+	inCh, err := topicChannel(ctx, resolver, q.Ref)
+	if err != nil {
+		return output.TopicRow{}, err
+	}
+	if _, err := api.ChannelsUpdatePinnedForumTopic(ctx, &tg.ChannelsUpdatePinnedForumTopicRequest{
+		Channel: inCh,
+		TopicID: q.TopicID,
+		Pinned:  q.Pinned,
+	}); err != nil {
+		return output.TopicRow{}, mapForumErr(err)
+	}
+	return output.TopicRow{ID: q.TopicID, Pinned: q.Pinned}, nil
+}
+
+// topicChannel resolves a ref to the InputChannel forum RPCs need.
+func topicChannel(ctx context.Context, resolver *peer.Resolver, target ref.Ref) (tg.InputChannelClass, error) {
+	resolved, err := resolver.Resolve(ctx, target)
+	if err != nil {
+		return nil, err
+	}
+	inCh, ok := inputChannelFromPeer(resolved.InputPeer)
+	if !ok {
+		return nil, fmt.Errorf("%w: topics are only available in forum supergroups", command.ErrUnsupported)
+	}
+	return inCh, nil
 }
 
 // mapForumErr translates "this chat is not a forum" RPC errors into a clear

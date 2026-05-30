@@ -25,6 +25,7 @@ type SendRequest struct {
 	Silent   bool
 	Schedule time.Time
 	Parse    string
+	RandomID int64
 	Stdin    io.Reader
 }
 
@@ -37,7 +38,12 @@ type SendQuery struct {
 	Silent      bool
 	Schedule    time.Time
 	Parse       string
-	Stdin       io.Reader
+	// RandomID, when non-zero, is the message dedup key Telegram uses to
+	// drop duplicate sends. Reusing the same value across retries makes a
+	// resend idempotent. Zero means "let the client pick a fresh random
+	// id" (the default, non-idempotent behavior).
+	RandomID int64
+	Stdin    io.Reader
 }
 
 // Attachment is one file sent by `tg msg send --file`.
@@ -123,6 +129,7 @@ func NormalizeSend(req SendRequest) (SendQuery, error) {
 		Silent:      req.Silent,
 		Schedule:    req.Schedule,
 		Parse:       req.Parse,
+		RandomID:    req.RandomID,
 		Stdin:       req.Stdin,
 	}, nil
 }
@@ -293,6 +300,7 @@ type ForwardRequest struct {
 	RawMessageRefs []string
 	RawTo          string
 	Silent         bool
+	RandomID       int64
 }
 
 // ForwardQuery is the normalized payload passed to Telegram.
@@ -301,6 +309,10 @@ type ForwardQuery struct {
 	To     ref.Ref
 	IDs    []int
 	Silent bool
+	// RandomID is the dedup key (see SendQuery.RandomID). forwardMessages
+	// assigns one id per forwarded message; the key seeds a deterministic
+	// sequence so multi-message forwards stay idempotent on retry too.
+	RandomID int64
 }
 
 // ForwardFunc forwards messages.
@@ -331,7 +343,7 @@ func NormalizeForward(req ForwardRequest) (ForwardQuery, error) {
 	if err != nil {
 		return ForwardQuery{}, fmt.Errorf("%w: %s", command.ErrUsage, err.Error())
 	}
-	return ForwardQuery{From: from, To: to, IDs: ids, Silent: req.Silent}, nil
+	return ForwardQuery{From: from, To: to, IDs: ids, Silent: req.Silent, RandomID: req.RandomID}, nil
 }
 
 // DeleteRequest is the raw request for `tg msg delete`.

@@ -124,6 +124,63 @@ func TestSend_RejectsMismatchedNames(t *testing.T) {
 	require.ErrorIs(t, err, command.ErrUsage)
 }
 
+func TestSend_RandomIDPassesThrough(t *testing.T) {
+	_, err := actionmessage.Send(context.Background(), actionmessage.SendRequest{
+		RawRef:   "@alice",
+		Text:     "hi",
+		RandomID: 7654321,
+	}, func(_ context.Context, q actionmessage.SendQuery) ([]output.SendResultRow, error) {
+		require.Equal(t, int64(7654321), q.RandomID)
+		return []output.SendResultRow{{Action: "send", MessageID: 1}}, nil
+	})
+	require.NoError(t, err)
+}
+
+func TestSend_RandomIDWithAlbumPassesThrough(t *testing.T) {
+	dir := t.TempDir()
+	a := filepath.Join(dir, "a.bin")
+	b := filepath.Join(dir, "b.bin")
+	require.NoError(t, os.WriteFile(a, []byte("a"), 0600))
+	require.NoError(t, os.WriteFile(b, []byte("b"), 0600))
+
+	_, err := actionmessage.Send(context.Background(), actionmessage.SendRequest{
+		RawRef:   "@alice",
+		Files:    []string{a, b},
+		RandomID: 42,
+	}, func(_ context.Context, q actionmessage.SendQuery) ([]output.SendResultRow, error) {
+		require.Equal(t, int64(42), q.RandomID)
+		require.Len(t, q.Attachments, 2)
+		return []output.SendResultRow{{Action: "send", MessageID: 1}}, nil
+	})
+	require.NoError(t, err)
+}
+
+func TestForward_RandomIDPassesThroughSingle(t *testing.T) {
+	_, err := actionmessage.Forward(context.Background(), actionmessage.ForwardRequest{
+		RawMessageRefs: []string{"@alice:1"},
+		RawTo:          "@bob",
+		RandomID:       99,
+	}, func(_ context.Context, q actionmessage.ForwardQuery) (output.SendResultRow, error) {
+		require.Equal(t, int64(99), q.RandomID)
+		require.Equal(t, []int{1}, q.IDs)
+		return output.SendResultRow{Action: "forward", MessageID: 1}, nil
+	})
+	require.NoError(t, err)
+}
+
+func TestForward_RandomIDWithMultiplePassesThrough(t *testing.T) {
+	_, err := actionmessage.Forward(context.Background(), actionmessage.ForwardRequest{
+		RawMessageRefs: []string{"@alice:1", "@alice:2"},
+		RawTo:          "@bob",
+		RandomID:       99,
+	}, func(_ context.Context, q actionmessage.ForwardQuery) (output.SendResultRow, error) {
+		require.Equal(t, int64(99), q.RandomID)
+		require.Equal(t, []int{1, 2}, q.IDs)
+		return output.SendResultRow{Action: "forward", MessageID: 1}, nil
+	})
+	require.NoError(t, err)
+}
+
 func TestDownload_NormalizesMessageRef(t *testing.T) {
 	row, err := actionmessage.Download(context.Background(), actionmessage.DownloadRequest{
 		RawMessageRef: "@alice:42",

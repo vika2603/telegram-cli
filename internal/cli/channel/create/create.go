@@ -1,4 +1,4 @@
-// Package create implements "tg chat create <title>".
+// Package create implements "tg channel create <title>".
 package create
 
 import (
@@ -21,18 +21,17 @@ import (
 type Options struct {
 	Title     string
 	About     string
-	Forum     bool
 	Exporter  output.Exporter
 	IOStreams *ui.IOStreams
 	Create    actionchat.CreateChatFunc
 }
 
-// New builds the cobra command for "tg chat create".
+// New builds the cobra command for "tg channel create".
 func New(f *runtime.Invocation, runF func(*Options) error) *cobra.Command {
 	opts := &Options{}
 	cmd := &cobra.Command{
 		Use:   "create <title>",
-		Short: "Create a supergroup",
+		Short: "Create a broadcast channel",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Title = args[0]
@@ -45,18 +44,17 @@ func New(f *runtime.Invocation, runF func(*Options) error) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&opts.About, "about", "", "Description / about text")
-	cmd.Flags().BoolVar(&opts.Forum, "forum", false, "Enable topics (supergroups only)")
 	command.SetMeta(cmd, command.Meta{NeedsAccount: true, NeedsClient: true})
 	output.AddJSONFlags(cmd, &opts.Exporter, []string{"peer", "title", "type"})
 	return cmd
 }
 
-// Run dispatches the create request and renders the new chat.
+// Run dispatches the create request and renders the new channel.
 func Run(ctx context.Context, opts *Options) error {
 	row, err := actionchat.CreateChat(ctx, actionchat.CreateChatRequest{
-		Title: opts.Title,
-		About: opts.About,
-		Forum: opts.Forum,
+		Title:     opts.Title,
+		About:     opts.About,
+		Broadcast: true,
 	}, opts.Create)
 	if err != nil {
 		return err

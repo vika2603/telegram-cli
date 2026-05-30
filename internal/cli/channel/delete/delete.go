@@ -1,14 +1,16 @@
-// Package create implements "tg chat create <title>".
-package create
+// Package deletecmd implements "tg channel delete <ref>".
+package deletecmd
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/gotd/td/telegram/peers"
 	"github.com/gotd/td/tg"
 	"github.com/spf13/cobra"
 
 	actionchat "github.com/vika2603/telegram-cli/internal/action/chat"
+	"github.com/vika2603/telegram-cli/internal/cli/complete"
 	"github.com/vika2603/telegram-cli/internal/command"
 	"github.com/vika2603/telegram-cli/internal/output"
 	"github.com/vika2603/telegram-cli/internal/runtime"
@@ -19,66 +21,68 @@ import (
 
 // Options holds the resolved flags and injected dependencies for Run.
 type Options struct {
-	Title     string
-	About     string
-	Forum     bool
+	RawRef    string
+	Yes       bool
 	Exporter  output.Exporter
 	IOStreams *ui.IOStreams
-	Create    actionchat.CreateChatFunc
+	Prompter  ui.Prompter
+	Delete    actionchat.DeleteChatFunc
 }
 
-// New builds the cobra command for "tg chat create".
+// New builds the cobra command for "tg channel delete".
 func New(f *runtime.Invocation, runF func(*Options) error) *cobra.Command {
 	opts := &Options{}
 	cmd := &cobra.Command{
-		Use:   "create <title>",
-		Short: "Create a supergroup",
-		Args:  cobra.ExactArgs(1),
+		Use:               "delete <ref>",
+		Short:             "Delete a channel (irreversible)",
+		Args:              cobra.ExactArgs(1),
+		ValidArgsFunction: complete.PeerRefs(f),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			opts.Title = args[0]
+			opts.RawRef = args[0]
 			opts.IOStreams = f.IOStreams
+			opts.Prompter = f.Prompter
 			if runF != nil {
 				return runF(opts)
 			}
-			opts.Create = newCreate(f)
+			opts.Delete = newDeleteFn(f)
 			return Run(cmd.Context(), opts)
 		},
 	}
-	cmd.Flags().StringVar(&opts.About, "about", "", "Description / about text")
-	cmd.Flags().BoolVar(&opts.Forum, "forum", false, "Enable topics (supergroups only)")
+	cmd.Flags().BoolVarP(&opts.Yes, "yes", "y", false, "Skip confirmation prompt")
 	command.SetMeta(cmd, command.Meta{NeedsAccount: true, NeedsClient: true})
 	output.AddJSONFlags(cmd, &opts.Exporter, []string{"peer", "title", "type"})
 	return cmd
 }
 
-// Run dispatches the create request and renders the new chat.
+// Run dispatches the delete request and renders the result.
 func Run(ctx context.Context, opts *Options) error {
-	row, err := actionchat.CreateChat(ctx, actionchat.CreateChatRequest{
-		Title: opts.Title,
-		About: opts.About,
-		Forum: opts.Forum,
-	}, opts.Create)
+	pr, err := actionchat.DeleteChat(ctx, actionchat.DeleteChatRequest{
+		RawRef:   opts.RawRef,
+		Yes:      opts.Yes,
+		Prompter: opts.Prompter,
+	}, opts.Delete)
 	if err != nil {
 		return err
 	}
 	if opts.Exporter != nil {
-		return opts.Exporter.Write(opts.IOStreams, row)
+		return opts.Exporter.Write(opts.IOStreams, pr)
 	}
-	return output.RenderChatShow(opts.IOStreams, row)
+	_, err = fmt.Fprintf(opts.IOStreams.Out, "deleted %s\n", opts.RawRef)
+	return err
 }
 
-func newCreate(f *runtime.Invocation) actionchat.CreateChatFunc {
-	return func(ctx context.Context, q actionchat.CreateChatQuery) (output.ChatRow, error) {
+func newDeleteFn(f *runtime.Invocation) actionchat.DeleteChatFunc {
+	return func(ctx context.Context, q actionchat.DeleteChatQuery) (output.PeerRef, error) {
 		acct, err := f.Account("")
 		if err != nil {
-			return output.ChatRow{}, err
+			return output.PeerRef{}, err
 		}
-		var row output.ChatRow
+		var pr output.PeerRef
 		err = f.WithPeers(ctx, acct, runtime.ClientOptsFrom(f, acct),
-			func(ctx context.Context, api *tg.Client, _ *peers.Manager, _ *peer.Resolver) error {
-				row, err = telegram.CreateChat(ctx, api, q)
+			func(ctx context.Context, api *tg.Client, _ *peers.Manager, res *peer.Resolver) error {
+				pr, err = telegram.DeleteChat(ctx, api, res, q)
 				return err
 			})
-		return row, err
+		return pr, err
 	}
 }

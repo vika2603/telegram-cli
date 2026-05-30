@@ -11,6 +11,7 @@ import (
 	authcmd "github.com/vika2603/telegram-cli/internal/cli/auth"
 	authlogincmd "github.com/vika2603/telegram-cli/internal/cli/auth/login"
 	authlogoutcmd "github.com/vika2603/telegram-cli/internal/cli/auth/logout"
+	channelcmd "github.com/vika2603/telegram-cli/internal/cli/channel"
 	chatcmd "github.com/vika2603/telegram-cli/internal/cli/chat"
 	chatshowcmd "github.com/vika2603/telegram-cli/internal/cli/chat/show"
 	"github.com/vika2603/telegram-cli/internal/cli/completion"
@@ -87,6 +88,7 @@ func New(f *runtime.Invocation) *cobra.Command {
 	cmd.AddCommand(completion.New(f))
 	cmd.AddCommand(frequentCommands(f)...)
 	cmd.AddCommand(chatcmd.New(f))
+	cmd.AddCommand(channelcmd.New(f))
 	cmd.AddCommand(msgcmd.New(f))
 	cmd.AddCommand(searchcmd.New(f))
 	cmd.AddCommand(mecmd.New(f, nil))

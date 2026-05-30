@@ -5,6 +5,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/vika2603/telegram-cli/internal/cli/chat/archive"
+	"github.com/vika2603/telegram-cli/internal/cli/chat/create"
 	"github.com/vika2603/telegram-cli/internal/cli/chat/join"
 	"github.com/vika2603/telegram-cli/internal/cli/chat/leave"
 	"github.com/vika2603/telegram-cli/internal/cli/chat/list"
@@ -24,6 +25,7 @@ func New(f *runtime.Invocation) *cobra.Command {
 		Short:   "Dialogs, chats, and channels",
 		GroupID: "core",
 	}
+	cmd.AddCommand(create.New(f, nil))
 	cmd.AddCommand(list.New(f, nil))
 	cmd.AddCommand(show.New(f, nil))
 	cmd.AddCommand(members.New(f, nil))

@@ -9,6 +9,7 @@ import (
 	"github.com/vika2603/telegram-cli/internal/cli/auth/list"
 	"github.com/vika2603/telegram-cli/internal/cli/auth/login"
 	"github.com/vika2603/telegram-cli/internal/cli/auth/logout"
+	"github.com/vika2603/telegram-cli/internal/cli/auth/rename"
 	"github.com/vika2603/telegram-cli/internal/cli/auth/status"
 	switchcmd "github.com/vika2603/telegram-cli/internal/cli/auth/switch"
 	"github.com/vika2603/telegram-cli/internal/runtime"
@@ -25,5 +26,6 @@ func New(f *runtime.Invocation) *cobra.Command {
 	cmd.AddCommand(list.New(f, nil))
 	cmd.AddCommand(switchcmd.New(f, nil))
 	cmd.AddCommand(status.New(f, nil))
+	cmd.AddCommand(rename.New(f, nil))
 	return cmd
 }

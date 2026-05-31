@@ -58,6 +58,10 @@ func New(f *runtime.Invocation, runF func(*ListOptions) error) *cobra.Command {
 	cmd.AddCommand(newDeleteTopic(f, nil))
 	cmd.AddCommand(newPinTopic(f, nil))
 	cmd.AddCommand(newUnpinTopic(f, nil))
+	cmd.AddCommand(newTopicInfo(f, nil))
+	cmd.AddCommand(newMuteTopic(f, nil))
+	cmd.AddCommand(newUnmuteTopic(f, nil))
+	cmd.AddCommand(newReadTopic(f, nil))
 	return cmd
 }
 

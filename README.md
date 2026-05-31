@@ -93,6 +93,9 @@ client commands route through when present).
 | `tg chat edit <ref>` | Edit a supergroup: `--title`, `--about`, `--public <name>` (make public) / `--private` (make invite-only). |
 | `tg chat topics <ref>` | List a forum supergroup's topics. `--q` filters by title. |
 | `tg chat topics create <ref> <title>` | Create a topic. `--icon-color`, `--icon-emoji`, and `--random-id` (idempotent retry). |
+| `tg chat topics info <ref> <id>` | Show details for one topic. |
+| `tg chat topics mute <ref> <id>` / `tg chat topics unmute <ref> <id>` | Mute or unmute a single topic. |
+| `tg chat topics read <ref> <id>` | Mark a topic as read. |
 | `tg chat topics edit <ref> <id>` | Rename (`--title`), close/reopen (`--close`/`--reopen`), hide/unhide (`--hide`/`--unhide`). |
 | `tg chat topics pin <ref> <id>` / `tg chat topics unpin <ref> <id>` | Pin or unpin a topic. |
 | `tg chat topics delete <ref> <id>` | Delete a topic and its history. Prompts unless `--yes`. |

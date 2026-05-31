@@ -139,3 +139,95 @@ func PinTopic(ctx context.Context, req PinTopicRequest, do PinTopicFunc) (output
 	}
 	return do(ctx, PinTopicQuery{Ref: parsed, TopicID: req.TopicID, Pinned: !req.Unpin})
 }
+
+// TopicInfoRequest is the raw request for `tg chat topics info`.
+type TopicInfoRequest struct {
+	RawRef  string
+	TopicID int
+}
+
+// TopicInfoQuery is the normalized payload passed to Telegram.
+type TopicInfoQuery struct {
+	Ref     ref.Ref
+	TopicID int
+}
+
+// TopicInfoFunc fetches a single forum topic.
+type TopicInfoFunc func(context.Context, TopicInfoQuery) (output.TopicRow, error)
+
+// InfoTopic validates and dispatches a topic-info request.
+func InfoTopic(ctx context.Context, req TopicInfoRequest, do TopicInfoFunc) (output.TopicRow, error) {
+	if req.TopicID <= 0 {
+		return output.TopicRow{}, fmt.Errorf("%w: topic id must be positive", command.ErrUsage)
+	}
+	parsed, err := ref.ParseRef(req.RawRef)
+	if err != nil {
+		return output.TopicRow{}, fmt.Errorf("%w: %s", command.ErrUsage, err.Error())
+	}
+	if do == nil {
+		return output.TopicRow{}, fmt.Errorf("%w: chat topics info called without info function", command.ErrPrecondition)
+	}
+	return do(ctx, TopicInfoQuery{Ref: parsed, TopicID: req.TopicID})
+}
+
+// MuteTopicRequest is the raw request for `tg chat topics mute/unmute`.
+type MuteTopicRequest struct {
+	RawRef    string
+	TopicID   int
+	MuteUntil int
+}
+
+// MuteTopicQuery is the normalized payload passed to Telegram.
+type MuteTopicQuery struct {
+	Ref       ref.Ref
+	TopicID   int
+	MuteUntil int
+}
+
+// MuteTopicFunc mutes or unmutes a forum topic.
+type MuteTopicFunc func(context.Context, MuteTopicQuery) (output.TopicRow, error)
+
+// MuteTopic validates and dispatches a topic mute/unmute request.
+func MuteTopic(ctx context.Context, req MuteTopicRequest, do MuteTopicFunc) (output.TopicRow, error) {
+	if req.TopicID <= 0 {
+		return output.TopicRow{}, fmt.Errorf("%w: topic id must be positive", command.ErrUsage)
+	}
+	parsed, err := ref.ParseRef(req.RawRef)
+	if err != nil {
+		return output.TopicRow{}, fmt.Errorf("%w: %s", command.ErrUsage, err.Error())
+	}
+	if do == nil {
+		return output.TopicRow{}, fmt.Errorf("%w: chat topics mute called without mute function", command.ErrPrecondition)
+	}
+	return do(ctx, MuteTopicQuery{Ref: parsed, TopicID: req.TopicID, MuteUntil: req.MuteUntil})
+}
+
+// ReadTopicRequest is the raw request for `tg chat topics read`.
+type ReadTopicRequest struct {
+	RawRef  string
+	TopicID int
+}
+
+// ReadTopicQuery is the normalized payload passed to Telegram.
+type ReadTopicQuery struct {
+	Ref     ref.Ref
+	TopicID int
+}
+
+// ReadTopicFunc marks a forum topic as read.
+type ReadTopicFunc func(context.Context, ReadTopicQuery) (output.TopicRow, error)
+
+// ReadTopic validates and dispatches a topic-read request.
+func ReadTopic(ctx context.Context, req ReadTopicRequest, do ReadTopicFunc) (output.TopicRow, error) {
+	if req.TopicID <= 0 {
+		return output.TopicRow{}, fmt.Errorf("%w: topic id must be positive", command.ErrUsage)
+	}
+	parsed, err := ref.ParseRef(req.RawRef)
+	if err != nil {
+		return output.TopicRow{}, fmt.Errorf("%w: %s", command.ErrUsage, err.Error())
+	}
+	if do == nil {
+		return output.TopicRow{}, fmt.Errorf("%w: chat topics read called without read function", command.ErrPrecondition)
+	}
+	return do(ctx, ReadTopicQuery{Ref: parsed, TopicID: req.TopicID})
+}

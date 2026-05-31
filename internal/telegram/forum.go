@@ -168,6 +168,81 @@ func PinForumTopic(ctx context.Context, api *tg.Client, resolver *peer.Resolver,
 	return output.TopicRow{ID: q.TopicID, Pinned: q.Pinned}, nil
 }
 
+// GetForumTopicByID fetches a single forum topic by its ID.
+func GetForumTopicByID(ctx context.Context, api *tg.Client, resolver *peer.Resolver, q actionchat.TopicInfoQuery) (output.TopicRow, error) {
+	inCh, err := topicChannel(ctx, resolver, q.Ref)
+	if err != nil {
+		return output.TopicRow{}, err
+	}
+	resp, err := api.ChannelsGetForumTopicsByID(ctx, &tg.ChannelsGetForumTopicsByIDRequest{
+		Channel: inCh,
+		Topics:  []int{q.TopicID},
+	})
+	if err != nil {
+		return output.TopicRow{}, mapForumErr(err)
+	}
+	for _, tc := range resp.Topics {
+		if t, ok := tc.(*tg.ForumTopic); ok && t.ID == q.TopicID {
+			return forumTopicToRow(t), nil
+		}
+	}
+	return output.TopicRow{}, fmt.Errorf("%w: topic %d not found", command.ErrUsage, q.TopicID)
+}
+
+// MuteForumTopic mutes or unmutes a single forum topic's notifications.
+func MuteForumTopic(ctx context.Context, api *tg.Client, resolver *peer.Resolver, q actionchat.MuteTopicQuery) (output.TopicRow, error) {
+	resolved, err := resolver.Resolve(ctx, q.Ref)
+	if err != nil {
+		return output.TopicRow{}, err
+	}
+	settings := &tg.InputPeerNotifySettings{}
+	settings.SetMuteUntil(q.MuteUntil)
+	req := &tg.AccountUpdateNotifySettingsRequest{
+		Peer:     &tg.InputNotifyForumTopic{Peer: resolved.InputPeer, TopMsgID: q.TopicID},
+		Settings: *settings,
+	}
+	if _, err := api.AccountUpdateNotifySettings(ctx, req); err != nil {
+		return output.TopicRow{}, mapForumErr(err)
+	}
+	return output.TopicRow{ID: q.TopicID}, nil
+}
+
+// ReadForumTopic marks a forum topic as read up to its latest message.
+func ReadForumTopic(ctx context.Context, api *tg.Client, resolver *peer.Resolver, q actionchat.ReadTopicQuery) (output.TopicRow, error) {
+	resolved, err := resolver.Resolve(ctx, q.Ref)
+	if err != nil {
+		return output.TopicRow{}, err
+	}
+	inCh, ok := inputChannelFromPeer(resolved.InputPeer)
+	if !ok {
+		return output.TopicRow{}, fmt.Errorf("%w: topics are only available in forum supergroups", command.ErrUnsupported)
+	}
+	resp, err := api.ChannelsGetForumTopicsByID(ctx, &tg.ChannelsGetForumTopicsByIDRequest{
+		Channel: inCh,
+		Topics:  []int{q.TopicID},
+	})
+	if err != nil {
+		return output.TopicRow{}, mapForumErr(err)
+	}
+	topMessage := q.TopicID // fallback
+	for _, tc := range resp.Topics {
+		if t, ok := tc.(*tg.ForumTopic); ok && t.ID == q.TopicID {
+			if t.TopMessage != 0 {
+				topMessage = t.TopMessage
+			}
+			break
+		}
+	}
+	if _, err := api.MessagesReadDiscussion(ctx, &tg.MessagesReadDiscussionRequest{
+		Peer:      resolved.InputPeer,
+		MsgID:     q.TopicID,
+		ReadMaxID: topMessage,
+	}); err != nil {
+		return output.TopicRow{}, mapForumErr(err)
+	}
+	return output.TopicRow{ID: q.TopicID}, nil
+}
+
 // topicChannel resolves a ref to the InputChannel forum RPCs need.
 func topicChannel(ctx context.Context, resolver *peer.Resolver, target ref.Ref) (tg.InputChannelClass, error) {
 	resolved, err := resolver.Resolve(ctx, target)

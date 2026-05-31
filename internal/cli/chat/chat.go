@@ -4,10 +4,13 @@ package chat
 import (
 	"github.com/spf13/cobra"
 
+	"github.com/vika2603/telegram-cli/internal/cli/chat/admin"
 	"github.com/vika2603/telegram-cli/internal/cli/chat/archive"
+	"github.com/vika2603/telegram-cli/internal/cli/chat/ban"
 	"github.com/vika2603/telegram-cli/internal/cli/chat/create"
 	chatdelete "github.com/vika2603/telegram-cli/internal/cli/chat/delete"
 	"github.com/vika2603/telegram-cli/internal/cli/chat/edit"
+	"github.com/vika2603/telegram-cli/internal/cli/chat/invite"
 	"github.com/vika2603/telegram-cli/internal/cli/chat/join"
 	"github.com/vika2603/telegram-cli/internal/cli/chat/leave"
 	"github.com/vika2603/telegram-cli/internal/cli/chat/list"
@@ -41,5 +44,10 @@ func New(f *runtime.Invocation) *cobra.Command {
 	cmd.AddCommand(archive.New(f, nil))
 	cmd.AddCommand(unarchive.New(f, nil))
 	cmd.AddCommand(topics.New(f, nil))
+	cmd.AddCommand(invite.New(f, nil))
+	cmd.AddCommand(ban.NewBan(f, nil))
+	cmd.AddCommand(ban.NewUnban(f, nil))
+	cmd.AddCommand(admin.NewPromote(f, nil))
+	cmd.AddCommand(admin.NewDemote(f, nil))
 	return cmd
 }

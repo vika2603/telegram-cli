@@ -142,16 +142,113 @@ func LeaveChat(ctx context.Context, api *tg.Client, resolver *peer.Resolver, q a
 	return output.ChatMembershipRow{Action: "leave", Peer: output.PeerRefFromResolved(resolved)}, nil
 }
 
-// ListChatMembers resolves a channel before participant loading.
-func ListChatMembers(ctx context.Context, resolver *peer.Resolver, q actionchat.MembersQuery) ([]output.MemberRow, error) {
+// ListChatMembers fetches the member list for a channel / supergroup.
+func ListChatMembers(ctx context.Context, api *tg.Client, resolver *peer.Resolver, q actionchat.MembersQuery) ([]output.MemberRow, error) {
 	resolved, err := resolver.Resolve(ctx, q.Ref)
 	if err != nil {
 		return nil, err
 	}
-	if _, ok := resolved.InputPeer.(*tg.InputPeerChannel); !ok {
-		return nil, fmt.Errorf("%w: chat members only supported on channels/supergroups", command.ErrUnsupported)
+	inCh, ok := inputChannelFromPeer(resolved.InputPeer)
+	if !ok {
+		return nil, fmt.Errorf("%w: members are only available in groups/channels", command.ErrUnsupported)
 	}
-	return nil, fmt.Errorf("%w: chat members is not available yet", command.ErrUnsupported)
+
+	var filter tg.ChannelParticipantsFilterClass
+	switch q.Filter {
+	case "recent", "":
+		filter = &tg.ChannelParticipantsRecent{}
+	case "admins":
+		filter = &tg.ChannelParticipantsAdmins{}
+	case "bots":
+		filter = &tg.ChannelParticipantsBots{}
+	case "kicked":
+		filter = &tg.ChannelParticipantsKicked{Q: q.Q}
+	case "banned":
+		filter = &tg.ChannelParticipantsBanned{Q: q.Q}
+	case "contacts":
+		filter = &tg.ChannelParticipantsContacts{Q: q.Q}
+	default:
+		return nil, fmt.Errorf("%w: unknown --filter %q", command.ErrUsage, q.Filter)
+	}
+
+	const batch = 100
+	var rows []output.MemberRow
+	offset := 0
+	for len(rows) < q.Limit {
+		limit := batch
+		if remaining := q.Limit - len(rows); remaining < limit {
+			limit = remaining
+		}
+		res, err := api.ChannelsGetParticipants(ctx, &tg.ChannelsGetParticipantsRequest{
+			Channel: inCh,
+			Filter:  filter,
+			Offset:  offset,
+			Limit:   limit,
+			Hash:    0,
+		})
+		if err != nil {
+			return nil, err
+		}
+		cp, ok := res.(*tg.ChannelsChannelParticipants)
+		if !ok {
+			// ChannelsChannelParticipantsNotModified — no data
+			break
+		}
+		if len(cp.Participants) == 0 {
+			break
+		}
+
+		// Build a user lookup map.
+		users := make(map[int64]*tg.User, len(cp.Users))
+		for _, uc := range cp.Users {
+			if u, ok := uc.(*tg.User); ok {
+				users[u.ID] = u
+			}
+		}
+
+		for _, p := range cp.Participants {
+			userID, role, date := participantInfo(p)
+			if userID == 0 {
+				continue
+			}
+			row := output.MemberRow{UserID: userID, Role: role, JoinedAt: fmtUnix(date)}
+			if u, ok := users[userID]; ok {
+				row.FirstName = u.FirstName
+				row.LastName = u.LastName
+				row.Username = u.Username
+				row.IsBot = u.Bot
+			}
+			rows = append(rows, row)
+		}
+		offset += len(cp.Participants)
+	}
+	return rows, nil
+}
+
+// participantInfo extracts the user ID, role string, and join date from a
+// ChannelParticipantClass variant.
+func participantInfo(p tg.ChannelParticipantClass) (userID int64, role string, date int) {
+	switch v := p.(type) {
+	case *tg.ChannelParticipantCreator:
+		return v.UserID, "creator", 0
+	case *tg.ChannelParticipantAdmin:
+		return v.UserID, "admin", v.Date
+	case *tg.ChannelParticipantSelf:
+		return v.UserID, "member", v.Date
+	case *tg.ChannelParticipant:
+		return v.UserID, "member", v.Date
+	case *tg.ChannelParticipantBanned:
+		if pu, ok := v.Peer.(*tg.PeerUser); ok {
+			return pu.UserID, "banned", v.Date
+		}
+		return 0, "", 0
+	case *tg.ChannelParticipantLeft:
+		if pu, ok := v.Peer.(*tg.PeerUser); ok {
+			return pu.UserID, "left", 0
+		}
+		return 0, "", 0
+	}
+	return 0, "", 0
 }
 
 func fillInviteTarget(ctx context.Context, api *tg.Client, target ref.Ref, row output.ChatMembershipRow) output.ChatMembershipRow {
@@ -175,6 +272,18 @@ func inputChannelFromPeer(p tg.InputPeerClass) (tg.InputChannelClass, bool) {
 		return &tg.InputChannel{ChannelID: v.ChannelID, AccessHash: v.AccessHash}, true
 	case *tg.InputPeerChannelFromMessage:
 		return &tg.InputChannelFromMessage{Peer: v.Peer, MsgID: v.MsgID, ChannelID: v.ChannelID}, true
+	}
+	return nil, false
+}
+
+// inputUserFromPeer converts an InputPeerClass to an InputUserClass.
+// Returns (nil, false) for non-user peers.
+func inputUserFromPeer(p tg.InputPeerClass) (tg.InputUserClass, bool) {
+	switch v := p.(type) {
+	case *tg.InputPeerUser:
+		return &tg.InputUser{UserID: v.UserID, AccessHash: v.AccessHash}, true
+	case *tg.InputPeerSelf:
+		return &tg.InputUserSelf{}, true
 	}
 	return nil, false
 }

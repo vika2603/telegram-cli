@@ -1,0 +1,95 @@
+package chat_test
+
+import (
+	"context"
+	"testing"
+
+	"github.com/stretchr/testify/require"
+
+	actionchat "github.com/vika2603/telegram-cli/internal/action/chat"
+	"github.com/vika2603/telegram-cli/internal/command"
+	"github.com/vika2603/telegram-cli/internal/output"
+	"github.com/vika2603/telegram-cli/internal/ui"
+)
+
+func TestInvite_ParsesGroupAndUsers(t *testing.T) {
+	rows, err := actionchat.Invite(context.Background(), actionchat.InviteRequest{
+		RawRef:   "@grp",
+		RawUsers: []string{"@alice", "@bob"},
+	}, func(_ context.Context, q actionchat.InviteQuery) ([]output.PeerRef, error) {
+		require.Equal(t, "grp", q.Ref.Value)
+		require.Len(t, q.Users, 2)
+		require.Equal(t, "alice", q.Users[0].Value)
+		require.Equal(t, "bob", q.Users[1].Value)
+		return []output.PeerRef{{Ref: "@alice"}, {Ref: "@bob"}}, nil
+	})
+	require.NoError(t, err)
+	require.Len(t, rows, 2)
+}
+
+func TestInvite_RequiresAtLeastOneUser(t *testing.T) {
+	_, err := actionchat.Invite(context.Background(), actionchat.InviteRequest{
+		RawRef: "@grp",
+	}, func(context.Context, actionchat.InviteQuery) ([]output.PeerRef, error) {
+		t.Fatal("invite must not run without users")
+		return nil, nil
+	})
+	require.ErrorIs(t, err, command.ErrUsage)
+}
+
+func TestBan_ConfirmsBeforeDispatch(t *testing.T) {
+	called := false
+	_, err := actionchat.Ban(context.Background(), actionchat.BanRequest{
+		RawRef:   "@grp",
+		RawUser:  "@alice",
+		Prompter: &ui.StubPrompter{Answers: []any{true}},
+	}, func(_ context.Context, q actionchat.BanQuery) (output.PeerRef, error) {
+		called = true
+		require.Equal(t, "alice", q.User.Value)
+		require.False(t, q.Unban)
+		return output.PeerRef{}, nil
+	})
+	require.NoError(t, err)
+	require.True(t, called)
+}
+
+func TestBan_DeclineSkipsDispatch(t *testing.T) {
+	_, err := actionchat.Ban(context.Background(), actionchat.BanRequest{
+		RawRef:   "@grp",
+		RawUser:  "@alice",
+		Prompter: &ui.StubPrompter{Answers: []any{false}},
+	}, func(context.Context, actionchat.BanQuery) (output.PeerRef, error) {
+		t.Fatal("ban must not run when the prompt is declined")
+		return output.PeerRef{}, nil
+	})
+	require.ErrorIs(t, err, command.ErrNotConfirmed)
+}
+
+func TestUnban_SkipsConfirmation(t *testing.T) {
+	called := false
+	_, err := actionchat.Ban(context.Background(), actionchat.BanRequest{
+		RawRef:  "@grp",
+		RawUser: "@alice",
+		Unban:   true,
+		// no Prompter: unban must not prompt
+	}, func(_ context.Context, q actionchat.BanQuery) (output.PeerRef, error) {
+		called = true
+		require.True(t, q.Unban)
+		return output.PeerRef{}, nil
+	})
+	require.NoError(t, err)
+	require.True(t, called)
+}
+
+func TestPromote_DemoteFlagPassesThrough(t *testing.T) {
+	_, err := actionchat.Promote(context.Background(), actionchat.PromoteRequest{
+		RawRef:  "@grp",
+		RawUser: "@alice",
+		Demote:  true,
+	}, func(_ context.Context, q actionchat.PromoteQuery) (output.PeerRef, error) {
+		require.Equal(t, "alice", q.User.Value)
+		require.True(t, q.Demote)
+		return output.PeerRef{}, nil
+	})
+	require.NoError(t, err)
+}

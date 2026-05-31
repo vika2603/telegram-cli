@@ -109,7 +109,10 @@ client commands route through when present).
 | `tg chat unmute <ref>` | Restore notifications. |
 | `tg chat archive <ref>` | Move a chat to the archive folder. |
 | `tg chat unarchive <ref>` | Move a chat back to the main folder. |
-| `tg chat members <ref>` | Command shape is present; Telegram participant loading is not wired yet. |
+| `tg chat members <ref>` | List members. `--filter recent\|admins\|bots\|kicked\|banned\|contacts`, `--q`, `--limit`. |
+| `tg chat invite <ref> <user>...` | Add users to a group or channel. |
+| `tg chat ban <ref> <user>` / `tg chat unban <ref> <user>` | Ban (remove + block) or unban a member. Ban prompts unless `--yes`. |
+| `tg chat promote <ref> <user>` / `tg chat demote <ref> <user>` | Grant or revoke admin rights. |
 | `tg msg list <ref>` | List message history. |
 | `tg msg send <ref> [text...]` | Send text. Repeat `--file <path>` to attach one or more files; text becomes the first media caption. Use `--name` to override upload filenames. |
 | `tg msg download <msg-ref>` | Download photo, video, document, or other message media. Defaults to the media filename; use `-o/--output` for a file path or existing directory. |

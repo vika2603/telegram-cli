@@ -26,71 +26,25 @@ func ListForumTopics(ctx context.Context, api *tg.Client, resolver *peer.Resolve
 		return nil, fmt.Errorf("%w: topics are only available in forum supergroups", command.ErrUnsupported)
 	}
 
-	const batch = 100
-	var rows []output.TopicRow
-	var offsetDate, offsetID, offsetTopic int
-	for len(rows) < q.Limit {
-		limit := batch
-		if rem := q.Limit - len(rows); rem < limit {
-			limit = rem
-		}
-		req := &tg.ChannelsGetForumTopicsRequest{
-			Channel:     inCh,
-			Limit:       limit,
-			OffsetDate:  offsetDate,
-			OffsetID:    offsetID,
-			OffsetTopic: offsetTopic,
-		}
-		if q.Q != "" {
-			req.SetQ(q.Q)
-		}
-		resp, err := api.ChannelsGetForumTopics(ctx, req)
-		if err != nil {
-			return nil, mapForumErr(err)
-		}
-		if len(resp.Topics) == 0 {
-			break
-		}
-		var last *tg.ForumTopic
-		for _, tc := range resp.Topics {
-			// ForumTopicDeleted carries no fields worth surfacing; skip it.
-			if t, ok := tc.(*tg.ForumTopic); ok {
-				rows = append(rows, forumTopicToRow(t))
-				last = t
-			}
-		}
-		// Stop when the server returned fewer than requested (last page) or we
-		// can't derive a pagination cursor from this page.
-		if len(resp.Topics) < limit || last == nil {
-			break
-		}
-		offsetTopic = last.ID
-		offsetID = last.TopMessage
-		if resp.OrderByCreateDate {
-			offsetDate = last.Date
-		} else {
-			offsetDate = forumMessageDate(resp.Messages, last.TopMessage)
+	// Single page only: offset-based pagination over forum topics is not
+	// implemented, so groups with more than one page (~100) of topics are
+	// truncated to what the server returns in one call.
+	req := &tg.ChannelsGetForumTopicsRequest{Channel: inCh, Limit: q.Limit}
+	if q.Q != "" {
+		req.SetQ(q.Q)
+	}
+	resp, err := api.ChannelsGetForumTopics(ctx, req)
+	if err != nil {
+		return nil, mapForumErr(err)
+	}
+	rows := make([]output.TopicRow, 0, len(resp.Topics))
+	for _, tc := range resp.Topics {
+		// ForumTopicDeleted carries no fields worth surfacing; skip it.
+		if t, ok := tc.(*tg.ForumTopic); ok {
+			rows = append(rows, forumTopicToRow(t))
 		}
 	}
 	return rows, nil
-}
-
-// forumMessageDate finds the date of the message with the given id among a
-// forum-topics response's related messages, for offset-based pagination.
-func forumMessageDate(msgs []tg.MessageClass, id int) int {
-	for _, m := range msgs {
-		switch v := m.(type) {
-		case *tg.Message:
-			if v.ID == id {
-				return v.Date
-			}
-		case *tg.MessageService:
-			if v.ID == id {
-				return v.Date
-			}
-		}
-	}
-	return 0
 }
 
 func forumTopicToRow(t *tg.ForumTopic) output.TopicRow {

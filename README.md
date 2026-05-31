@@ -91,7 +91,7 @@ client commands route through when present).
 | `tg chat create <title>` | Create a supergroup. `--forum` enables topics; `--about` sets the description. |
 | `tg chat delete <ref>` | Delete a supergroup or channel (irreversible). Prompts unless `--yes`. |
 | `tg chat edit <ref>` | Edit a supergroup: `--title`, `--about`, `--public <name>` / `--private`; toggles: `--forum`/`--no-forum`, `--hide-members`/`--show-members`, `--hide-history`/`--show-history`, `--slow-mode <s>`, `--no-forwards`/`--allow-forwards`. |
-| `tg chat topics <ref>` | List a forum supergroup's topics. `--search` filters by title; `--limit` caps results. |
+| `tg chat topics <ref>` | List a forum supergroup's topics. `--search` filters by title; `--limit` caps results (single page only, ~100 max — pagination not implemented). |
 | `tg chat topics create <ref> <title>` | Create a topic. `--icon-color`, `--icon-emoji`, and `--random-id` (idempotent retry). |
 | `tg chat topics info <ref> <topic-id>` | Show details for one topic. |
 | `tg chat topics mute <ref> <topic-id>` / `tg chat topics unmute <ref> <topic-id>` | Mute or unmute a single topic. Mute takes `--duration`, `--until`, or `--forever` (default forever). |

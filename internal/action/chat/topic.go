@@ -10,7 +10,7 @@ import (
 	"github.com/vika2603/telegram-cli/internal/ref"
 )
 
-// TopicsRequest is the raw request for `tg chat topic`.
+// TopicsRequest is the raw request for `tg chat topic list`.
 type TopicsRequest struct {
 	RawRef string
 	Q      string
@@ -34,7 +34,7 @@ func Topics(ctx context.Context, req TopicsRequest, do TopicsFunc) ([]output.Top
 		return nil, err
 	}
 	if do == nil {
-		return nil, fmt.Errorf("%w: chat topic called without fetch function", command.ErrPrecondition)
+		return nil, fmt.Errorf("%w: chat topic list called without fetch function", command.ErrPrecondition)
 	}
 	return do(ctx, q)
 }

@@ -8,7 +8,7 @@ import (
 	"github.com/vika2603/telegram-cli/internal/ui"
 )
 
-// TopicRow is the output of `tg chat topic` (list) and
+// TopicRow is the output of `tg chat topic list` and
 // `tg chat topic create`. ID is the forum topic id, which equals the id of
 // the topic's creation service message.
 type TopicRow struct {

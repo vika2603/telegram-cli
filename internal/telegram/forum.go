@@ -15,7 +15,7 @@ import (
 	"github.com/vika2603/telegram-cli/internal/telegram/peer"
 )
 
-// ListForumTopics performs the RPC for `tg chat topic`.
+// ListForumTopics performs the RPC for `tg chat topic list`.
 func ListForumTopics(ctx context.Context, api *tg.Client, resolver *peer.Resolver, q actionchat.TopicsQuery) ([]output.TopicRow, error) {
 	resolved, err := resolver.Resolve(ctx, q.Ref)
 	if err != nil {

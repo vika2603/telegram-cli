@@ -26,11 +26,11 @@ type InviteQuery struct {
 	Users []ref.Ref
 }
 
-// InviteFunc invites users and returns one PeerRef per invited user.
-type InviteFunc func(context.Context, InviteQuery) ([]output.PeerRef, error)
+// InviteFunc invites users and returns one InviteRow per requested user.
+type InviteFunc func(context.Context, InviteQuery) ([]output.InviteRow, error)
 
 // Invite validates the request and dispatches the invite operation.
-func Invite(ctx context.Context, req InviteRequest, do InviteFunc) ([]output.PeerRef, error) {
+func Invite(ctx context.Context, req InviteRequest, do InviteFunc) ([]output.InviteRow, error) {
 	if len(req.RawUsers) == 0 {
 		return nil, fmt.Errorf("%w: at least one user argument is required", command.ErrUsage)
 	}

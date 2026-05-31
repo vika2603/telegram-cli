@@ -46,13 +46,13 @@ func New(f *runtime.Invocation, runF func(*Options) error) *cobra.Command {
 		},
 	}
 	command.SetMeta(cmd, command.Meta{NeedsAccount: true, NeedsClient: true})
-	output.AddJSONFlags(cmd, &opts.Exporter, []string{"ref", "id", "kind", "title", "username"})
+	output.AddJSONFlags(cmd, &opts.Exporter, []string{"peer", "invited", "skip_reason"})
 	return cmd
 }
 
 // Run executes the invite logic.
 func Run(ctx context.Context, opts *Options) error {
-	refs, err := actionchat.Invite(ctx, actionchat.InviteRequest{
+	rows, err := actionchat.Invite(ctx, actionchat.InviteRequest{
 		RawRef:   opts.RawRef,
 		RawUsers: opts.RawUsers,
 	}, opts.Invite)
@@ -60,17 +60,25 @@ func Run(ctx context.Context, opts *Options) error {
 		return err
 	}
 	if opts.Exporter != nil {
-		return opts.Exporter.Write(opts.IOStreams, refs)
+		return opts.Exporter.Write(opts.IOStreams, rows)
 	}
-	for _, r := range refs {
-		name := r.Title
-		if r.Username != "" {
-			name = "@" + r.Username
+	for _, r := range rows {
+		name := r.Peer.Title
+		if r.Peer.Username != "" {
+			name = "@" + r.Peer.Username
 		}
 		if name == "" {
-			name = r.Ref
+			name = r.Peer.Ref
 		}
-		if _, err := fmt.Fprintf(opts.IOStreams.Out, "invited %s\n", name); err != nil {
+		line := "invited " + name
+		if !r.Invited {
+			reason := r.SkipReason
+			if reason == "" {
+				reason = "not added"
+			}
+			line = fmt.Sprintf("skipped %s (%s)", name, reason)
+		}
+		if _, err := fmt.Fprintln(opts.IOStreams.Out, line); err != nil {
 			return err
 		}
 	}
@@ -78,17 +86,17 @@ func Run(ctx context.Context, opts *Options) error {
 }
 
 func newInviteFn(f *runtime.Invocation) actionchat.InviteFunc {
-	return func(ctx context.Context, q actionchat.InviteQuery) ([]output.PeerRef, error) {
+	return func(ctx context.Context, q actionchat.InviteQuery) ([]output.InviteRow, error) {
 		acct, err := f.Account("")
 		if err != nil {
 			return nil, err
 		}
-		var refs []output.PeerRef
+		var rows []output.InviteRow
 		err = f.WithPeers(ctx, acct, runtime.ClientOptsFrom(f, acct),
 			func(ctx context.Context, api *tg.Client, _ *peers.Manager, res *peer.Resolver) error {
-				refs, err = telegram.InviteToChat(ctx, api, res, q)
+				rows, err = telegram.InviteToChat(ctx, api, res, q)
 				return err
 			})
-		return refs, err
+		return rows, err
 	}
 }

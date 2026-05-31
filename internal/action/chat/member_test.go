@@ -16,21 +16,27 @@ func TestInvite_ParsesGroupAndUsers(t *testing.T) {
 	rows, err := actionchat.Invite(context.Background(), actionchat.InviteRequest{
 		RawRef:   "@grp",
 		RawUsers: []string{"@alice", "@bob"},
-	}, func(_ context.Context, q actionchat.InviteQuery) ([]output.PeerRef, error) {
+	}, func(_ context.Context, q actionchat.InviteQuery) ([]output.InviteRow, error) {
 		require.Equal(t, "grp", q.Ref.Value)
 		require.Len(t, q.Users, 2)
 		require.Equal(t, "alice", q.Users[0].Value)
 		require.Equal(t, "bob", q.Users[1].Value)
-		return []output.PeerRef{{Ref: "@alice"}, {Ref: "@bob"}}, nil
+		return []output.InviteRow{
+			{Peer: output.PeerRef{Ref: "@alice"}, Invited: true},
+			{Peer: output.PeerRef{Ref: "@bob"}, Invited: false, SkipReason: "privacy_restricted"},
+		}, nil
 	})
 	require.NoError(t, err)
 	require.Len(t, rows, 2)
+	require.True(t, rows[0].Invited)
+	require.False(t, rows[1].Invited)
+	require.Equal(t, "privacy_restricted", rows[1].SkipReason)
 }
 
 func TestInvite_RequiresAtLeastOneUser(t *testing.T) {
 	_, err := actionchat.Invite(context.Background(), actionchat.InviteRequest{
 		RawRef: "@grp",
-	}, func(context.Context, actionchat.InviteQuery) ([]output.PeerRef, error) {
+	}, func(context.Context, actionchat.InviteQuery) ([]output.InviteRow, error) {
 		t.Fatal("invite must not run without users")
 		return nil, nil
 	})

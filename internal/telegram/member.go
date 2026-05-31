@@ -13,7 +13,7 @@ import (
 )
 
 // InviteToChat adds users to a channel/supergroup via channels.inviteToChannel.
-func InviteToChat(ctx context.Context, api *tg.Client, resolver *peer.Resolver, q actionchat.InviteQuery) ([]output.PeerRef, error) {
+func InviteToChat(ctx context.Context, api *tg.Client, resolver *peer.Resolver, q actionchat.InviteQuery) ([]output.InviteRow, error) {
 	groupResolved, err := resolver.Resolve(ctx, q.Ref)
 	if err != nil {
 		return nil, err
@@ -38,18 +38,44 @@ func InviteToChat(ctx context.Context, api *tg.Client, resolver *peer.Resolver, 
 		userResolved = append(userResolved, res)
 	}
 
-	if _, err := api.ChannelsInviteToChannel(ctx, &tg.ChannelsInviteToChannelRequest{
+	res, err := api.ChannelsInviteToChannel(ctx, &tg.ChannelsInviteToChannelRequest{
 		Channel: inCh,
 		Users:   inputUsers,
-	}); err != nil {
+	})
+	if err != nil {
 		return nil, err
 	}
 
-	refs := make([]output.PeerRef, 0, len(userResolved))
-	for _, r := range userResolved {
-		refs = append(refs, output.PeerRefFromResolved(r))
+	// Telegram accepts the request even for users it could not actually add
+	// (e.g. their privacy settings disallow being added); those land in
+	// MissingInvitees rather than producing an error.
+	missing := make(map[int64]tg.MissingInvitee, len(res.MissingInvitees))
+	for _, m := range res.MissingInvitees {
+		missing[m.UserID] = m
 	}
-	return refs, nil
+
+	rows := make([]output.InviteRow, 0, len(userResolved))
+	for _, r := range userResolved {
+		row := output.InviteRow{Peer: output.PeerRefFromResolved(r), Invited: true}
+		if m, ok := missing[r.ID]; ok {
+			row.Invited = false
+			row.SkipReason = inviteSkipReason(m)
+		}
+		rows = append(rows, row)
+	}
+	return rows, nil
+}
+
+// inviteSkipReason classifies why Telegram declined to add a user.
+func inviteSkipReason(m tg.MissingInvitee) string {
+	switch {
+	case m.PremiumWouldAllowInvite:
+		return "premium_would_allow_invite"
+	case m.PremiumRequiredForPm:
+		return "premium_required_for_pm"
+	default:
+		return "privacy_restricted"
+	}
 }
 
 // SetMemberBanned bans or unbans a user in a channel/supergroup via

@@ -112,7 +112,7 @@ client commands route through when present).
 | `tg chat pin <ref>` | Pin a chat to the top of the chat list. |
 | `tg chat unpin <ref>` | Unpin a chat from the top of the chat list. |
 | `tg chat members <ref>` | List members. `--filter recent\|admins\|bots\|kicked\|banned\|contacts`, `--q`, `--limit`. |
-| `tg chat invite <ref> <user>...` | Add users to a group or channel. |
+| `tg chat invite <ref> <user>...` | Add users to a group or channel. Each row reports `invited` true/false plus a `skip_reason` (e.g. `privacy_restricted`) when Telegram declined to add a user. |
 | `tg chat ban <ref> <user>` / `tg chat unban <ref> <user>` | Ban (remove + block) or unban a member. Ban prompts unless `--yes`. |
 | `tg chat promote <ref> <user>` / `tg chat demote <ref> <user>` | Grant or revoke admin rights. |
 | `tg msg list <ref>` | List message history. |

@@ -251,6 +251,16 @@ type ChatMembershipRow struct {
 	Role          string  `json:"role,omitempty"` // "member" | "admin" | "creator"
 }
 
+// InviteRow is emitted by `chat invite`, one per requested user. Invited is
+// false when Telegram accepted the request but did not actually add the user
+// (typically the target's privacy settings disallow being added by others);
+// SkipReason names the cause.
+type InviteRow struct {
+	Peer       PeerRef `json:"peer"`
+	Invited    bool    `json:"invited"`
+	SkipReason string  `json:"skip_reason,omitempty"`
+}
+
 // PeerRefFromResolved converts a peer.Resolved into a compact PeerRef.
 func PeerRefFromResolved(r peer.Resolved) PeerRef {
 	return PeerRef{

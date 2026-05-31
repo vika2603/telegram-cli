@@ -46,8 +46,8 @@ Pass `--qr` to `auth login` for QR login instead.
 | `tg auth list` | List local account slots. |
 | `tg auth switch <name>` | Set `default_account` for later commands. |
 | `tg auth status [name]` | Show local account health. `--probe` adds a live Telegram check. |
-| `tg sessions list` | List remote Telegram authorizations. |
-| `tg sessions revoke [hash]` | Revoke a remote session, or use `--all-others` to keep only this CLI session. |
+| `tg session list` | List remote Telegram authorizations. |
+| `tg session revoke [hash]` | Revoke a remote session, or use `--all-others` to keep only this CLI session. |
 | `tg password set` | Set or rotate the Telegram cloud password. |
 | `tg password disable` | Remove the Telegram cloud password. |
 | `tg config get <key>` | Read one config value. `--no-redact` shows `api_hash` verbatim. |
@@ -91,14 +91,14 @@ client commands route through when present).
 | `tg chat create <title>` | Create a supergroup. `--forum` enables topics; `--about` sets the description. |
 | `tg chat delete <ref>` | Delete a supergroup or channel (irreversible). Prompts unless `--yes`. |
 | `tg chat edit <ref>` | Edit a supergroup: `--title`, `--about`, `--public <name>` / `--private`; toggles: `--forum`/`--no-forum`, `--hide-members`/`--show-members`, `--hide-history`/`--show-history`, `--slow-mode <s>`, `--no-forwards`/`--allow-forwards`. |
-| `tg chat topics <ref>` | List a forum supergroup's topics. `--search` filters by title; `--limit` caps results (single page only, ~100 max — pagination not implemented). |
-| `tg chat topics create <ref> <title>` | Create a topic. `--icon-color`, `--icon-emoji`, and `--random-id` (idempotent retry). |
-| `tg chat topics info <ref> <topic-id>` | Show details for one topic. |
-| `tg chat topics mute <ref> <topic-id>` / `tg chat topics unmute <ref> <topic-id>` | Mute or unmute a single topic. Mute takes `--duration`, `--until`, or `--forever` (default forever). |
-| `tg chat topics read <ref> <topic-id>` | Mark a topic as read. |
-| `tg chat topics edit <ref> <topic-id>` | Rename (`--title`), close/reopen (`--close`/`--reopen`), hide/unhide (`--hide`/`--unhide`). |
-| `tg chat topics pin <ref> <topic-id>` / `tg chat topics unpin <ref> <topic-id>` | Pin or unpin a topic. |
-| `tg chat topics delete <ref> <topic-id>` | Delete a topic and its history. Prompts unless `--yes`. |
+| `tg chat topic list <ref>` | List a forum supergroup's topics. `--search` filters by title; `--limit` caps results (single page only, ~100 max — pagination not implemented). |
+| `tg chat topic create <ref> <title>` | Create a topic. `--icon-color`, `--icon-emoji`, and `--random-id` (idempotent retry). |
+| `tg chat topic info <ref> <topic-id>` | Show details for one topic. |
+| `tg chat topic mute <ref> <topic-id>` / `tg chat topic unmute <ref> <topic-id>` | Mute or unmute a single topic. Mute takes `--duration`, `--until`, or `--forever` (default forever). |
+| `tg chat topic read <ref> <topic-id>` | Mark a topic as read. |
+| `tg chat topic edit <ref> <topic-id>` | Rename (`--title`), close/reopen (`--close`/`--reopen`), hide/unhide (`--hide`/`--unhide`). |
+| `tg chat topic pin <ref> <topic-id>` / `tg chat topic unpin <ref> <topic-id>` | Pin or unpin a topic. |
+| `tg chat topic delete <ref> <topic-id>` | Delete a topic and its history. Prompts unless `--yes`. |
 | `tg channel create <title>` | Create a broadcast channel. `--about` sets the description. |
 | `tg channel delete <ref>` | Delete a channel (irreversible). Prompts unless `--yes`. |
 | `tg channel edit <ref>` | Edit a channel: `--title`, `--about`, `--public <name>` / `--private`; toggles: `--no-forwards`/`--allow-forwards`, `--signatures`/`--no-signatures`. |
@@ -111,7 +111,7 @@ client commands route through when present).
 | `tg chat unarchive <ref>` | Move a chat back to the main folder. |
 | `tg chat pin <ref>` | Pin a chat to the top of the chat list. |
 | `tg chat unpin <ref>` | Unpin a chat from the top of the chat list. |
-| `tg chat members <ref>` | List members. `--filter recent\|admins\|bots\|kicked\|banned\|contacts`, `--search`, `--limit`. |
+| `tg chat member list <ref>` | List members. `--filter recent\|admins\|bots\|kicked\|banned\|contacts`, `--search`, `--limit`. |
 | `tg chat invite <ref> <user>...` | Add users to a group or channel. Each row reports `invited` true/false plus a `skip_reason` (e.g. `privacy_restricted`) when Telegram declined to add a user. |
 | `tg chat ban <ref> <user>` / `tg chat unban <ref> <user>` | Ban (remove + block) or unban a member. Ban prompts unless `--yes`. |
 | `tg chat promote <ref> <user>` / `tg chat demote <ref> <user>` | Grant or revoke admin rights. |

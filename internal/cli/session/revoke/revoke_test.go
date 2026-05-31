@@ -1,4 +1,4 @@
-package terminate_test
+package revoke_test
 
 import (
 	"context"
@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/vika2603/telegram-cli/internal/account"
-	"github.com/vika2603/telegram-cli/internal/cli/session/terminate"
+	"github.com/vika2603/telegram-cli/internal/cli/session/revoke"
 	"github.com/vika2603/telegram-cli/internal/command"
 	"github.com/vika2603/telegram-cli/internal/runtime"
 	"github.com/vika2603/telegram-cli/internal/telegram/peer"
@@ -54,8 +54,8 @@ func noopFetch(auths *tg.AccountAuthorizations) func(context.Context, *tg.Client
 
 func TestNew_FlagParsing_Hash(t *testing.T) {
 	f := runtime.NewTestInvocation(t)
-	var captured *terminate.Options
-	cmd := terminate.New(f, func(o *terminate.Options) error {
+	var captured *revoke.Options
+	cmd := revoke.New(f, func(o *revoke.Options) error {
 		captured = o
 		return nil
 	})
@@ -68,8 +68,8 @@ func TestNew_FlagParsing_Hash(t *testing.T) {
 
 func TestNew_FlagParsing_AllOthers(t *testing.T) {
 	f := runtime.NewTestInvocation(t)
-	var captured *terminate.Options
-	cmd := terminate.New(f, func(o *terminate.Options) error {
+	var captured *revoke.Options
+	cmd := revoke.New(f, func(o *revoke.Options) error {
 		captured = o
 		return nil
 	})
@@ -82,20 +82,20 @@ func TestNew_FlagParsing_AllOthers(t *testing.T) {
 
 func TestRun_MissingHashAndAllOthers_IsUsage(t *testing.T) {
 	f := runtime.NewTestInvocation(t)
-	opts := &terminate.Options{
+	opts := &revoke.Options{
 		F:        f,
 		Fetch:    noopFetch(twoSessions()),
 		Reset:    func(_ context.Context, _ *tg.Client, _ int64) error { return nil },
 		ResetAll: func(_ context.Context, _ *tg.Client, _ []int64) error { return nil },
 	}
-	err := terminate.Run(context.Background(), opts)
+	err := revoke.Run(context.Background(), opts)
 	require.ErrorIs(t, err, command.ErrUsage)
 	require.ErrorContains(t, err, "provide a hash or --all-others")
 }
 
 func TestRun_HashAndAllOthers_IsUsage(t *testing.T) {
 	f := runtime.NewTestInvocation(t)
-	opts := &terminate.Options{
+	opts := &revoke.Options{
 		F:         f,
 		Hash:      "200",
 		AllOthers: true,
@@ -103,7 +103,7 @@ func TestRun_HashAndAllOthers_IsUsage(t *testing.T) {
 		Reset:     func(_ context.Context, _ *tg.Client, _ int64) error { return nil },
 		ResetAll:  func(_ context.Context, _ *tg.Client, _ []int64) error { return nil },
 	}
-	err := terminate.Run(context.Background(), opts)
+	err := revoke.Run(context.Background(), opts)
 	require.ErrorIs(t, err, command.ErrUsage)
 	require.ErrorContains(t, err, "cannot use <hash> and --all-others together")
 }
@@ -112,14 +112,14 @@ func TestRun_HashNotFound(t *testing.T) {
 	f := runtime.NewTestInvocation(t)
 	stubAccount(f)
 	stubWithPeers(f)
-	opts := &terminate.Options{
+	opts := &revoke.Options{
 		F:        f,
 		Hash:     "999",
 		Fetch:    noopFetch(twoSessions()),
 		Reset:    func(_ context.Context, _ *tg.Client, _ int64) error { return nil },
 		ResetAll: func(_ context.Context, _ *tg.Client, _ []int64) error { return nil },
 	}
-	err := terminate.Run(context.Background(), opts)
+	err := revoke.Run(context.Background(), opts)
 	require.ErrorIs(t, err, command.ErrUsage)
 	require.ErrorContains(t, err, "no session with hash")
 }
@@ -128,14 +128,14 @@ func TestRun_HashIsCurrent(t *testing.T) {
 	f := runtime.NewTestInvocation(t)
 	stubAccount(f)
 	stubWithPeers(f)
-	opts := &terminate.Options{
+	opts := &revoke.Options{
 		F:        f,
 		Hash:     "100", // hash 100 is current
 		Fetch:    noopFetch(twoSessions()),
 		Reset:    func(_ context.Context, _ *tg.Client, _ int64) error { return nil },
 		ResetAll: func(_ context.Context, _ *tg.Client, _ []int64) error { return nil },
 	}
-	err := terminate.Run(context.Background(), opts)
+	err := revoke.Run(context.Background(), opts)
 	require.ErrorIs(t, err, session.ErrCurrent)
 }
 
@@ -144,14 +144,14 @@ func TestRun_DeclinedPrompt(t *testing.T) {
 	stubAccount(f)
 	stubWithPeers(f)
 	f.Prompter = &ui.StubPrompter{Answers: []any{false}}
-	opts := &terminate.Options{
+	opts := &revoke.Options{
 		F:        f,
 		Hash:     "200", // non-current session
 		Fetch:    noopFetch(twoSessions()),
 		Reset:    func(_ context.Context, _ *tg.Client, _ int64) error { return nil },
 		ResetAll: func(_ context.Context, _ *tg.Client, _ []int64) error { return nil },
 	}
-	err := terminate.Run(context.Background(), opts)
+	err := revoke.Run(context.Background(), opts)
 	require.ErrorIs(t, err, command.ErrNotConfirmed)
 }
 
@@ -162,7 +162,7 @@ func TestRun_AcceptedTerminatesOne(t *testing.T) {
 	f.Prompter = &ui.StubPrompter{Answers: []any{true}}
 
 	var resetHash int64
-	opts := &terminate.Options{
+	opts := &revoke.Options{
 		F:     f,
 		Hash:  "200",
 		Fetch: noopFetch(twoSessions()),
@@ -172,7 +172,7 @@ func TestRun_AcceptedTerminatesOne(t *testing.T) {
 		},
 		ResetAll: func(_ context.Context, _ *tg.Client, _ []int64) error { return nil },
 	}
-	require.NoError(t, terminate.Run(context.Background(), opts))
+	require.NoError(t, revoke.Run(context.Background(), opts))
 	require.Equal(t, int64(200), resetHash)
 }
 
@@ -191,7 +191,7 @@ func TestRun_AllOthersCountsNonCurrent(t *testing.T) {
 	}
 
 	var resetHashes []int64
-	opts := &terminate.Options{
+	opts := &revoke.Options{
 		F:         f,
 		AllOthers: true,
 		Fetch:     noopFetch(auths),
@@ -201,7 +201,7 @@ func TestRun_AllOthersCountsNonCurrent(t *testing.T) {
 			return nil
 		},
 	}
-	require.NoError(t, terminate.Run(context.Background(), opts))
+	require.NoError(t, revoke.Run(context.Background(), opts))
 	require.Len(t, resetHashes, 2)
 }
 
@@ -215,14 +215,14 @@ func TestRun_AllOthers_NoOthers(t *testing.T) {
 			{Hash: 100, Current: true, DeviceModel: "Desktop", Platform: "Linux", AppName: "Telegram"},
 		},
 	}
-	opts := &terminate.Options{
+	opts := &revoke.Options{
 		F:         f,
 		AllOthers: true,
 		Fetch:     noopFetch(auths),
 		Reset:     func(_ context.Context, _ *tg.Client, _ int64) error { return nil },
 		ResetAll:  func(_ context.Context, _ *tg.Client, _ []int64) error { return nil },
 	}
-	err := terminate.Run(context.Background(), opts)
+	err := revoke.Run(context.Background(), opts)
 	// NoResultsError exits 0; errors.Is must recognise it via pointer type check.
 	require.Error(t, err)
 	var nre *command.NoResultsError

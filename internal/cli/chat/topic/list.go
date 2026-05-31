@@ -1,5 +1,4 @@
-// Package topics implements "tg chat topics" (list) and its "create" child.
-package topics
+package topic
 
 import (
 	"context"
@@ -29,12 +28,10 @@ type ListOptions struct {
 	Fetch     actionchat.TopicsFunc
 }
 
-// New builds the "tg chat topics" command: listing by default, with a
-// "create" subcommand.
-func New(f *runtime.Invocation, runF func(*ListOptions) error) *cobra.Command {
+func newList(f *runtime.Invocation, runF func(*ListOptions) error) *cobra.Command {
 	opts := &ListOptions{}
 	cmd := &cobra.Command{
-		Use:               "topics <ref>",
+		Use:               "list <ref>",
 		Short:             "List forum topics of a supergroup",
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: complete.PeerRefs(f),
@@ -49,19 +46,10 @@ func New(f *runtime.Invocation, runF func(*ListOptions) error) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&opts.Q, "search", "", "Substring search on topic titles")
-	cmd.Flags().IntVar(&opts.Limit, "limit", 100, "Max topics to list")
+	cmd.Flags().IntVar(&opts.Limit, "limit", 100, "Max topics to list (single page only, ~100 max)")
 	command.SetMeta(cmd, command.Meta{NeedsAccount: true, NeedsClient: true})
 	output.AddJSONFlags(cmd, &opts.Exporter,
 		[]string{"id", "title", "icon_color", "icon_emoji_id", "top_message", "unread_count", "closed", "hidden", "pinned"})
-	cmd.AddCommand(newCreate(f, nil))
-	cmd.AddCommand(newEdit(f, nil))
-	cmd.AddCommand(newDeleteTopic(f, nil))
-	cmd.AddCommand(newPinTopic(f, nil))
-	cmd.AddCommand(newUnpinTopic(f, nil))
-	cmd.AddCommand(newTopicInfo(f, nil))
-	cmd.AddCommand(newMuteTopic(f, nil))
-	cmd.AddCommand(newUnmuteTopic(f, nil))
-	cmd.AddCommand(newReadTopic(f, nil))
 	return cmd
 }
 

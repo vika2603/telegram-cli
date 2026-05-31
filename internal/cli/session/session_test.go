@@ -12,7 +12,7 @@ import (
 func TestNew_GroupProperties(t *testing.T) {
 	f := runtime.NewTestInvocation(t)
 	cmd := session.New(f)
-	require.Equal(t, "sessions", cmd.Name())
+	require.Equal(t, "session", cmd.Name())
 	require.Equal(t, "setup", cmd.GroupID)
 }
 

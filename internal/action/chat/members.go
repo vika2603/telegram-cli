@@ -11,7 +11,7 @@ import (
 
 const maxMembersLimit = 1000
 
-// MembersRequest is the raw request for `tg chat members`.
+// MembersRequest is the raw request for `tg chat member`.
 type MembersRequest struct {
 	RawRef string
 	Filter string
@@ -57,7 +57,7 @@ func Members(ctx context.Context, req MembersRequest, fetch MembersFunc) ([]outp
 		return nil, fmt.Errorf("%w: --limit must be positive", command.ErrUsage)
 	}
 	if fetch == nil {
-		return nil, fmt.Errorf("%w: chat members called without fetch function", command.ErrPrecondition)
+		return nil, fmt.Errorf("%w: chat member called without fetch function", command.ErrPrecondition)
 	}
 	if req.Limit > maxMembersLimit {
 		req.Limit = maxMembersLimit

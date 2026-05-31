@@ -1,4 +1,4 @@
-package topics
+package topic
 
 import (
 	"context"
@@ -33,7 +33,7 @@ type MuteTopicOptions struct {
 	Mute      actionchat.MuteTopicFunc
 }
 
-// newMuteTopic builds "tg chat topics mute"; newUnmuteTopic builds the
+// newMuteTopic builds "tg chat topic mute"; newUnmuteTopic builds the
 // "unmute" counterpart. They share a factory (topicMuteCmd) to mirror the
 // pin/unpin convention.
 func newMuteTopic(f *runtime.Invocation, runF func(*MuteTopicOptions) error) *cobra.Command {

@@ -1,5 +1,5 @@
-// Package terminate implements "tg sessions revoke".
-package terminate
+// Package revoke implements "tg session revoke".
+package revoke
 
 import (
 	"context"
@@ -36,7 +36,7 @@ type Options struct {
 	ResetAll actionsession.ResetAllFunc
 }
 
-// New builds the cobra command for "tg sessions revoke".
+// New builds the cobra command for "tg session revoke".
 func New(f *runtime.Invocation, runF func(*Options) error) *cobra.Command {
 	opts := &Options{F: f}
 	cmd := &cobra.Command{

@@ -44,7 +44,7 @@ func TestNew_HasTopLevels(t *testing.T) {
 	want := []string{
 		"login", "logout", "send", "reply", "inbox", "read", "digest", "resolve",
 		"chat", "channel", "msg", "search", "me", "contact", "profile",
-		"auth", "sessions", "password", "config", "completion",
+		"auth", "session", "password", "config", "completion",
 	}
 	names := map[string]bool{}
 	for _, c := range cmd.Commands() {

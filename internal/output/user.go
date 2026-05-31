@@ -12,7 +12,7 @@ import (
 )
 
 // UserRow is the output of `tg me`, `search chat` (user rows), and the
-// nested user shape inside chat members.
+// nested user shape inside chat member.
 type UserRow struct {
 	ID         int64  `json:"id"`
 	Username   string `json:"username,omitempty"`

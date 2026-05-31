@@ -1,4 +1,4 @@
-package show_test
+package info_test
 
 import (
 	"context"
@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	actionchat "github.com/vika2603/telegram-cli/internal/action/chat"
-	"github.com/vika2603/telegram-cli/internal/cli/chat/show"
+	"github.com/vika2603/telegram-cli/internal/cli/chat/info"
 	"github.com/vika2603/telegram-cli/internal/output"
 	"github.com/vika2603/telegram-cli/internal/runtime"
 	"github.com/vika2603/telegram-cli/internal/telegram/peer"
@@ -16,16 +16,16 @@ import (
 
 func TestNew_RequiresRef(t *testing.T) {
 	f := runtime.NewTestInvocation(t)
-	cmd := show.New(f, nil)
+	cmd := info.New(f, nil)
 	cmd.SetArgs([]string{})
 	err := cmd.Execute()
 	require.Error(t, err)
 }
 
 func TestNew_ParsesRef(t *testing.T) {
-	var captured *show.Options
+	var captured *info.Options
 	f := runtime.NewTestInvocation(t)
-	cmd := show.New(f, func(o *show.Options) error {
+	cmd := info.New(f, func(o *info.Options) error {
 		captured = o
 		return nil
 	})
@@ -37,14 +37,14 @@ func TestNew_ParsesRef(t *testing.T) {
 
 func TestRun_RendersRow(t *testing.T) {
 	ios, _, stdout, _ := ui.Test()
-	opts := &show.Options{
+	opts := &info.Options{
 		RawRef:    "@durov",
 		IOStreams: ios,
 		Fetch: func(context.Context, actionchat.ShowQuery) (output.ChatRow, error) {
 			return output.ChatRow{ID: 1, Kind: "user", Title: "Pavel", Username: "durov"}, nil
 		},
 	}
-	require.NoError(t, show.Run(context.Background(), opts))
+	require.NoError(t, info.Run(context.Background(), opts))
 	got := stdout.String()
 	require.Contains(t, got, "Pavel")
 	require.Contains(t, got, "durov")
@@ -52,13 +52,13 @@ func TestRun_RendersRow(t *testing.T) {
 
 func TestRun_PeerNotFoundSurfaces(t *testing.T) {
 	ios, _, _, _ := ui.Test()
-	opts := &show.Options{
+	opts := &info.Options{
 		RawRef:    "@missing",
 		IOStreams: ios,
 		Fetch: func(context.Context, actionchat.ShowQuery) (output.ChatRow, error) {
 			return output.ChatRow{}, peer.ErrNotFound
 		},
 	}
-	err := show.Run(context.Background(), opts)
+	err := info.Run(context.Background(), opts)
 	require.ErrorIs(t, err, peer.ErrNotFound)
 }

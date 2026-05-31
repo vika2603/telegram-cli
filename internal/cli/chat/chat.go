@@ -10,16 +10,16 @@ import (
 	"github.com/vika2603/telegram-cli/internal/cli/chat/create"
 	chatdelete "github.com/vika2603/telegram-cli/internal/cli/chat/delete"
 	"github.com/vika2603/telegram-cli/internal/cli/chat/edit"
+	"github.com/vika2603/telegram-cli/internal/cli/chat/info"
 	"github.com/vika2603/telegram-cli/internal/cli/chat/invite"
 	"github.com/vika2603/telegram-cli/internal/cli/chat/join"
 	"github.com/vika2603/telegram-cli/internal/cli/chat/leave"
 	"github.com/vika2603/telegram-cli/internal/cli/chat/list"
-	"github.com/vika2603/telegram-cli/internal/cli/chat/members"
+	"github.com/vika2603/telegram-cli/internal/cli/chat/member"
 	"github.com/vika2603/telegram-cli/internal/cli/chat/mute"
 	"github.com/vika2603/telegram-cli/internal/cli/chat/pin"
 	"github.com/vika2603/telegram-cli/internal/cli/chat/read"
-	"github.com/vika2603/telegram-cli/internal/cli/chat/show"
-	"github.com/vika2603/telegram-cli/internal/cli/chat/topics"
+	"github.com/vika2603/telegram-cli/internal/cli/chat/topic"
 	"github.com/vika2603/telegram-cli/internal/cli/chat/unarchive"
 	"github.com/vika2603/telegram-cli/internal/cli/chat/unmute"
 	"github.com/vika2603/telegram-cli/internal/runtime"
@@ -35,8 +35,8 @@ func New(f *runtime.Invocation) *cobra.Command {
 	cmd.AddCommand(chatdelete.New(f, nil))
 	cmd.AddCommand(edit.New(f, nil))
 	cmd.AddCommand(list.New(f, nil))
-	cmd.AddCommand(show.New(f, nil))
-	cmd.AddCommand(members.New(f, nil))
+	cmd.AddCommand(info.New(f, nil))
+	cmd.AddCommand(member.New(f))
 	cmd.AddCommand(read.New(f, nil))
 	cmd.AddCommand(join.New(f, nil))
 	cmd.AddCommand(leave.New(f, nil))
@@ -46,7 +46,7 @@ func New(f *runtime.Invocation) *cobra.Command {
 	cmd.AddCommand(unarchive.New(f, nil))
 	cmd.AddCommand(pin.NewPin(f, nil))
 	cmd.AddCommand(pin.NewUnpin(f, nil))
-	cmd.AddCommand(topics.New(f, nil))
+	cmd.AddCommand(topic.New(f))
 	cmd.AddCommand(invite.New(f, nil))
 	cmd.AddCommand(ban.NewBan(f, nil))
 	cmd.AddCommand(ban.NewUnban(f, nil))

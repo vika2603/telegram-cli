@@ -15,7 +15,7 @@ import (
 	"github.com/vika2603/telegram-cli/internal/telegram/peer"
 )
 
-// ListForumTopics performs the RPC for `tg chat topics`.
+// ListForumTopics performs the RPC for `tg chat topic`.
 func ListForumTopics(ctx context.Context, api *tg.Client, resolver *peer.Resolver, q actionchat.TopicsQuery) ([]output.TopicRow, error) {
 	resolved, err := resolver.Resolve(ctx, q.Ref)
 	if err != nil {
@@ -64,7 +64,7 @@ func forumTopicToRow(t *tg.ForumTopic) output.TopicRow {
 	return row
 }
 
-// CreateForumTopic performs the RPC for `tg chat topics create`.
+// CreateForumTopic performs the RPC for `tg chat topic create`.
 func CreateForumTopic(ctx context.Context, api *tg.Client, resolver *peer.Resolver, q actionchat.CreateTopicQuery) (output.TopicRow, error) {
 	resolved, err := resolver.Resolve(ctx, q.Ref)
 	if err != nil {
@@ -105,7 +105,7 @@ func CreateForumTopic(ctx context.Context, api *tg.Client, resolver *peer.Resolv
 	return output.TopicRow{ID: msgs[0].MessageID, Title: q.Title, IconColor: q.IconColor, IconEmojiID: q.IconEmojiID}, nil
 }
 
-// EditForumTopic performs the RPC for `tg chat topics edit`. Only the fields
+// EditForumTopic performs the RPC for `tg chat topic edit`. Only the fields
 // the caller set (non-nil) are sent, so an edit changes title/closed/hidden
 // independently.
 func EditForumTopic(ctx context.Context, api *tg.Client, resolver *peer.Resolver, q actionchat.EditTopicQuery) (output.TopicRow, error) {
@@ -133,7 +133,7 @@ func EditForumTopic(ctx context.Context, api *tg.Client, resolver *peer.Resolver
 	return row, nil
 }
 
-// DeleteForumTopic performs the RPC for `tg chat topics delete`. It deletes
+// DeleteForumTopic performs the RPC for `tg chat topic delete`. It deletes
 // the topic's message history; deleteTopicHistory returns the remaining
 // offset, so loop (bounded) until it's drained.
 func DeleteForumTopic(ctx context.Context, api *tg.Client, resolver *peer.Resolver, q actionchat.DeleteTopicQuery) error {
@@ -156,7 +156,7 @@ func DeleteForumTopic(ctx context.Context, api *tg.Client, resolver *peer.Resolv
 	return fmt.Errorf("delete topic %d: history not fully drained after 100 batches; rerun to continue", q.TopicID)
 }
 
-// PinForumTopic performs the RPC for `tg chat topics pin`.
+// PinForumTopic performs the RPC for `tg chat topic pin`.
 func PinForumTopic(ctx context.Context, api *tg.Client, resolver *peer.Resolver, q actionchat.PinTopicQuery) (output.TopicRow, error) {
 	inCh, err := topicChannel(ctx, resolver, q.Ref)
 	if err != nil {

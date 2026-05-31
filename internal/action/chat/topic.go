@@ -10,7 +10,7 @@ import (
 	"github.com/vika2603/telegram-cli/internal/ref"
 )
 
-// TopicsRequest is the raw request for `tg chat topics`.
+// TopicsRequest is the raw request for `tg chat topic`.
 type TopicsRequest struct {
 	RawRef string
 	Q      string
@@ -34,7 +34,7 @@ func Topics(ctx context.Context, req TopicsRequest, do TopicsFunc) ([]output.Top
 		return nil, err
 	}
 	if do == nil {
-		return nil, fmt.Errorf("%w: chat topics called without fetch function", command.ErrPrecondition)
+		return nil, fmt.Errorf("%w: chat topic called without fetch function", command.ErrPrecondition)
 	}
 	return do(ctx, q)
 }
@@ -52,7 +52,7 @@ func NormalizeTopics(req TopicsRequest) (TopicsQuery, error) {
 	return TopicsQuery{Ref: parsed, Q: req.Q, Limit: limit}, nil
 }
 
-// CreateTopicRequest is the raw request for `tg chat topics create`.
+// CreateTopicRequest is the raw request for `tg chat topic create`.
 type CreateTopicRequest struct {
 	RawRef      string
 	Title       string
@@ -83,7 +83,7 @@ func CreateTopic(ctx context.Context, req CreateTopicRequest, do CreateTopicFunc
 		return output.TopicRow{}, err
 	}
 	if do == nil {
-		return output.TopicRow{}, fmt.Errorf("%w: chat topics create called without create function", command.ErrPrecondition)
+		return output.TopicRow{}, fmt.Errorf("%w: chat topic create called without create function", command.ErrPrecondition)
 	}
 	return do(ctx, q)
 }

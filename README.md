@@ -93,7 +93,7 @@ client commands route through when present).
 | `tg chat topics <ref>` | List a forum supergroup's topics. `--q` filters by title. |
 | `tg chat topics create <ref> <title>` | Create a topic. `--icon-color`, `--icon-emoji`, and `--random-id` (idempotent retry). |
 | `tg chat topics edit <ref> <id>` | Rename (`--title`), close/reopen (`--close`/`--reopen`), hide/unhide (`--hide`/`--unhide`). |
-| `tg chat topics pin <ref> <id>` | Pin a topic, or unpin with `--unpin`. |
+| `tg chat topics pin <ref> <id>` / `tg chat topics unpin <ref> <id>` | Pin or unpin a topic. |
 | `tg chat topics delete <ref> <id>` | Delete a topic and its history. Prompts unless `--yes`. |
 | `tg channel create <title>` | Create a broadcast channel. `--about` sets the description. |
 | `tg channel delete <ref>` | Delete a channel (irreversible). Prompts unless `--yes`. |

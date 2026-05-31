@@ -29,11 +29,22 @@ type PinTopicOptions struct {
 	Pin       actionchat.PinTopicFunc
 }
 
+// newPinTopic builds "tg chat topics pin"; newUnpinTopic builds the "unpin"
+// counterpart. They are separate commands (not one with a --unpin flag) to
+// match the repo's toggle convention (msg pin/unpin, chat mute/unmute, …).
 func newPinTopic(f *runtime.Invocation, runF func(*PinTopicOptions) error) *cobra.Command {
-	opts := &PinTopicOptions{}
+	return topicPinCmd(f, runF, false, "pin", "Pin a forum topic")
+}
+
+func newUnpinTopic(f *runtime.Invocation, runF func(*PinTopicOptions) error) *cobra.Command {
+	return topicPinCmd(f, runF, true, "unpin", "Unpin a forum topic")
+}
+
+func topicPinCmd(f *runtime.Invocation, runF func(*PinTopicOptions) error, unpin bool, use, short string) *cobra.Command {
+	opts := &PinTopicOptions{Unpin: unpin}
 	cmd := &cobra.Command{
-		Use:   "pin <ref> <topic-id>",
-		Short: "Pin (or unpin) a forum topic",
+		Use:   use + " <ref> <topic-id>",
+		Short: short,
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.RawRef = args[0]
@@ -50,7 +61,6 @@ func newPinTopic(f *runtime.Invocation, runF func(*PinTopicOptions) error) *cobr
 			return runPinTopic(cmd.Context(), opts)
 		},
 	}
-	cmd.Flags().BoolVar(&opts.Unpin, "unpin", false, "Unpin the topic instead of pinning it")
 	command.SetMeta(cmd, command.Meta{NeedsAccount: true, NeedsClient: true})
 	output.AddJSONFlags(cmd, &opts.Exporter, []string{"id", "title", "closed", "hidden", "pinned"})
 	return cmd

@@ -57,6 +57,7 @@ func New(f *runtime.Invocation, runF func(*ListOptions) error) *cobra.Command {
 	cmd.AddCommand(newEdit(f, nil))
 	cmd.AddCommand(newDeleteTopic(f, nil))
 	cmd.AddCommand(newPinTopic(f, nil))
+	cmd.AddCommand(newUnpinTopic(f, nil))
 	return cmd
 }
 

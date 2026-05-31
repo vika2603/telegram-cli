@@ -7,6 +7,7 @@ package channel
 import (
 	"github.com/spf13/cobra"
 
+	"github.com/vika2603/telegram-cli/internal/cli/channel/discussion"
 	chatcreate "github.com/vika2603/telegram-cli/internal/cli/chat/create"
 	chatdelete "github.com/vika2603/telegram-cli/internal/cli/chat/delete"
 	chatedit "github.com/vika2603/telegram-cli/internal/cli/chat/edit"
@@ -22,5 +23,6 @@ func New(f *runtime.Invocation) *cobra.Command {
 	cmd.AddCommand(chatcreate.NewWith(f, nil, "Create a broadcast channel", true))
 	cmd.AddCommand(chatdelete.NewWith(f, nil, "Delete a channel (irreversible)"))
 	cmd.AddCommand(chatedit.NewWith(f, nil, "Edit a channel: title, about, visibility, and settings", chatedit.ScopeChannel))
+	cmd.AddCommand(discussion.New(f))
 	return cmd
 }

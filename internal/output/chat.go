@@ -251,6 +251,26 @@ type ChatMembershipRow struct {
 	Role          string  `json:"role,omitempty"` // "member" | "admin" | "creator"
 }
 
+// DiscussionRow is emitted by `channel discussion link` / `unlink`. Group is
+// nil on unlink (the channel's discussion group was cleared).
+type DiscussionRow struct {
+	Action  string   `json:"action"` // "link" | "unlink"
+	Channel PeerRef  `json:"channel"`
+	Group   *PeerRef `json:"group,omitempty"`
+}
+
+// WriteDiscussionJSON emits one ndjson line.
+func WriteDiscussionJSON(w io.Writer, r DiscussionRow) error {
+	b, err := json.Marshal(r)
+	if err != nil {
+		return err
+	}
+	if _, err := w.Write(append(b, '\n')); err != nil {
+		return err
+	}
+	return nil
+}
+
 // InviteRow is emitted by `chat invite`, one per requested user. Invited is
 // false when Telegram accepted the request but did not actually add the user
 // (typically the target's privacy settings disallow being added by others);

@@ -21,11 +21,27 @@ func EditChat(ctx context.Context, api *tg.Client, resolver *peer.Resolver, q ac
 		return output.ChatRow{}, err
 	}
 
+	// Pre-check: if any channel-only toggle is requested we need an InputChannel.
+	// Resolve it once and reuse below.
+	needsChannel := q.Forum != nil || q.HideMembers != nil || q.HideHistory != nil ||
+		q.SlowMode != nil || q.Signatures != nil
+	var inCh tg.InputChannelClass
+	if needsChannel || q.Title != nil || q.Username != nil {
+		var ok bool
+		inCh, ok = inputChannelFromPeer(resolved.InputPeer)
+		if !ok && (needsChannel || q.Username != nil) {
+			return output.ChatRow{}, fmt.Errorf("%w: only supergroups/channels support this setting", command.ErrUsage)
+		}
+	}
+
 	title := resolved.Title
 	if q.Title != nil {
-		inCh, ok := inputChannelFromPeer(resolved.InputPeer)
-		if !ok {
-			return output.ChatRow{}, fmt.Errorf("%w: only supergroups and channels can be edited by ref", command.ErrUsage)
+		if inCh == nil {
+			var ok bool
+			inCh, ok = inputChannelFromPeer(resolved.InputPeer)
+			if !ok {
+				return output.ChatRow{}, fmt.Errorf("%w: only supergroups and channels can be edited by ref", command.ErrUsage)
+			}
 		}
 		if _, err := api.ChannelsEditTitle(ctx, &tg.ChannelsEditTitleRequest{Channel: inCh, Title: *q.Title}); err != nil {
 			return output.ChatRow{}, err
@@ -40,16 +56,46 @@ func EditChat(ctx context.Context, api *tg.Client, resolver *peer.Resolver, q ac
 
 	username := resolved.Username
 	if q.Username != nil {
-		inCh, ok := inputChannelFromPeer(resolved.InputPeer)
-		if !ok {
-			return output.ChatRow{}, fmt.Errorf("%w: only supergroups and channels have public usernames", command.ErrUsage)
-		}
+		// inCh is guaranteed non-nil here (checked above in needsChannel block).
 		// "" removes the public username (makes the chat private); a value
 		// sets/replaces it (makes it public).
 		if _, err := api.ChannelsUpdateUsername(ctx, &tg.ChannelsUpdateUsernameRequest{Channel: inCh, Username: *q.Username}); err != nil {
 			return output.ChatRow{}, err
 		}
 		username = *q.Username
+	}
+
+	// Toggle RPCs — all require an InputChannel (supergroups/channels only).
+	if q.Forum != nil {
+		if _, err := api.ChannelsToggleForum(ctx, &tg.ChannelsToggleForumRequest{Channel: inCh, Enabled: *q.Forum}); err != nil {
+			return output.ChatRow{}, err
+		}
+	}
+	if q.HideMembers != nil {
+		if _, err := api.ChannelsToggleParticipantsHidden(ctx, &tg.ChannelsToggleParticipantsHiddenRequest{Channel: inCh, Enabled: *q.HideMembers}); err != nil {
+			return output.ChatRow{}, err
+		}
+	}
+	if q.HideHistory != nil {
+		if _, err := api.ChannelsTogglePreHistoryHidden(ctx, &tg.ChannelsTogglePreHistoryHiddenRequest{Channel: inCh, Enabled: *q.HideHistory}); err != nil {
+			return output.ChatRow{}, err
+		}
+	}
+	if q.SlowMode != nil {
+		if _, err := api.ChannelsToggleSlowMode(ctx, &tg.ChannelsToggleSlowModeRequest{Channel: inCh, Seconds: *q.SlowMode}); err != nil {
+			return output.ChatRow{}, err
+		}
+	}
+	if q.Signatures != nil {
+		if _, err := api.ChannelsToggleSignatures(ctx, &tg.ChannelsToggleSignaturesRequest{Channel: inCh, Enabled: *q.Signatures}); err != nil {
+			return output.ChatRow{}, err
+		}
+	}
+	// NoForwards uses InputPeer directly, not InputChannel.
+	if q.NoForwards != nil {
+		if _, err := api.MessagesToggleNoForwards(ctx, &tg.MessagesToggleNoForwardsRequest{Peer: resolved.InputPeer, Enabled: *q.NoForwards}); err != nil {
+			return output.ChatRow{}, err
+		}
 	}
 
 	return output.ChatRow{

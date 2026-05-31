@@ -20,6 +20,6 @@ func New(f *runtime.Invocation) *cobra.Command {
 	}
 	cmd.AddCommand(create.New(f, nil))
 	cmd.AddCommand(channeldelete.New(f, nil))
-	cmd.AddCommand(chatedit.NewWith(f, nil, "Edit a channel's title and/or about text"))
+	cmd.AddCommand(chatedit.NewWith(f, nil, "Edit a channel: title, about, visibility, and settings", chatedit.ScopeChannel))
 	return cmd
 }

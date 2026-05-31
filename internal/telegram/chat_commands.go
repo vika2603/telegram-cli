@@ -63,6 +63,26 @@ func updateChatMute(ctx context.Context, api *tg.Client, resolver *peer.Resolver
 	return output.ChatMuteRow{Action: action, Peer: output.PeerRefFromResolved(resolved)}, nil
 }
 
+// PinChat toggles whether a dialog is pinned to the top of the chat list.
+func PinChat(ctx context.Context, api *tg.Client, resolver *peer.Resolver, q actionchat.PinQuery) (output.ChatPinRow, error) {
+	resolved, err := resolver.Resolve(ctx, q.Ref)
+	if err != nil {
+		return output.ChatPinRow{}, err
+	}
+	req := &tg.MessagesToggleDialogPinRequest{
+		Peer: &tg.InputDialogPeer{Peer: resolved.InputPeer},
+	}
+	req.SetPinned(q.Pinned)
+	if _, err := api.MessagesToggleDialogPin(ctx, req); err != nil {
+		return output.ChatPinRow{}, err
+	}
+	action := "pin"
+	if !q.Pinned {
+		action = "unpin"
+	}
+	return output.ChatPinRow{Action: action, Peer: output.PeerRefFromResolved(resolved), Pinned: q.Pinned}, nil
+}
+
 // ReadChat marks a chat as read.
 func ReadChat(ctx context.Context, api *tg.Client, resolver *peer.Resolver, q actionchat.ReadQuery) error {
 	resolved, err := resolver.Resolve(ctx, q.Ref)

@@ -395,6 +395,20 @@ func registerHandlers(
 		return json.Marshal(row)
 	})
 
+	// chat.pin covers both pin and unpin — PinQuery.Pinned discriminates
+	// direction.
+	srv.Register("chat.pin", func(ctx context.Context, params json.RawMessage) (json.RawMessage, error) {
+		var q actionchat.PinQuery
+		if err := json.Unmarshal(params, &q); err != nil { //nolint:musttag
+			return nil, fmt.Errorf("invalid chat.pin params: %w", err)
+		}
+		row, err := telegram.PinChat(ctx, api, res, q)
+		if err != nil {
+			return nil, err
+		}
+		return json.Marshal(row)
+	})
+
 	srv.Register("msg.link", func(ctx context.Context, params json.RawMessage) (json.RawMessage, error) {
 		var q actionmessage.LinkQuery
 		if err := json.Unmarshal(params, &q); err != nil { //nolint:musttag

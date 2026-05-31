@@ -109,6 +109,8 @@ client commands route through when present).
 | `tg chat unmute <ref>` | Restore notifications. |
 | `tg chat archive <ref>` | Move a chat to the archive folder. |
 | `tg chat unarchive <ref>` | Move a chat back to the main folder. |
+| `tg chat pin <ref>` | Pin a chat to the top of the chat list. |
+| `tg chat unpin <ref>` | Unpin a chat from the top of the chat list. |
 | `tg chat members <ref>` | List members. `--filter recent\|admins\|bots\|kicked\|banned\|contacts`, `--q`, `--limit`. |
 | `tg chat invite <ref> <user>...` | Add users to a group or channel. |
 | `tg chat ban <ref> <user>` / `tg chat unban <ref> <user>` | Ban (remove + block) or unban a member. Ban prompts unless `--yes`. |

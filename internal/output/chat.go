@@ -349,6 +349,26 @@ func WriteChatMuteJSON(w io.Writer, r ChatMuteRow) error {
 	return nil
 }
 
+// ChatPinRow is emitted by `chat pin` / `chat unpin`. It reports whether the
+// dialog is pinned to the top of the chat list after the call.
+type ChatPinRow struct {
+	Action string  `json:"action"` // "pin" | "unpin"
+	Peer   PeerRef `json:"peer"`
+	Pinned bool    `json:"pinned"`
+}
+
+// WriteChatPinJSON emits one ndjson line.
+func WriteChatPinJSON(w io.Writer, r ChatPinRow) error {
+	b, err := json.Marshal(r)
+	if err != nil {
+		return err
+	}
+	if _, err := w.Write(append(b, '\n')); err != nil {
+		return err
+	}
+	return nil
+}
+
 // ChatFolderRow is emitted by `chat archive` / `chat unarchive`.
 // Folder is the numeric folder ID (0 = main, 1 = archive).
 type ChatFolderRow struct {

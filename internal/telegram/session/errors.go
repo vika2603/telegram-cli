@@ -11,7 +11,7 @@ var (
 	ErrAuth          = errors.New("auth required")
 	ErrNetwork       = errors.New("network")
 	ErrRateExhausted = errors.New("rate exhausted")
-	ErrCurrent       = errors.New("refuses to terminate the current session")
+	ErrCurrent       = errors.New("refuses to revoke the current session")
 	ErrBadPassword   = errors.New("2FA password incorrect")
 )
 

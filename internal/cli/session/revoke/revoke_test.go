@@ -155,7 +155,7 @@ func TestRun_DeclinedPrompt(t *testing.T) {
 	require.ErrorIs(t, err, command.ErrNotConfirmed)
 }
 
-func TestRun_AcceptedTerminatesOne(t *testing.T) {
+func TestRun_AcceptedRevokesOne(t *testing.T) {
 	f := runtime.NewTestInvocation(t)
 	stubAccount(f)
 	stubWithPeers(f)

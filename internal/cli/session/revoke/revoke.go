@@ -66,7 +66,7 @@ func New(f *runtime.Invocation, runF func(*Options) error) *cobra.Command {
 // Run opens the current account client, dispatches the action, and emits the result.
 func Run(ctx context.Context, opts *Options) error {
 	if opts.Fetch == nil || opts.Reset == nil || opts.ResetAll == nil {
-		return fmt.Errorf("%w: internal error: session terminate functions are not configured", command.ErrPrecondition)
+		return fmt.Errorf("%w: internal error: session revoke functions are not configured", command.ErrPrecondition)
 	}
 	req := actionsession.TerminateRequest{
 		Hash:      opts.Hash,

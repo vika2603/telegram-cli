@@ -41,7 +41,7 @@ func List(ctx context.Context, api *tg.Client, fetch FetchFunc) ([]output.Accoun
 	return rows, nil
 }
 
-// TerminateRequest is the normalized request for `tg session terminate`.
+// TerminateRequest is the normalized request for `tg session revoke`.
 type TerminateRequest struct {
 	Hash      string
 	AllOthers bool
@@ -59,7 +59,7 @@ func Terminate(
 	resetAll ResetAllFunc,
 ) (map[string]any, error) {
 	if fetch == nil || reset == nil || resetAll == nil {
-		return nil, fmt.Errorf("%w: internal error: session terminate functions are not configured", command.ErrPrecondition)
+		return nil, fmt.Errorf("%w: internal error: session revoke functions are not configured", command.ErrPrecondition)
 	}
 	if err := ValidateTerminate(req); err != nil {
 		return nil, err

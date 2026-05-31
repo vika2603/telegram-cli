@@ -22,7 +22,7 @@ type MembershipQuery struct {
 	Ref ref.Ref
 }
 
-// MembershipFunc changes chat memberhip after validation.
+// MembershipFunc changes chat membership after validation.
 type MembershipFunc func(context.Context, MembershipQuery) (output.ChatMembershipRow, error)
 
 // Join validates `tg chat join` and delegates.

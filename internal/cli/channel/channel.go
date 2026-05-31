@@ -8,6 +8,7 @@ import (
 
 	"github.com/vika2603/telegram-cli/internal/cli/channel/create"
 	channeldelete "github.com/vika2603/telegram-cli/internal/cli/channel/delete"
+	chatedit "github.com/vika2603/telegram-cli/internal/cli/chat/edit"
 	"github.com/vika2603/telegram-cli/internal/runtime"
 )
 
@@ -19,5 +20,6 @@ func New(f *runtime.Invocation) *cobra.Command {
 	}
 	cmd.AddCommand(create.New(f, nil))
 	cmd.AddCommand(channeldelete.New(f, nil))
+	cmd.AddCommand(chatedit.NewWith(f, nil, "Edit a channel's title and/or about text"))
 	return cmd
 }

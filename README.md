@@ -90,6 +90,7 @@ client commands route through when present).
 | `tg chat info <ref>` | Show one user, chat, bot, or channel. |
 | `tg chat create <title>` | Create a supergroup. `--forum` enables topics; `--about` sets the description. |
 | `tg chat delete <ref>` | Delete a supergroup or channel (irreversible). Prompts unless `--yes`. |
+| `tg chat edit <ref>` | Edit a supergroup: `--title`, `--about`, `--public <name>` (make public) / `--private` (make invite-only). |
 | `tg chat topics <ref>` | List a forum supergroup's topics. `--q` filters by title. |
 | `tg chat topics create <ref> <title>` | Create a topic. `--icon-color`, `--icon-emoji`, and `--random-id` (idempotent retry). |
 | `tg chat topics edit <ref> <id>` | Rename (`--title`), close/reopen (`--close`/`--reopen`), hide/unhide (`--hide`/`--unhide`). |
@@ -97,6 +98,7 @@ client commands route through when present).
 | `tg chat topics delete <ref> <id>` | Delete a topic and its history. Prompts unless `--yes`. |
 | `tg channel create <title>` | Create a broadcast channel. `--about` sets the description. |
 | `tg channel delete <ref>` | Delete a channel (irreversible). Prompts unless `--yes`. |
+| `tg channel edit <ref>` | Edit a channel: `--title`, `--about`, `--public <name>` (make public) / `--private` (make invite-only). |
 | `tg chat mark-read <ref>` | Mark a chat as read. `--max-id` limits the range. |
 | `tg chat join <ref>` | Join a channel, group, or invite link. |
 | `tg chat leave <ref>` | Leave a channel or supergroup. Prompts unless `--yes`. |

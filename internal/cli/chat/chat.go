@@ -7,6 +7,7 @@ import (
 	"github.com/vika2603/telegram-cli/internal/cli/chat/archive"
 	"github.com/vika2603/telegram-cli/internal/cli/chat/create"
 	chatdelete "github.com/vika2603/telegram-cli/internal/cli/chat/delete"
+	"github.com/vika2603/telegram-cli/internal/cli/chat/edit"
 	"github.com/vika2603/telegram-cli/internal/cli/chat/join"
 	"github.com/vika2603/telegram-cli/internal/cli/chat/leave"
 	"github.com/vika2603/telegram-cli/internal/cli/chat/list"
@@ -28,6 +29,7 @@ func New(f *runtime.Invocation) *cobra.Command {
 	}
 	cmd.AddCommand(create.New(f, nil))
 	cmd.AddCommand(chatdelete.New(f, nil))
+	cmd.AddCommand(edit.New(f, nil))
 	cmd.AddCommand(list.New(f, nil))
 	cmd.AddCommand(show.New(f, nil))
 	cmd.AddCommand(members.New(f, nil))

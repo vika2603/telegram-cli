@@ -1,5 +1,5 @@
-// Package members implements "tg chat members <ref>".
-package members
+// Package member implements the "tg chat member" command group.
+package member
 
 import (
 	"context"
@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 
 	actionchat "github.com/vika2603/telegram-cli/internal/action/chat"
+	"github.com/vika2603/telegram-cli/internal/cli/complete"
 	"github.com/vika2603/telegram-cli/internal/command"
 	"github.com/vika2603/telegram-cli/internal/output"
 	"github.com/vika2603/telegram-cli/internal/runtime"
@@ -28,13 +29,14 @@ type Options struct {
 	Fetch     actionchat.MembersFunc
 }
 
-// New builds the cobra command for "tg chat members".
-func New(f *runtime.Invocation, runF func(*Options) error) *cobra.Command {
+// NewList builds the cobra command for "tg chat member list".
+func NewList(f *runtime.Invocation, runF func(*Options) error) *cobra.Command {
 	opts := &Options{}
 	cmd := &cobra.Command{
-		Use:   "members <ref>",
-		Short: "List members of a group or channel (not available yet)",
-		Args:  cobra.ExactArgs(1),
+		Use:               "list <ref>",
+		Short:             "List members of a group or channel",
+		Args:              cobra.ExactArgs(1),
+		ValidArgsFunction: complete.PeerRefs(f),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.RawRef = args[0]
 			opts.IOStreams = f.IOStreams

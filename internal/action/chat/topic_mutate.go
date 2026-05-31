@@ -12,7 +12,7 @@ import (
 	"github.com/vika2603/telegram-cli/internal/ui"
 )
 
-// EditTopicRequest is the raw request for `tg chat topics edit`. Title/Closed/
+// EditTopicRequest is the raw request for `tg chat topic edit`. Title/Closed/
 // Hidden are pointers so "not passed" (nil) is distinct from "set to empty/
 // false" — only non-nil fields are sent to editForumTopic.
 type EditTopicRequest struct {
@@ -42,7 +42,7 @@ func EditTopic(ctx context.Context, req EditTopicRequest, do EditTopicFunc) (out
 		return output.TopicRow{}, err
 	}
 	if do == nil {
-		return output.TopicRow{}, fmt.Errorf("%w: chat topics edit called without edit function", command.ErrPrecondition)
+		return output.TopicRow{}, fmt.Errorf("%w: chat topic edit called without edit function", command.ErrPrecondition)
 	}
 	return do(ctx, q)
 }
@@ -71,7 +71,7 @@ func NormalizeEditTopic(req EditTopicRequest) (EditTopicQuery, error) {
 	return EditTopicQuery{Ref: parsed, TopicID: req.TopicID, Title: req.Title, Closed: req.Closed, Hidden: req.Hidden}, nil
 }
 
-// DeleteTopicRequest is the raw request for `tg chat topics delete`.
+// DeleteTopicRequest is the raw request for `tg chat topic delete`.
 type DeleteTopicRequest struct {
 	RawRef   string
 	TopicID  int
@@ -98,7 +98,7 @@ func DeleteTopic(ctx context.Context, req DeleteTopicRequest, do DeleteTopicFunc
 		return output.TopicRow{}, fmt.Errorf("%w: %s", command.ErrUsage, err.Error())
 	}
 	if do == nil {
-		return output.TopicRow{}, fmt.Errorf("%w: chat topics delete called without delete function", command.ErrPrecondition)
+		return output.TopicRow{}, fmt.Errorf("%w: chat topic delete called without delete function", command.ErrPrecondition)
 	}
 	if err := ui.ConfirmDestructive(req.Prompter, fmt.Sprintf("delete topic %d in %s (this removes its messages)?", req.TopicID, parsed.String()), req.Yes); err != nil {
 		return output.TopicRow{}, err
@@ -109,7 +109,7 @@ func DeleteTopic(ctx context.Context, req DeleteTopicRequest, do DeleteTopicFunc
 	return output.TopicRow{ID: req.TopicID}, nil
 }
 
-// PinTopicRequest is the raw request for `tg chat topics pin`.
+// PinTopicRequest is the raw request for `tg chat topic pin`.
 type PinTopicRequest struct {
 	RawRef  string
 	TopicID int
@@ -136,12 +136,12 @@ func PinTopic(ctx context.Context, req PinTopicRequest, do PinTopicFunc) (output
 		return output.TopicRow{}, fmt.Errorf("%w: %s", command.ErrUsage, err.Error())
 	}
 	if do == nil {
-		return output.TopicRow{}, fmt.Errorf("%w: chat topics pin called without pin function", command.ErrPrecondition)
+		return output.TopicRow{}, fmt.Errorf("%w: chat topic pin called without pin function", command.ErrPrecondition)
 	}
 	return do(ctx, PinTopicQuery{Ref: parsed, TopicID: req.TopicID, Pinned: !req.Unpin})
 }
 
-// TopicInfoRequest is the raw request for `tg chat topics info`.
+// TopicInfoRequest is the raw request for `tg chat topic info`.
 type TopicInfoRequest struct {
 	RawRef  string
 	TopicID int
@@ -166,12 +166,12 @@ func InfoTopic(ctx context.Context, req TopicInfoRequest, do TopicInfoFunc) (out
 		return output.TopicRow{}, fmt.Errorf("%w: %s", command.ErrUsage, err.Error())
 	}
 	if do == nil {
-		return output.TopicRow{}, fmt.Errorf("%w: chat topics info called without info function", command.ErrPrecondition)
+		return output.TopicRow{}, fmt.Errorf("%w: chat topic info called without info function", command.ErrPrecondition)
 	}
 	return do(ctx, TopicInfoQuery{Ref: parsed, TopicID: req.TopicID})
 }
 
-// MuteTopicRequest is the raw request for `tg chat topics mute/unmute`. For
+// MuteTopicRequest is the raw request for `tg chat topic mute/unmute`. For
 // mute, the target timestamp comes from Duration/Until/Forever (mutually
 // exclusive); unmute ignores them and clears the mute.
 type MuteTopicRequest struct {
@@ -204,7 +204,7 @@ func MuteTopic(ctx context.Context, req MuteTopicRequest, do MuteTopicFunc) (out
 		return output.TopicRow{}, fmt.Errorf("%w: %s", command.ErrUsage, err.Error())
 	}
 	if do == nil {
-		return output.TopicRow{}, fmt.Errorf("%w: chat topics mute called without mute function", command.ErrPrecondition)
+		return output.TopicRow{}, fmt.Errorf("%w: chat topic mute called without mute function", command.ErrPrecondition)
 	}
 	muteUntil := 0
 	if !req.Unmute {
@@ -227,7 +227,7 @@ func MuteTopic(ctx context.Context, req MuteTopicRequest, do MuteTopicFunc) (out
 	return do(ctx, MuteTopicQuery{Ref: parsed, TopicID: req.TopicID, MuteUntil: muteUntil})
 }
 
-// ReadTopicRequest is the raw request for `tg chat topics read`.
+// ReadTopicRequest is the raw request for `tg chat topic read`.
 type ReadTopicRequest struct {
 	RawRef  string
 	TopicID int
@@ -252,7 +252,7 @@ func ReadTopic(ctx context.Context, req ReadTopicRequest, do ReadTopicFunc) (out
 		return output.TopicRow{}, fmt.Errorf("%w: %s", command.ErrUsage, err.Error())
 	}
 	if do == nil {
-		return output.TopicRow{}, fmt.Errorf("%w: chat topics read called without read function", command.ErrPrecondition)
+		return output.TopicRow{}, fmt.Errorf("%w: chat topic read called without read function", command.ErrPrecondition)
 	}
 	return do(ctx, ReadTopicQuery{Ref: parsed, TopicID: req.TopicID})
 }

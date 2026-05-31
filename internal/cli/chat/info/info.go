@@ -1,5 +1,5 @@
-// Package show implements "tg chat info <ref>".
-package show
+// Package info implements "tg chat info <ref>".
+package info
 
 import (
 	"context"

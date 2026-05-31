@@ -1,5 +1,5 @@
-// Package terminate implements "tg sessions revoke".
-package terminate
+// Package revoke implements "tg session revoke".
+package revoke
 
 import (
 	"context"
@@ -29,14 +29,14 @@ type Options struct {
 	// Fetch pulls the current list of authorizations. Used for the safety
 	// check AND the rich prompt content.
 	Fetch actionsession.FetchFunc
-	// Reset terminates a single session by hash.
+	// Reset revokes a single session by hash.
 	Reset actionsession.ResetFunc
-	// ResetAll terminates every session in the given hash list.
+	// ResetAll revokes every session in the given hash list.
 	// Production code calls AccountResetAuthorization for each victim hash.
 	ResetAll actionsession.ResetAllFunc
 }
 
-// New builds the cobra command for "tg sessions revoke".
+// New builds the cobra command for "tg session revoke".
 func New(f *runtime.Invocation, runF func(*Options) error) *cobra.Command {
 	opts := &Options{F: f}
 	cmd := &cobra.Command{
@@ -56,7 +56,7 @@ func New(f *runtime.Invocation, runF func(*Options) error) *cobra.Command {
 			return Run(cmd.Context(), opts)
 		},
 	}
-	cmd.Flags().BoolVar(&opts.AllOthers, "all-others", false, "Terminate every session except the current one")
+	cmd.Flags().BoolVar(&opts.AllOthers, "all-others", false, "Revoke every session except the current one")
 	cmd.Flags().BoolVarP(&opts.Yes, "yes", "y", false, "Skip confirmation prompt")
 	command.SetMeta(cmd, command.Meta{NeedsAccount: true, NeedsClient: true})
 	output.AddJSONFlags(cmd, &opts.Exporter, []string{"action", "hash", "device", "count", "all_others", "kept_hash"})
@@ -66,15 +66,15 @@ func New(f *runtime.Invocation, runF func(*Options) error) *cobra.Command {
 // Run opens the current account client, dispatches the action, and emits the result.
 func Run(ctx context.Context, opts *Options) error {
 	if opts.Fetch == nil || opts.Reset == nil || opts.ResetAll == nil {
-		return fmt.Errorf("%w: internal error: session terminate functions are not configured", command.ErrPrecondition)
+		return fmt.Errorf("%w: internal error: session revoke functions are not configured", command.ErrPrecondition)
 	}
-	req := actionsession.TerminateRequest{
+	req := actionsession.RevokeRequest{
 		Hash:      opts.Hash,
 		AllOthers: opts.AllOthers,
 		Yes:       opts.Yes,
 		Prompter:  opts.F.Prompter,
 	}
-	if err := actionsession.ValidateTerminate(req); err != nil {
+	if err := actionsession.ValidateRevoke(req); err != nil {
 		return err
 	}
 
@@ -86,7 +86,7 @@ func Run(ctx context.Context, opts *Options) error {
 	err = opts.F.WithPeers(ctx, acct, runtime.ClientOptsFrom(opts.F, acct),
 		func(ctx context.Context, api *tg.Client, _ *peers.Manager, _ *peer.Resolver) error {
 			var ferr error
-			row, ferr = actionsession.Terminate(ctx, api, req, opts.Fetch, opts.Reset, opts.ResetAll)
+			row, ferr = actionsession.Revoke(ctx, api, req, opts.Fetch, opts.Reset, opts.ResetAll)
 			return ferr
 		})
 	if err != nil {
@@ -113,7 +113,7 @@ func defaultReset(ctx context.Context, api *tg.Client, hash int64) error {
 	return err
 }
 
-// defaultResetAll terminates each victim session individually.
+// defaultResetAll revokes each victim session individually.
 // The Telegram API has no bulk-revoke-all-others endpoint in gotd/td v0.107.0;
 // AccountResetAuthorization is called once per victim hash.
 func defaultResetAll(ctx context.Context, api *tg.Client, victimHashes []int64) error {

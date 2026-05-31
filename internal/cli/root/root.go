@@ -13,7 +13,7 @@ import (
 	authlogoutcmd "github.com/vika2603/telegram-cli/internal/cli/auth/logout"
 	channelcmd "github.com/vika2603/telegram-cli/internal/cli/channel"
 	chatcmd "github.com/vika2603/telegram-cli/internal/cli/chat"
-	chatshowcmd "github.com/vika2603/telegram-cli/internal/cli/chat/show"
+	chatinfocmd "github.com/vika2603/telegram-cli/internal/cli/chat/info"
 	"github.com/vika2603/telegram-cli/internal/cli/completion"
 	configcmd "github.com/vika2603/telegram-cli/internal/cli/config"
 	contactcmd "github.com/vika2603/telegram-cli/internal/cli/contact"
@@ -122,7 +122,7 @@ func frequentCommands(f *runtime.Invocation) []*cobra.Command {
 	digest := digestcmd.New(f, nil)
 	digest.GroupID = "frequent"
 
-	resolve := chatshowcmd.New(f, nil)
+	resolve := chatinfocmd.New(f, nil)
 	resolve.Use = "resolve <ref>"
 	resolve.Short = "Resolve a user, chat, or channel"
 	resolve.GroupID = "frequent"

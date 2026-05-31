@@ -19,10 +19,10 @@ import (
 // FetchFunc loads Telegram authorizations.
 type FetchFunc func(context.Context, *tg.Client) (*tg.AccountAuthorizations, error)
 
-// ResetFunc terminates a single Telegram authorization hash.
+// ResetFunc revokes a single Telegram authorization hash.
 type ResetFunc func(context.Context, *tg.Client, int64) error
 
-// ResetAllFunc terminates a set of Telegram authorization hashes.
+// ResetAllFunc revokes a set of Telegram authorization hashes.
 type ResetAllFunc func(context.Context, *tg.Client, []int64) error
 
 // List loads and maps active remote sessions.
@@ -41,27 +41,27 @@ func List(ctx context.Context, api *tg.Client, fetch FetchFunc) ([]output.Accoun
 	return rows, nil
 }
 
-// TerminateRequest is the normalized request for `tg session terminate`.
-type TerminateRequest struct {
+// RevokeRequest is the normalized request for `tg session revoke`.
+type RevokeRequest struct {
 	Hash      string
 	AllOthers bool
 	Yes       bool
 	Prompter  ui.Prompter
 }
 
-// Terminate validates and terminates one or more remote sessions.
-func Terminate(
+// Revoke validates and revokes one or more remote sessions.
+func Revoke(
 	ctx context.Context,
 	api *tg.Client,
-	req TerminateRequest,
+	req RevokeRequest,
 	fetch FetchFunc,
 	reset ResetFunc,
 	resetAll ResetAllFunc,
 ) (map[string]any, error) {
 	if fetch == nil || reset == nil || resetAll == nil {
-		return nil, fmt.Errorf("%w: internal error: session terminate functions are not configured", command.ErrPrecondition)
+		return nil, fmt.Errorf("%w: internal error: session revoke functions are not configured", command.ErrPrecondition)
 	}
-	if err := ValidateTerminate(req); err != nil {
+	if err := ValidateRevoke(req); err != nil {
 		return nil, err
 	}
 
@@ -71,13 +71,13 @@ func Terminate(
 	}
 	currentHash := currentAuthorizationHash(auths)
 	if req.AllOthers {
-		return terminateAllOthers(ctx, api, req, auths, currentHash, resetAll)
+		return revokeAllOthers(ctx, api, req, auths, currentHash, resetAll)
 	}
-	return terminateSingle(ctx, api, req, auths, currentHash, reset)
+	return revokeSingle(ctx, api, req, auths, currentHash, reset)
 }
 
-// ValidateTerminate checks options that do not require a Telegram client.
-func ValidateTerminate(req TerminateRequest) error {
+// ValidateRevoke checks options that do not require a Telegram client.
+func ValidateRevoke(req RevokeRequest) error {
 	if req.Hash == "" && !req.AllOthers {
 		return fmt.Errorf("%w: provide a hash or --all-others", command.ErrUsage)
 	}
@@ -109,10 +109,10 @@ func RowFromAuth(a tg.Authorization) output.AccountSessionRow {
 	}
 }
 
-func terminateSingle(
+func revokeSingle(
 	ctx context.Context,
 	api *tg.Client,
-	req TerminateRequest,
+	req RevokeRequest,
 	auths *tg.AccountAuthorizations,
 	current int64,
 	reset ResetFunc,
@@ -135,17 +135,17 @@ func terminateSingle(
 		return nil, err
 	}
 	return map[string]any{
-		"action": "terminate",
+		"action": "revoke",
 		"hash":   req.Hash,
 		"device": target.DeviceModel,
 		"count":  1,
 	}, nil
 }
 
-func terminateAllOthers(
+func revokeAllOthers(
 	ctx context.Context,
 	api *tg.Client,
-	req TerminateRequest,
+	req RevokeRequest,
 	auths *tg.AccountAuthorizations,
 	current int64,
 	resetAll ResetAllFunc,
@@ -160,7 +160,7 @@ func terminateAllOthers(
 		victims = append(victims, a)
 	}
 	if len(victims) == 0 {
-		return nil, command.NewNoResultsError("no other sessions to terminate")
+		return nil, command.NewNoResultsError("no other sessions to revoke")
 	}
 	if err := ui.ConfirmDestructive(req.Prompter, allOthersPrompt(victims, kept), req.Yes); err != nil {
 		return nil, err
@@ -173,7 +173,7 @@ func terminateAllOthers(
 		return nil, err
 	}
 	return map[string]any{
-		"action":     "terminate",
+		"action":     "revoke",
 		"all_others": true,
 		"count":      len(victims),
 		"kept_hash":  strconv.FormatInt(current, 10),
@@ -200,7 +200,7 @@ func findAuthorization(auths *tg.AccountAuthorizations, hash int64) *tg.Authoriz
 
 func singlePrompt(target *tg.Authorization) string {
 	return fmt.Sprintf(
-		"Terminate this session?\n  device:      %s · %s\n  platform:    %s %s\n  location:    %s (%s)\n  created:     %s\n  last active: %s",
+		"Revoke this session?\n  device:      %s · %s\n  platform:    %s %s\n  location:    %s (%s)\n  created:     %s\n  last active: %s",
 		target.DeviceModel, target.AppName,
 		target.Platform, target.SystemVersion,
 		coalesce(target.Country), coalesce(target.IP),
@@ -211,7 +211,7 @@ func singlePrompt(target *tg.Authorization) string {
 
 func allOthersPrompt(victims []tg.Authorization, kept tg.Authorization) string {
 	var pb strings.Builder
-	_, _ = fmt.Fprintf(&pb, "Terminate %d session(s)?\n", len(victims))
+	_, _ = fmt.Fprintf(&pb, "Revoke %d session(s)?\n", len(victims))
 	for i, v := range victims {
 		_, _ = fmt.Fprintf(&pb, "  [%d] %s · %s · %s (%s)\n", i+1, v.DeviceModel, v.AppName,
 			coalesce(v.Country), coalesce(v.IP))

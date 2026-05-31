@@ -36,19 +36,19 @@ func TestListMapsAuthorizations(t *testing.T) {
 	require.Equal(t, "2024-01-01T00:00:00Z", rows[0].DateCreated)
 }
 
-func TestValidateTerminate(t *testing.T) {
-	err := ValidateTerminate(TerminateRequest{})
+func TestValidateRevoke(t *testing.T) {
+	err := ValidateRevoke(RevokeRequest{})
 	require.ErrorIs(t, err, command.ErrUsage)
 
-	err = ValidateTerminate(TerminateRequest{Hash: "100", AllOthers: true})
+	err = ValidateRevoke(RevokeRequest{Hash: "100", AllOthers: true})
 	require.ErrorIs(t, err, command.ErrUsage)
 }
 
-func TestTerminateRejectsCurrentSession(t *testing.T) {
-	_, err := Terminate(
+func TestRevokeRejectsCurrentSession(t *testing.T) {
+	_, err := Revoke(
 		context.Background(),
 		nil,
-		TerminateRequest{Hash: "100", Prompter: &ui.StubPrompter{Answers: []any{true}}},
+		RevokeRequest{Hash: "100", Prompter: &ui.StubPrompter{Answers: []any{true}}},
 		fetchAuths(auths()),
 		func(context.Context, *tg.Client, int64) error { return nil },
 		func(context.Context, *tg.Client, []int64) error { return nil },
@@ -56,12 +56,12 @@ func TestTerminateRejectsCurrentSession(t *testing.T) {
 	require.ErrorIs(t, err, tgsession.ErrCurrent)
 }
 
-func TestTerminateAllOthersCollectsVictimHashes(t *testing.T) {
+func TestRevokeAllOthersCollectsVictimHashes(t *testing.T) {
 	var got []int64
-	row, err := Terminate(
+	row, err := Revoke(
 		context.Background(),
 		nil,
-		TerminateRequest{AllOthers: true, Yes: true, Prompter: &ui.StubPrompter{}},
+		RevokeRequest{AllOthers: true, Yes: true, Prompter: &ui.StubPrompter{}},
 		fetchAuths(auths()),
 		func(context.Context, *tg.Client, int64) error { return nil },
 		func(_ context.Context, _ *tg.Client, hashes []int64) error {

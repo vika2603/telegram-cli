@@ -6,7 +6,7 @@ import (
 	"github.com/vika2603/telegram-cli/internal/ui"
 )
 
-// MemberRow is the output of `chat members`. Role is one of: "creator",
+// MemberRow is the output of `chat member list`. Role is one of: "creator",
 // "admin", "member", "restricted", "banned", "kicked", "left".
 type MemberRow struct {
 	UserID    int64  `json:"user_id"`

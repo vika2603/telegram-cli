@@ -16,7 +16,7 @@ func TestNew_HasSubcommands(t *testing.T) {
 	for _, c := range cmd.Commands() {
 		names[c.Name()] = true
 	}
-	want := []string{"list", "info", "members", "mark-read", "join", "leave", "mute", "unmute", "archive", "unarchive", "pin", "unpin"}
+	want := []string{"list", "info", "member", "topic", "mark-read", "join", "leave", "mute", "unmute", "archive", "unarchive", "pin", "unpin"}
 	for _, n := range want {
 		require.True(t, names[n], "expected subcommand %q to be registered", n)
 	}

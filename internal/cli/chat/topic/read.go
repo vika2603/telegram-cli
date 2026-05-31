@@ -1,4 +1,4 @@
-package topics
+package topic
 
 import (
 	"context"
@@ -19,33 +19,21 @@ import (
 	"github.com/vika2603/telegram-cli/internal/ui"
 )
 
-// PinTopicOptions holds the resolved flags and injected dependencies for the
-// pin run.
-type PinTopicOptions struct {
+// ReadTopicOptions holds the resolved flags and injected dependencies for the
+// topic read run.
+type ReadTopicOptions struct {
 	RawRef    string
 	TopicID   int
-	Unpin     bool
 	Exporter  output.Exporter
 	IOStreams *ui.IOStreams
-	Pin       actionchat.PinTopicFunc
+	Read      actionchat.ReadTopicFunc
 }
 
-// newPinTopic builds "tg chat topics pin"; newUnpinTopic builds the "unpin"
-// counterpart. They are separate commands (not one with a --unpin flag) to
-// match the repo's toggle convention (msg pin/unpin, chat mute/unmute, …).
-func newPinTopic(f *runtime.Invocation, runF func(*PinTopicOptions) error) *cobra.Command {
-	return topicPinCmd(f, runF, false, "pin", "Pin a forum topic")
-}
-
-func newUnpinTopic(f *runtime.Invocation, runF func(*PinTopicOptions) error) *cobra.Command {
-	return topicPinCmd(f, runF, true, "unpin", "Unpin a forum topic")
-}
-
-func topicPinCmd(f *runtime.Invocation, runF func(*PinTopicOptions) error, unpin bool, use, short string) *cobra.Command {
-	opts := &PinTopicOptions{Unpin: unpin}
+func newReadTopic(f *runtime.Invocation, runF func(*ReadTopicOptions) error) *cobra.Command {
+	opts := &ReadTopicOptions{}
 	cmd := &cobra.Command{
-		Use:               use + " <ref> <topic-id>",
-		Short:             short,
+		Use:               "read <ref> <topic-id>",
+		Short:             "Mark a forum topic as read",
 		Args:              cobra.ExactArgs(2),
 		ValidArgsFunction: complete.PeerRefs(f),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -59,37 +47,32 @@ func topicPinCmd(f *runtime.Invocation, runF func(*PinTopicOptions) error, unpin
 			if runF != nil {
 				return runF(opts)
 			}
-			opts.Pin = newPinTopicFn(f)
-			return runPinTopic(cmd.Context(), opts)
+			opts.Read = newReadTopicFn(f)
+			return runReadTopic(cmd.Context(), opts)
 		},
 	}
 	command.SetMeta(cmd, command.Meta{NeedsAccount: true, NeedsClient: true})
-	output.AddJSONFlags(cmd, &opts.Exporter, []string{"id", "pinned"})
+	output.AddJSONFlags(cmd, &opts.Exporter, []string{"id"})
 	return cmd
 }
 
-func runPinTopic(ctx context.Context, opts *PinTopicOptions) error {
-	row, err := actionchat.PinTopic(ctx, actionchat.PinTopicRequest{
+func runReadTopic(ctx context.Context, opts *ReadTopicOptions) error {
+	row, err := actionchat.ReadTopic(ctx, actionchat.ReadTopicRequest{
 		RawRef:  opts.RawRef,
 		TopicID: opts.TopicID,
-		Unpin:   opts.Unpin,
-	}, opts.Pin)
+	}, opts.Read)
 	if err != nil {
 		return err
 	}
 	if opts.Exporter != nil {
 		return opts.Exporter.Write(opts.IOStreams, row)
 	}
-	verb := "pinned"
-	if opts.Unpin {
-		verb = "unpinned"
-	}
-	_, err = fmt.Fprintf(opts.IOStreams.Out, "%s topic %d\n", verb, row.ID)
+	_, err = fmt.Fprintf(opts.IOStreams.Out, "read topic %d\n", row.ID)
 	return err
 }
 
-func newPinTopicFn(f *runtime.Invocation) actionchat.PinTopicFunc {
-	return func(ctx context.Context, q actionchat.PinTopicQuery) (output.TopicRow, error) {
+func newReadTopicFn(f *runtime.Invocation) actionchat.ReadTopicFunc {
+	return func(ctx context.Context, q actionchat.ReadTopicQuery) (output.TopicRow, error) {
 		acct, err := f.Account("")
 		if err != nil {
 			return output.TopicRow{}, err
@@ -97,7 +80,7 @@ func newPinTopicFn(f *runtime.Invocation) actionchat.PinTopicFunc {
 		var row output.TopicRow
 		err = f.WithPeers(ctx, acct, runtime.ClientOptsFrom(f, acct),
 			func(ctx context.Context, api *tg.Client, _ *peers.Manager, res *peer.Resolver) error {
-				row, err = telegram.PinForumTopic(ctx, api, res, q)
+				row, err = telegram.ReadForumTopic(ctx, api, res, q)
 				return err
 			})
 		return row, err

@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 
 	actionchat "github.com/vika2603/telegram-cli/internal/action/chat"
+	"github.com/vika2603/telegram-cli/internal/cli/complete"
 	"github.com/vika2603/telegram-cli/internal/command"
 	"github.com/vika2603/telegram-cli/internal/output"
 	"github.com/vika2603/telegram-cli/internal/runtime"
@@ -33,9 +34,10 @@ type DeleteTopicOptions struct {
 func newDeleteTopic(f *runtime.Invocation, runF func(*DeleteTopicOptions) error) *cobra.Command {
 	opts := &DeleteTopicOptions{}
 	cmd := &cobra.Command{
-		Use:   "delete <ref> <topic-id>",
-		Short: "Delete a forum topic and its message history",
-		Args:  cobra.ExactArgs(2),
+		Use:               "delete <ref> <topic-id>",
+		Short:             "Delete a forum topic and its message history",
+		Args:              cobra.ExactArgs(2),
+		ValidArgsFunction: complete.PeerRefs(f),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.RawRef = args[0]
 			id, err := strconv.Atoi(args[1])
@@ -54,7 +56,7 @@ func newDeleteTopic(f *runtime.Invocation, runF func(*DeleteTopicOptions) error)
 	}
 	cmd.Flags().BoolVarP(&opts.Yes, "yes", "y", false, "Skip confirmation prompt")
 	command.SetMeta(cmd, command.Meta{NeedsAccount: true, NeedsClient: true})
-	output.AddJSONFlags(cmd, &opts.Exporter, []string{"id", "title", "closed", "hidden"})
+	output.AddJSONFlags(cmd, &opts.Exporter, []string{"id"})
 	return cmd
 }
 

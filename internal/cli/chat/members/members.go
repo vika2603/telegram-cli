@@ -47,8 +47,8 @@ func New(f *runtime.Invocation, runF func(*Options) error) *cobra.Command {
 	}
 	cmd.Flags().StringVar(&opts.Filter, "filter", "recent",
 		"Filter: recent|admins|bots|kicked|banned|contacts")
-	cmd.Flags().StringVar(&opts.Q, "q", "",
-		"Substring filter (valid only with --filter kicked|banned|contacts)")
+	cmd.Flags().StringVar(&opts.Q, "search", "",
+		"Substring search (valid only with --filter kicked|banned|contacts)")
 	cmd.Flags().IntVar(&opts.Limit, "limit", 30, "Max members (cap 1000)")
 	command.SetMeta(cmd, command.Meta{NeedsAccount: true, NeedsClient: true})
 	output.AddJSONFlags(cmd, &opts.Exporter,

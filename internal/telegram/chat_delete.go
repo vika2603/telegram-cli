@@ -21,7 +21,7 @@ func DeleteChat(ctx context.Context, api *tg.Client, resolver *peer.Resolver, q 
 	}
 	inCh, ok := inputChannelFromPeer(resolved.InputPeer)
 	if !ok {
-		return output.PeerRef{}, fmt.Errorf("%w: only supergroups and channels can be deleted by ref", command.ErrUsage)
+		return output.PeerRef{}, fmt.Errorf("%w: only supergroups and channels can be deleted by ref", command.ErrUnsupported)
 	}
 	if _, err := api.ChannelsDeleteChannel(ctx, inCh); err != nil {
 		return output.PeerRef{}, err

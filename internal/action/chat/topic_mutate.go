@@ -3,6 +3,7 @@ package chat
 import (
 	"context"
 	"fmt"
+	"time"
 	"unicode/utf8"
 
 	"github.com/vika2603/telegram-cli/internal/command"
@@ -170,11 +171,17 @@ func InfoTopic(ctx context.Context, req TopicInfoRequest, do TopicInfoFunc) (out
 	return do(ctx, TopicInfoQuery{Ref: parsed, TopicID: req.TopicID})
 }
 
-// MuteTopicRequest is the raw request for `tg chat topics mute/unmute`.
+// MuteTopicRequest is the raw request for `tg chat topics mute/unmute`. For
+// mute, the target timestamp comes from Duration/Until/Forever (mutually
+// exclusive); unmute ignores them and clears the mute.
 type MuteTopicRequest struct {
-	RawRef    string
-	TopicID   int
-	MuteUntil int
+	RawRef   string
+	TopicID  int
+	Unmute   bool
+	Duration string
+	Until    string
+	Forever  bool
+	Now      time.Time
 }
 
 // MuteTopicQuery is the normalized payload passed to Telegram.
@@ -199,7 +206,25 @@ func MuteTopic(ctx context.Context, req MuteTopicRequest, do MuteTopicFunc) (out
 	if do == nil {
 		return output.TopicRow{}, fmt.Errorf("%w: chat topics mute called without mute function", command.ErrPrecondition)
 	}
-	return do(ctx, MuteTopicQuery{Ref: parsed, TopicID: req.TopicID, MuteUntil: req.MuteUntil})
+	muteUntil := 0
+	if !req.Unmute {
+		if err := command.MutuallyExclusive(
+			"--duration, --until, and --forever are mutually exclusive",
+			req.Duration != "", req.Until != "", req.Forever,
+		); err != nil {
+			return output.TopicRow{}, err
+		}
+		now := req.Now
+		if now.IsZero() {
+			now = time.Now()
+		}
+		secs, _, err := ResolveMuteUntil(MuteRequest{Duration: req.Duration, Until: req.Until, Forever: req.Forever}, now)
+		if err != nil {
+			return output.TopicRow{}, err
+		}
+		muteUntil = int(secs)
+	}
+	return do(ctx, MuteTopicQuery{Ref: parsed, TopicID: req.TopicID, MuteUntil: muteUntil})
 }
 
 // ReadTopicRequest is the raw request for `tg chat topics read`.

@@ -22,17 +22,25 @@ type Options struct {
 	Title     string
 	About     string
 	Forum     bool
+	Broadcast bool
 	Exporter  output.Exporter
 	IOStreams *ui.IOStreams
 	Create    actionchat.CreateChatFunc
 }
 
-// New builds the cobra command for "tg chat create".
+// New builds the cobra command for "tg chat create" (a supergroup).
 func New(f *runtime.Invocation, runF func(*Options) error) *cobra.Command {
-	opts := &Options{}
+	return NewWith(f, runF, "Create a supergroup", false)
+}
+
+// NewWith builds the create command with a caller-supplied short description.
+// When broadcast is true it creates a broadcast channel (no --forum flag) so
+// the "tg channel create" tree can reuse this implementation.
+func NewWith(f *runtime.Invocation, runF func(*Options) error, short string, broadcast bool) *cobra.Command {
+	opts := &Options{Broadcast: broadcast}
 	cmd := &cobra.Command{
 		Use:   "create <title>",
-		Short: "Create a supergroup",
+		Short: short,
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Title = args[0]
@@ -45,7 +53,9 @@ func New(f *runtime.Invocation, runF func(*Options) error) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&opts.About, "about", "", "Description / about text")
-	cmd.Flags().BoolVar(&opts.Forum, "forum", false, "Enable topics (supergroups only)")
+	if !broadcast {
+		cmd.Flags().BoolVar(&opts.Forum, "forum", false, "Enable topics (supergroups only)")
+	}
 	command.SetMeta(cmd, command.Meta{NeedsAccount: true, NeedsClient: true})
 	output.AddJSONFlags(cmd, &opts.Exporter, []string{"peer", "title", "type"})
 	return cmd
@@ -54,9 +64,10 @@ func New(f *runtime.Invocation, runF func(*Options) error) *cobra.Command {
 // Run dispatches the create request and renders the new chat.
 func Run(ctx context.Context, opts *Options) error {
 	row, err := actionchat.CreateChat(ctx, actionchat.CreateChatRequest{
-		Title: opts.Title,
-		About: opts.About,
-		Forum: opts.Forum,
+		Title:     opts.Title,
+		About:     opts.About,
+		Forum:     opts.Forum,
+		Broadcast: opts.Broadcast,
 	}, opts.Create)
 	if err != nil {
 		return err

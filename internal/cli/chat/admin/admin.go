@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 
 	actionchat "github.com/vika2603/telegram-cli/internal/action/chat"
+	"github.com/vika2603/telegram-cli/internal/cli/complete"
 	"github.com/vika2603/telegram-cli/internal/command"
 	"github.com/vika2603/telegram-cli/internal/output"
 	"github.com/vika2603/telegram-cli/internal/runtime"
@@ -47,9 +48,10 @@ func adminCmd(f *runtime.Invocation, runF func(*Options) error, demote bool) *co
 		short = "Remove admin rights from a user in a group or channel"
 	}
 	cmd := &cobra.Command{
-		Use:   use,
-		Short: short,
-		Args:  cobra.ExactArgs(2),
+		Use:               use,
+		Short:             short,
+		Args:              cobra.ExactArgs(2),
+		ValidArgsFunction: complete.PeerRefs(f),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.RawRef = args[0]
 			opts.RawUser = args[1]

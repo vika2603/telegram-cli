@@ -133,10 +133,16 @@ func SetMemberAdmin(ctx context.Context, api *tg.Client, resolver *peer.Resolver
 		return output.PeerRef{}, fmt.Errorf("%w: %s is not a user", command.ErrUsage, q.User.String())
 	}
 
+	// A broad admin set covering both supergroups and broadcast channels.
+	// PostMessages/EditMessages only apply to broadcast channels (ignored by
+	// supergroups); the rest apply to supergroups. AddAdmins is deliberately
+	// left off so a promoted admin can't mint further admins.
 	var rights tg.ChatAdminRights
 	if !q.Demote {
 		rights = tg.ChatAdminRights{
 			ChangeInfo:     true,
+			PostMessages:   true,
+			EditMessages:   true,
 			DeleteMessages: true,
 			BanUsers:       true,
 			InviteUsers:    true,

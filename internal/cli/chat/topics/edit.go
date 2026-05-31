@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 
 	actionchat "github.com/vika2603/telegram-cli/internal/action/chat"
+	"github.com/vika2603/telegram-cli/internal/cli/complete"
 	"github.com/vika2603/telegram-cli/internal/command"
 	"github.com/vika2603/telegram-cli/internal/output"
 	"github.com/vika2603/telegram-cli/internal/runtime"
@@ -36,9 +37,10 @@ type EditOptions struct {
 func newEdit(f *runtime.Invocation, runF func(*EditOptions) error) *cobra.Command {
 	opts := &EditOptions{}
 	cmd := &cobra.Command{
-		Use:   "edit <ref> <topic-id>",
-		Short: "Edit a forum topic (title, close, hide)",
-		Args:  cobra.ExactArgs(2),
+		Use:               "edit <ref> <topic-id>",
+		Short:             "Edit a forum topic (title, close, hide)",
+		Args:              cobra.ExactArgs(2),
+		ValidArgsFunction: complete.PeerRefs(f),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.RawRef = args[0]
 			id, err := strconv.Atoi(args[1])

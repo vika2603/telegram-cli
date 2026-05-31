@@ -48,7 +48,7 @@ func New(f *runtime.Invocation, runF func(*ListOptions) error) *cobra.Command {
 			return runList(cmd.Context(), opts)
 		},
 	}
-	cmd.Flags().StringVar(&opts.Q, "q", "", "Substring filter on topic titles")
+	cmd.Flags().StringVar(&opts.Q, "search", "", "Substring search on topic titles")
 	cmd.Flags().IntVar(&opts.Limit, "limit", 100, "Max topics to list")
 	command.SetMeta(cmd, command.Meta{NeedsAccount: true, NeedsClient: true})
 	output.AddJSONFlags(cmd, &opts.Exporter,

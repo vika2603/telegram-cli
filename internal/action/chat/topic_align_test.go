@@ -3,6 +3,7 @@ package chat_test
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -88,12 +89,11 @@ func TestMuteTopic_NilDoReturnsPrecondition(t *testing.T) {
 	require.ErrorIs(t, err, command.ErrPrecondition)
 }
 
-func TestMuteTopic_PassesMuteUntilThrough(t *testing.T) {
+func TestMuteTopic_DefaultsToForever(t *testing.T) {
 	const forever = 1<<31 - 1 // math.MaxInt32
 	row, err := actionchat.MuteTopic(context.Background(), actionchat.MuteTopicRequest{
-		RawRef:    "@forum",
-		TopicID:   5,
-		MuteUntil: forever,
+		RawRef:  "@forum",
+		TopicID: 5,
 	}, func(_ context.Context, q actionchat.MuteTopicQuery) (output.TopicRow, error) {
 		require.Equal(t, 5, q.TopicID)
 		require.Equal(t, forever, q.MuteUntil)
@@ -103,11 +103,25 @@ func TestMuteTopic_PassesMuteUntilThrough(t *testing.T) {
 	require.Equal(t, 5, row.ID)
 }
 
+func TestMuteTopic_DurationComputesFutureTimestamp(t *testing.T) {
+	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	_, err := actionchat.MuteTopic(context.Background(), actionchat.MuteTopicRequest{
+		RawRef:   "@forum",
+		TopicID:  5,
+		Duration: "1h",
+		Now:      now,
+	}, func(_ context.Context, q actionchat.MuteTopicQuery) (output.TopicRow, error) {
+		require.Equal(t, int(now.Add(time.Hour).Unix()), q.MuteUntil)
+		return output.TopicRow{ID: 5}, nil
+	})
+	require.NoError(t, err)
+}
+
 func TestMuteTopic_UnmutePassesZero(t *testing.T) {
 	_, err := actionchat.MuteTopic(context.Background(), actionchat.MuteTopicRequest{
-		RawRef:    "@forum",
-		TopicID:   5,
-		MuteUntil: 0,
+		RawRef:  "@forum",
+		TopicID: 5,
+		Unmute:  true,
 	}, func(_ context.Context, q actionchat.MuteTopicQuery) (output.TopicRow, error) {
 		require.Equal(t, 0, q.MuteUntil)
 		return output.TopicRow{ID: 5}, nil

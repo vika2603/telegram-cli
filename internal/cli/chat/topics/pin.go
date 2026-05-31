@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 
 	actionchat "github.com/vika2603/telegram-cli/internal/action/chat"
+	"github.com/vika2603/telegram-cli/internal/cli/complete"
 	"github.com/vika2603/telegram-cli/internal/command"
 	"github.com/vika2603/telegram-cli/internal/output"
 	"github.com/vika2603/telegram-cli/internal/runtime"
@@ -43,9 +44,10 @@ func newUnpinTopic(f *runtime.Invocation, runF func(*PinTopicOptions) error) *co
 func topicPinCmd(f *runtime.Invocation, runF func(*PinTopicOptions) error, unpin bool, use, short string) *cobra.Command {
 	opts := &PinTopicOptions{Unpin: unpin}
 	cmd := &cobra.Command{
-		Use:   use + " <ref> <topic-id>",
-		Short: short,
-		Args:  cobra.ExactArgs(2),
+		Use:               use + " <ref> <topic-id>",
+		Short:             short,
+		Args:              cobra.ExactArgs(2),
+		ValidArgsFunction: complete.PeerRefs(f),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.RawRef = args[0]
 			id, err := strconv.Atoi(args[1])
@@ -62,7 +64,7 @@ func topicPinCmd(f *runtime.Invocation, runF func(*PinTopicOptions) error, unpin
 		},
 	}
 	command.SetMeta(cmd, command.Meta{NeedsAccount: true, NeedsClient: true})
-	output.AddJSONFlags(cmd, &opts.Exporter, []string{"id", "title", "closed", "hidden", "pinned"})
+	output.AddJSONFlags(cmd, &opts.Exporter, []string{"id", "pinned"})
 	return cmd
 }
 

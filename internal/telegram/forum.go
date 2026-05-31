@@ -25,22 +25,72 @@ func ListForumTopics(ctx context.Context, api *tg.Client, resolver *peer.Resolve
 	if !ok {
 		return nil, fmt.Errorf("%w: topics are only available in forum supergroups", command.ErrUnsupported)
 	}
-	req := &tg.ChannelsGetForumTopicsRequest{Channel: inCh, Limit: q.Limit}
-	if q.Q != "" {
-		req.SetQ(q.Q)
-	}
-	resp, err := api.ChannelsGetForumTopics(ctx, req)
-	if err != nil {
-		return nil, mapForumErr(err)
-	}
-	rows := make([]output.TopicRow, 0, len(resp.Topics))
-	for _, tc := range resp.Topics {
-		// ForumTopicDeleted carries no fields worth surfacing; skip it.
-		if t, ok := tc.(*tg.ForumTopic); ok {
-			rows = append(rows, forumTopicToRow(t))
+
+	const batch = 100
+	var rows []output.TopicRow
+	var offsetDate, offsetID, offsetTopic int
+	for len(rows) < q.Limit {
+		limit := batch
+		if rem := q.Limit - len(rows); rem < limit {
+			limit = rem
+		}
+		req := &tg.ChannelsGetForumTopicsRequest{
+			Channel:     inCh,
+			Limit:       limit,
+			OffsetDate:  offsetDate,
+			OffsetID:    offsetID,
+			OffsetTopic: offsetTopic,
+		}
+		if q.Q != "" {
+			req.SetQ(q.Q)
+		}
+		resp, err := api.ChannelsGetForumTopics(ctx, req)
+		if err != nil {
+			return nil, mapForumErr(err)
+		}
+		if len(resp.Topics) == 0 {
+			break
+		}
+		var last *tg.ForumTopic
+		for _, tc := range resp.Topics {
+			// ForumTopicDeleted carries no fields worth surfacing; skip it.
+			if t, ok := tc.(*tg.ForumTopic); ok {
+				rows = append(rows, forumTopicToRow(t))
+				last = t
+			}
+		}
+		// Stop when the server returned fewer than requested (last page) or we
+		// can't derive a pagination cursor from this page.
+		if len(resp.Topics) < limit || last == nil {
+			break
+		}
+		offsetTopic = last.ID
+		offsetID = last.TopMessage
+		if resp.OrderByCreateDate {
+			offsetDate = last.Date
+		} else {
+			offsetDate = forumMessageDate(resp.Messages, last.TopMessage)
 		}
 	}
 	return rows, nil
+}
+
+// forumMessageDate finds the date of the message with the given id among a
+// forum-topics response's related messages, for offset-based pagination.
+func forumMessageDate(msgs []tg.MessageClass, id int) int {
+	for _, m := range msgs {
+		switch v := m.(type) {
+		case *tg.Message:
+			if v.ID == id {
+				return v.Date
+			}
+		case *tg.MessageService:
+			if v.ID == id {
+				return v.Date
+			}
+		}
+	}
+	return 0
 }
 
 func forumTopicToRow(t *tg.ForumTopic) output.TopicRow {
@@ -93,12 +143,12 @@ func CreateForumTopic(ctx context.Context, api *tg.Client, resolver *peer.Resolv
 	if err != nil {
 		return output.TopicRow{}, mapForumErr(err)
 	}
-	row := output.TopicRow{Title: q.Title, IconColor: q.IconColor, IconEmojiID: q.IconEmojiID}
 	// The topic id equals the id of the creation service message.
-	if msgs := sentMessages(upd); len(msgs) > 0 {
-		row.ID = msgs[0].MessageID
+	msgs := sentMessages(upd)
+	if len(msgs) == 0 {
+		return output.TopicRow{}, fmt.Errorf("create topic %q: server response carried no topic id", q.Title)
 	}
-	return row, nil
+	return output.TopicRow{ID: msgs[0].MessageID, Title: q.Title, IconColor: q.IconColor, IconEmojiID: q.IconEmojiID}, nil
 }
 
 // EditForumTopic performs the RPC for `tg chat topics edit`. Only the fields
@@ -149,7 +199,7 @@ func DeleteForumTopic(ctx context.Context, api *tg.Client, resolver *peer.Resolv
 			return nil
 		}
 	}
-	return nil
+	return fmt.Errorf("delete topic %d: history not fully drained after 100 batches; rerun to continue", q.TopicID)
 }
 
 // PinForumTopic performs the RPC for `tg chat topics pin`.
@@ -186,7 +236,7 @@ func GetForumTopicByID(ctx context.Context, api *tg.Client, resolver *peer.Resol
 			return forumTopicToRow(t), nil
 		}
 	}
-	return output.TopicRow{}, fmt.Errorf("%w: topic %d not found", command.ErrUsage, q.TopicID)
+	return output.TopicRow{}, fmt.Errorf("%w: topic %d", peer.ErrNotFound, q.TopicID)
 }
 
 // MuteForumTopic mutes or unmutes a single forum topic's notifications.
@@ -194,6 +244,9 @@ func MuteForumTopic(ctx context.Context, api *tg.Client, resolver *peer.Resolver
 	resolved, err := resolver.Resolve(ctx, q.Ref)
 	if err != nil {
 		return output.TopicRow{}, err
+	}
+	if _, ok := inputChannelFromPeer(resolved.InputPeer); !ok {
+		return output.TopicRow{}, fmt.Errorf("%w: topics are only available in forum supergroups", command.ErrUnsupported)
 	}
 	settings := &tg.InputPeerNotifySettings{}
 	settings.SetMuteUntil(q.MuteUntil)
@@ -224,14 +277,15 @@ func ReadForumTopic(ctx context.Context, api *tg.Client, resolver *peer.Resolver
 	if err != nil {
 		return output.TopicRow{}, mapForumErr(err)
 	}
-	topMessage := q.TopicID // fallback
+	topMessage := 0
 	for _, tc := range resp.Topics {
 		if t, ok := tc.(*tg.ForumTopic); ok && t.ID == q.TopicID {
-			if t.TopMessage != 0 {
-				topMessage = t.TopMessage
-			}
+			topMessage = t.TopMessage
 			break
 		}
+	}
+	if topMessage == 0 {
+		return output.TopicRow{}, fmt.Errorf("%w: topic %d", peer.ErrNotFound, q.TopicID)
 	}
 	if _, err := api.MessagesReadDiscussion(ctx, &tg.MessagesReadDiscussionRequest{
 		Peer:      resolved.InputPeer,

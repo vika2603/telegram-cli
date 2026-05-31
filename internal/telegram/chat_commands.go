@@ -127,7 +127,7 @@ func JoinChat(ctx context.Context, api *tg.Client, resolver *peer.Resolver, q ac
 	}
 	ch, ok := resolved.InputPeer.(*tg.InputPeerChannel)
 	if !ok {
-		return output.ChatMembershipRow{}, fmt.Errorf("%w: only channels / supergroups can be joined by ref", command.ErrUsage)
+		return output.ChatMembershipRow{}, fmt.Errorf("%w: only supergroups and channels can be joined by ref", command.ErrUnsupported)
 	}
 	inCh := &tg.InputChannel{ChannelID: ch.ChannelID, AccessHash: ch.AccessHash}
 	if _, err := api.ChannelsJoinChannel(ctx, inCh); err != nil {
@@ -150,7 +150,7 @@ func LeaveChat(ctx context.Context, api *tg.Client, resolver *peer.Resolver, q a
 	}
 	ch, ok := resolved.InputPeer.(*tg.InputPeerChannel)
 	if !ok {
-		return output.ChatMembershipRow{}, fmt.Errorf("%w: only channels / supergroups can be left by ref", command.ErrUsage)
+		return output.ChatMembershipRow{}, fmt.Errorf("%w: only supergroups and channels can be left by ref", command.ErrUnsupported)
 	}
 	inCh := &tg.InputChannel{ChannelID: ch.ChannelID, AccessHash: ch.AccessHash}
 	if _, err := api.ChannelsLeaveChannel(ctx, inCh); err != nil {
@@ -170,7 +170,7 @@ func ListChatMembers(ctx context.Context, api *tg.Client, resolver *peer.Resolve
 	}
 	inCh, ok := inputChannelFromPeer(resolved.InputPeer)
 	if !ok {
-		return nil, fmt.Errorf("%w: members are only available in groups/channels", command.ErrUnsupported)
+		return nil, fmt.Errorf("%w: members are only available in supergroups and channels", command.ErrUnsupported)
 	}
 
 	var filter tg.ChannelParticipantsFilterClass

@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 
 	actionchat "github.com/vika2603/telegram-cli/internal/action/chat"
+	"github.com/vika2603/telegram-cli/internal/cli/complete"
 	"github.com/vika2603/telegram-cli/internal/command"
 	"github.com/vika2603/telegram-cli/internal/output"
 	"github.com/vika2603/telegram-cli/internal/runtime"
@@ -31,9 +32,10 @@ type InfoTopicOptions struct {
 func newTopicInfo(f *runtime.Invocation, runF func(*InfoTopicOptions) error) *cobra.Command {
 	opts := &InfoTopicOptions{}
 	cmd := &cobra.Command{
-		Use:   "info <ref> <topic-id>",
-		Short: "Show details for a single forum topic",
-		Args:  cobra.ExactArgs(2),
+		Use:               "info <ref> <topic-id>",
+		Short:             "Show details for a single forum topic",
+		Args:              cobra.ExactArgs(2),
+		ValidArgsFunction: complete.PeerRefs(f),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.RawRef = args[0]
 			id, err := strconv.Atoi(args[1])

@@ -21,28 +21,22 @@ func EditChat(ctx context.Context, api *tg.Client, resolver *peer.Resolver, q ac
 		return output.ChatRow{}, err
 	}
 
-	// Pre-check: if any channel-only toggle is requested we need an InputChannel.
-	// Resolve it once and reuse below.
-	needsChannel := q.Forum != nil || q.HideMembers != nil || q.HideHistory != nil ||
-		q.SlowMode != nil || q.Signatures != nil
+	// Title, username, and the toggle settings all require an InputChannel
+	// (supergroups/channels only). About and no-forwards work on the InputPeer
+	// directly, so they don't force a channel. Resolve it once and reuse below.
+	needsChannel := q.Title != nil || q.Username != nil || q.Forum != nil ||
+		q.HideMembers != nil || q.HideHistory != nil || q.SlowMode != nil || q.Signatures != nil
 	var inCh tg.InputChannelClass
-	if needsChannel || q.Title != nil || q.Username != nil {
+	if needsChannel {
 		var ok bool
 		inCh, ok = inputChannelFromPeer(resolved.InputPeer)
-		if !ok && (needsChannel || q.Username != nil) {
-			return output.ChatRow{}, fmt.Errorf("%w: only supergroups/channels support this setting", command.ErrUsage)
+		if !ok {
+			return output.ChatRow{}, fmt.Errorf("%w: only supergroups and channels support this setting", command.ErrUnsupported)
 		}
 	}
 
 	title := resolved.Title
 	if q.Title != nil {
-		if inCh == nil {
-			var ok bool
-			inCh, ok = inputChannelFromPeer(resolved.InputPeer)
-			if !ok {
-				return output.ChatRow{}, fmt.Errorf("%w: only supergroups and channels can be edited by ref", command.ErrUsage)
-			}
-		}
 		if _, err := api.ChannelsEditTitle(ctx, &tg.ChannelsEditTitleRequest{Channel: inCh, Title: *q.Title}); err != nil {
 			return output.ChatRow{}, err
 		}

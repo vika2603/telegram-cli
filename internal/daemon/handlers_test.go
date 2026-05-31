@@ -53,6 +53,7 @@ func TestRegisterHandlers_BindsExpectedMethods(t *testing.T) {
 		"chat.mute",
 		"chat.unmute",
 		"chat.folder",
+		"chat.pin",
 		"msg.link",
 		"msg.schedule_list",
 		"msg.schedule_cancel",

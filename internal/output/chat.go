@@ -251,6 +251,16 @@ type ChatMembershipRow struct {
 	Role          string  `json:"role,omitempty"` // "member" | "admin" | "creator"
 }
 
+// InviteRow is emitted by `chat invite`, one per requested user. Invited is
+// false when Telegram accepted the request but did not actually add the user
+// (typically the target's privacy settings disallow being added by others);
+// SkipReason names the cause.
+type InviteRow struct {
+	Peer       PeerRef `json:"peer"`
+	Invited    bool    `json:"invited"`
+	SkipReason string  `json:"skip_reason,omitempty"`
+}
+
 // PeerRefFromResolved converts a peer.Resolved into a compact PeerRef.
 func PeerRefFromResolved(r peer.Resolved) PeerRef {
 	return PeerRef{
@@ -339,6 +349,26 @@ type ChatMuteRow struct {
 
 // WriteChatMuteJSON emits one ndjson line.
 func WriteChatMuteJSON(w io.Writer, r ChatMuteRow) error {
+	b, err := json.Marshal(r)
+	if err != nil {
+		return err
+	}
+	if _, err := w.Write(append(b, '\n')); err != nil {
+		return err
+	}
+	return nil
+}
+
+// ChatPinRow is emitted by `chat pin` / `chat unpin`. It reports whether the
+// dialog is pinned to the top of the chat list after the call.
+type ChatPinRow struct {
+	Action string  `json:"action"` // "pin" | "unpin"
+	Peer   PeerRef `json:"peer"`
+	Pinned bool    `json:"pinned"`
+}
+
+// WriteChatPinJSON emits one ndjson line.
+func WriteChatPinJSON(w io.Writer, r ChatPinRow) error {
 	b, err := json.Marshal(r)
 	if err != nil {
 		return err

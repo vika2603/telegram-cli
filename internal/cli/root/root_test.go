@@ -43,7 +43,7 @@ func TestNew_HasTopLevels(t *testing.T) {
 	cmd := root.New(f)
 	want := []string{
 		"login", "logout", "send", "reply", "inbox", "read", "digest", "resolve",
-		"chat", "msg", "search", "me", "contact", "profile",
+		"chat", "channel", "msg", "search", "me", "contact", "profile",
 		"auth", "sessions", "password", "config", "completion",
 	}
 	names := map[string]bool{}

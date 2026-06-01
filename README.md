@@ -102,6 +102,9 @@ client commands route through when present).
 | `tg channel create <title>` | Create a broadcast channel. `--about` sets the description. |
 | `tg channel delete <ref>` | Delete a channel (irreversible). Prompts unless `--yes`. |
 | `tg channel edit <ref>` | Edit a channel: `--title`, `--about`, `--public <name>` / `--private`; toggles: `--no-forwards`/`--allow-forwards`, `--signatures`/`--no-signatures`. |
+| `tg channel discussion link <channel> <group>` | Link a supergroup as the channel's discussion group (comments). |
+| `tg channel discussion unlink <channel>` | Unlink the channel's discussion group. |
+| `tg channel discussion candidates` | List supergroups eligible to be a discussion group. |
 | `tg chat mark-read <ref>` | Mark a chat as read. `--max-id` limits the range. |
 | `tg chat join <ref>` | Join a channel, group, or invite link. |
 | `tg chat leave <ref>` | Leave a channel or supergroup. Prompts unless `--yes`. |

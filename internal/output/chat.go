@@ -294,7 +294,8 @@ type ChatMembershipRow struct {
 	Action        string  `json:"action"` // "join" | "leave"
 	Peer          PeerRef `json:"peer"`
 	AlreadyMember bool    `json:"already_member,omitempty"`
-	Role          string  `json:"role,omitempty"` // "member" | "admin" | "creator"
+	Requested     bool    `json:"requested,omitempty"` // join request sent, pending approval
+	Role          string  `json:"role,omitempty"`      // "member" | "admin" | "creator"
 }
 
 // ChatPhotoRow is emitted by `chat photo set` / `clear`.

@@ -25,7 +25,8 @@ func EditChat(ctx context.Context, api *tg.Client, resolver *peer.Resolver, q ac
 	// (supergroups/channels only). About and no-forwards work on the InputPeer
 	// directly, so they don't force a channel. Resolve it once and reuse below.
 	needsChannel := q.Title != nil || q.Username != nil || q.Forum != nil ||
-		q.HideMembers != nil || q.HideHistory != nil || q.SlowMode != nil || q.Signatures != nil
+		q.HideMembers != nil || q.HideHistory != nil || q.SlowMode != nil ||
+		q.Signatures != nil || q.JoinRequest != nil
 	var inCh tg.InputChannelClass
 	if needsChannel {
 		var ok bool
@@ -82,6 +83,11 @@ func EditChat(ctx context.Context, api *tg.Client, resolver *peer.Resolver, q ac
 	}
 	if q.Signatures != nil {
 		if _, err := api.ChannelsToggleSignatures(ctx, &tg.ChannelsToggleSignaturesRequest{Channel: inCh, Enabled: *q.Signatures}); err != nil {
+			return output.ChatRow{}, err
+		}
+	}
+	if q.JoinRequest != nil {
+		if _, err := api.ChannelsToggleJoinRequest(ctx, &tg.ChannelsToggleJoinRequestRequest{Channel: inCh, Enabled: *q.JoinRequest}); err != nil {
 			return output.ChatRow{}, err
 		}
 	}

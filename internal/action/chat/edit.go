@@ -25,6 +25,7 @@ type EditChatRequest struct {
 	SlowMode    *int
 	NoForwards  *bool
 	Signatures  *bool
+	JoinRequest *bool
 }
 
 // EditChatQuery is the normalized payload passed to Telegram.
@@ -39,6 +40,7 @@ type EditChatQuery struct {
 	SlowMode    *int
 	NoForwards  *bool
 	Signatures  *bool
+	JoinRequest *bool
 }
 
 // EditChatFunc edits a supergroup/channel's title and/or about.
@@ -60,7 +62,8 @@ func EditChat(ctx context.Context, req EditChatRequest, do EditChatFunc) (output
 func NormalizeEditChat(req EditChatRequest) (EditChatQuery, error) {
 	if req.Title == nil && req.About == nil && req.Username == nil &&
 		req.Forum == nil && req.HideMembers == nil && req.HideHistory == nil &&
-		req.SlowMode == nil && req.NoForwards == nil && req.Signatures == nil {
+		req.SlowMode == nil && req.NoForwards == nil && req.Signatures == nil &&
+		req.JoinRequest == nil {
 		return EditChatQuery{}, fmt.Errorf("%w: nothing to change; pass --title, --about, --public, --private, or a toggle flag", command.ErrUsage)
 	}
 	if req.Title != nil {
@@ -98,5 +101,6 @@ func NormalizeEditChat(req EditChatRequest) (EditChatQuery, error) {
 		SlowMode:    req.SlowMode,
 		NoForwards:  req.NoForwards,
 		Signatures:  req.Signatures,
+		JoinRequest: req.JoinRequest,
 	}, nil
 }

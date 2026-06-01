@@ -115,6 +115,11 @@ func JoinChat(ctx context.Context, api *tg.Client, resolver *peer.Resolver, q ac
 			case strings.Contains(msg, "USER_ALREADY_PARTICIPANT"):
 				row.AlreadyMember = true
 				return fillInviteTarget(ctx, api, q.Ref, row), nil
+			case strings.Contains(msg, "INVITE_REQUEST_SENT"):
+				// request-needed link: the join request was sent and now
+				// awaits admin approval — a success, not an error.
+				row.Requested = true
+				return fillInviteTarget(ctx, api, q.Ref, row), nil
 			}
 			return output.ChatMembershipRow{}, err
 		}

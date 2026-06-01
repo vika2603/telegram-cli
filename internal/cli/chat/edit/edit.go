@@ -41,6 +41,7 @@ type Options struct {
 	SlowMode    *int
 	NoForwards  *bool
 	Signatures  *bool
+	JoinRequest *bool
 	Exporter    output.Exporter
 	IOStreams   *ui.IOStreams
 	Edit        actionchat.EditChatFunc
@@ -64,6 +65,7 @@ func NewWith(f *runtime.Invocation, runF func(*Options) error, short string, sco
 	var hideHistory, showHistory bool
 	var noForwards, allowForwards bool
 	var signatures, noSignatures bool
+	var joinRequest, noJoinRequest bool
 	var slowMode int
 
 	cmd := &cobra.Command{
@@ -118,6 +120,10 @@ func NewWith(f *runtime.Invocation, runF func(*Options) error, short string, sco
 				if cmd.Flags().Changed("slow-mode") {
 					opts.SlowMode = &slowMode
 				}
+				opts.JoinRequest, err = triBool(cmd, "need-approval", "no-need-approval")
+				if err != nil {
+					return err
+				}
 			}
 
 			if scope == ScopeChannel {
@@ -152,6 +158,8 @@ func NewWith(f *runtime.Invocation, runF func(*Options) error, short string, sco
 		cmd.Flags().BoolVar(&hideHistory, "hide-history", false, "Hide chat history from new members")
 		cmd.Flags().BoolVar(&showHistory, "show-history", false, "Show chat history to new members")
 		cmd.Flags().IntVar(&slowMode, "slow-mode", 0, "Slow mode delay in seconds (0 = off)")
+		cmd.Flags().BoolVar(&joinRequest, "need-approval", false, "Require admin approval to join (public groups only)")
+		cmd.Flags().BoolVar(&noJoinRequest, "no-need-approval", false, "Allow joining without approval")
 	}
 
 	// ScopeChannel-only flags.
@@ -198,6 +206,7 @@ func Run(ctx context.Context, opts *Options) error {
 		SlowMode:    opts.SlowMode,
 		NoForwards:  opts.NoForwards,
 		Signatures:  opts.Signatures,
+		JoinRequest: opts.JoinRequest,
 	}, opts.Edit)
 	if err != nil {
 		return err

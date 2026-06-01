@@ -297,6 +297,24 @@ type ChatMembershipRow struct {
 	Role          string  `json:"role,omitempty"` // "member" | "admin" | "creator"
 }
 
+// ChatPhotoRow is emitted by `chat photo set` / `clear`.
+type ChatPhotoRow struct {
+	Action string  `json:"action"` // "set" | "clear"
+	Peer   PeerRef `json:"peer"`
+}
+
+// WriteChatPhotoJSON emits one ndjson line.
+func WriteChatPhotoJSON(w io.Writer, r ChatPhotoRow) error {
+	b, err := json.Marshal(r)
+	if err != nil {
+		return err
+	}
+	if _, err := w.Write(append(b, '\n')); err != nil {
+		return err
+	}
+	return nil
+}
+
 // DiscussionRow is emitted by `channel discussion link` / `unlink`. Group is
 // nil on unlink (the channel's discussion group was cleared).
 type DiscussionRow struct {

@@ -87,7 +87,7 @@ client commands route through when present).
 | Command | Purpose |
 | --- | --- |
 | `tg chat list` | List dialogs. |
-| `tg chat info <ref>` | Show one user, chat, bot, or channel. |
+| `tg chat info <ref>` | Show one user, chat, bot, or channel. `--full` adds members/admins/online counts, about, linked discussion group, pinned message, and slow mode (supergroups/channels only). |
 | `tg chat create <title>` | Create a supergroup. `--forum` enables topics; `--about` sets the description. |
 | `tg chat delete <ref>` | Delete a supergroup or channel (irreversible). Prompts unless `--yes`. |
 | `tg chat edit <ref>` | Edit a supergroup: `--title`, `--about`, `--public <name>` / `--private`; toggles: `--forum`/`--no-forum`, `--hide-members`/`--show-members`, `--hide-history`/`--show-history`, `--slow-mode <s>`, `--no-forwards`/`--allow-forwards`. |
@@ -114,6 +114,8 @@ client commands route through when present).
 | `tg chat unarchive <ref>` | Move a chat back to the main folder. |
 | `tg chat pin <ref>` | Pin a chat to the top of the chat list. |
 | `tg chat unpin <ref>` | Unpin a chat from the top of the chat list. |
+| `tg chat photo set <ref> <path>` | Set a group/channel photo (`-` reads stdin). Also available as `tg channel photo set`. |
+| `tg chat photo clear <ref>` | Remove a group/channel photo. Also `tg channel photo clear`. |
 | `tg chat member list <ref>` | List members. `--filter recent\|admins\|bots\|kicked\|banned\|contacts`, `--search`, `--limit`. |
 | `tg chat invite <ref> <user>...` | Add users to a group or channel. Each row reports `invited` true/false plus a `skip_reason` (e.g. `privacy_restricted`) when Telegram declined to add a user. |
 | `tg chat ban <ref> <user>` / `tg chat unban <ref> <user>` | Ban (remove + block) or unban a member. Ban prompts unless `--yes`. |

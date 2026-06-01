@@ -11,6 +11,7 @@ import (
 	chatcreate "github.com/vika2603/telegram-cli/internal/cli/chat/create"
 	chatdelete "github.com/vika2603/telegram-cli/internal/cli/chat/delete"
 	chatedit "github.com/vika2603/telegram-cli/internal/cli/chat/edit"
+	chatphoto "github.com/vika2603/telegram-cli/internal/cli/chat/photo"
 	"github.com/vika2603/telegram-cli/internal/runtime"
 )
 
@@ -24,5 +25,6 @@ func New(f *runtime.Invocation) *cobra.Command {
 	cmd.AddCommand(chatdelete.NewWith(f, nil, "Delete a channel (irreversible)"))
 	cmd.AddCommand(chatedit.NewWith(f, nil, "Edit a channel: title, about, visibility, and settings", chatedit.ScopeChannel))
 	cmd.AddCommand(discussion.New(f))
+	cmd.AddCommand(chatphoto.New(f))
 	return cmd
 }

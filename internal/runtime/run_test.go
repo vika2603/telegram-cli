@@ -48,6 +48,20 @@ func TestClientOptsFrom_FloodFlagOverridesConfigCap(t *testing.T) {
 	require.Equal(t, 5, opts.FloodMaxSec, "cap overridden by flag")
 }
 
+// TestClientOptsFrom_WaitFlagOverridesConfigMode: --wait forces wait mode
+// even when config says fail; --no-wait forces fail even when config says wait.
+func TestClientOptsFrom_WaitFlagOverridesConfigMode(t *testing.T) {
+	wait := cfgInvocation("fail", 30)
+	wait.WaitFlood = ptr(true)
+	require.Equal(t, session.FloodWait, appruntime.ClientOptsFrom(wait, &account.Account{}).FloodMode,
+		"--wait must override config fail mode")
+
+	noWait := cfgInvocation("wait", 30)
+	noWait.WaitFlood = ptr(false)
+	require.Equal(t, session.FloodFail, appruntime.ClientOptsFrom(noWait, &account.Account{}).FloodMode,
+		"--no-wait must override config wait mode")
+}
+
 // TestClientOptsFrom_FloodConfigErrorFallsBackToDefaults: a config
 // closure that errors must not crash — defaults apply.
 func TestClientOptsFrom_FloodConfigErrorFallsBackToDefaults(t *testing.T) {

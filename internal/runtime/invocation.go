@@ -51,6 +51,13 @@ type Invocation struct {
 	// flag > env > file > default chain for the flood-wait cap.
 	FloodWaitMax *int
 
+	// WaitFlood mirrors the --wait / --no-wait root flags, overriding the
+	// flood_wait.mode config. nil means "not set by flag" (use env/file/
+	// default); true forces wait mode, false forces fail mode. Takes
+	// precedence over config, completing flag > env > file > default for
+	// the flood-wait mode.
+	WaitFlood *bool
+
 	Config  func() (*config.Config, error)
 	Logger  func() (*zap.Logger, func(), error)
 	Account func(name string) (*account.Account, error)

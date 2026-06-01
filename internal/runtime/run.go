@@ -67,5 +67,13 @@ func floodPolicyFrom(f *Invocation) (session.FloodMode, int) {
 	if f != nil && f.FloodWaitMax != nil {
 		maxSec = *f.FloodWaitMax
 	}
+	// --wait / --no-wait flag overrides config mode (flag > env > file).
+	if f != nil && f.WaitFlood != nil {
+		if *f.WaitFlood {
+			mode = session.FloodWait
+		} else {
+			mode = session.FloodFail
+		}
+	}
 	return mode, maxSec
 }

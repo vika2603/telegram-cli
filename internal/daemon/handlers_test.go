@@ -24,6 +24,7 @@ func TestRegisterHandlers_BindsExpectedMethods(t *testing.T) {
 		// Phase 4 reads
 		"me.show",
 		"chat.resolve",
+		"chat.full",
 		"chat.list",
 		"msg.list",
 		// Phase 5 writes

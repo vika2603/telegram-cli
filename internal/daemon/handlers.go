@@ -71,6 +71,18 @@ func registerHandlers(
 		return json.Marshal(output.ChatRowWire(row))
 	})
 
+	srv.Register("chat.full", func(ctx context.Context, params json.RawMessage) (json.RawMessage, error) {
+		var q actionchat.ShowQuery
+		if err := json.Unmarshal(params, &q); err != nil { //nolint:musttag
+			return nil, fmt.Errorf("invalid chat.full params: %w", err)
+		}
+		row, err := telegram.ShowChatFull(ctx, api, res, q)
+		if err != nil {
+			return nil, err
+		}
+		return json.Marshal(output.ChatRowWire(row))
+	})
+
 	srv.Register("chat.list", func(ctx context.Context, params json.RawMessage) (json.RawMessage, error) {
 		var p actionchat.ListRequest
 		if len(params) > 0 {

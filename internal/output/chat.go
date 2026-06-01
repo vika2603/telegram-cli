@@ -29,30 +29,55 @@ type ChatRow struct {
 	IsMuted     bool            `json:"is_muted,omitempty"`
 	TopMessage  int             `json:"top_message,omitempty"`
 	Last        *MessageSummary `json:"last,omitempty"`
+
+	// Full-info fields, populated only by `chat info --full` (getFullChannel).
+	// Tags must stay in sync with MarshalJSON / the daemon wire round-trip
+	// (ChatRowWire serializes via these struct tags).
+	About           string `json:"about,omitempty"`
+	MembersCount    int    `json:"members_count,omitempty"`
+	AdminsCount     int    `json:"admins_count,omitempty"`
+	OnlineCount     int    `json:"online_count,omitempty"`
+	LinkedChatID    int64  `json:"linked_chat_id,omitempty"`
+	PinnedMsgID     int    `json:"pinned_msg_id,omitempty"`
+	SlowmodeSeconds int    `json:"slowmode_seconds,omitempty"`
 }
 
 func (r ChatRow) MarshalJSON() ([]byte, error) {
 	type chatRowJSON struct {
-		Peer       PeerObject      `json:"peer"`
-		Title      string          `json:"title,omitempty"`
-		Type       string          `json:"type,omitempty"`
-		Unread     int             `json:"unread,omitempty"`
-		Pinned     bool            `json:"pinned,omitempty"`
-		Archived   bool            `json:"archived,omitempty"`
-		Muted      bool            `json:"muted,omitempty"`
-		TopMessage int             `json:"top_message,omitempty"`
-		Last       *MessageSummary `json:"last,omitempty"`
+		Peer            PeerObject      `json:"peer"`
+		Title           string          `json:"title,omitempty"`
+		Type            string          `json:"type,omitempty"`
+		Unread          int             `json:"unread,omitempty"`
+		Pinned          bool            `json:"pinned,omitempty"`
+		Archived        bool            `json:"archived,omitempty"`
+		Muted           bool            `json:"muted,omitempty"`
+		TopMessage      int             `json:"top_message,omitempty"`
+		Last            *MessageSummary `json:"last,omitempty"`
+		About           string          `json:"about,omitempty"`
+		MembersCount    int             `json:"members_count,omitempty"`
+		AdminsCount     int             `json:"admins_count,omitempty"`
+		OnlineCount     int             `json:"online_count,omitempty"`
+		LinkedChatID    int64           `json:"linked_chat_id,omitempty"`
+		PinnedMsgID     int             `json:"pinned_msg_id,omitempty"`
+		SlowmodeSeconds int             `json:"slowmode_seconds,omitempty"`
 	}
 	return json.Marshal(chatRowJSON{
-		Peer:       peerObject(r.Ref, r.ID, r.Kind, r.Title, r.Username),
-		Title:      r.Title,
-		Type:       r.Kind,
-		Unread:     r.UnreadCount,
-		Pinned:     r.IsPinned,
-		Archived:   r.IsArchived,
-		Muted:      r.IsMuted,
-		TopMessage: r.TopMessage,
-		Last:       r.Last,
+		Peer:            peerObject(r.Ref, r.ID, r.Kind, r.Title, r.Username),
+		Title:           r.Title,
+		Type:            r.Kind,
+		Unread:          r.UnreadCount,
+		Pinned:          r.IsPinned,
+		Archived:        r.IsArchived,
+		Muted:           r.IsMuted,
+		TopMessage:      r.TopMessage,
+		Last:            r.Last,
+		About:           r.About,
+		MembersCount:    r.MembersCount,
+		AdminsCount:     r.AdminsCount,
+		OnlineCount:     r.OnlineCount,
+		LinkedChatID:    r.LinkedChatID,
+		PinnedMsgID:     r.PinnedMsgID,
+		SlowmodeSeconds: r.SlowmodeSeconds,
 	})
 }
 
@@ -213,6 +238,27 @@ func RenderChatShow(io *ui.IOStreams, r ChatRow) error {
 	if r.IsMuted {
 		tp.AddRow("MUTED", "true")
 	}
+	if r.About != "" {
+		tp.AddRow("ABOUT", r.About)
+	}
+	if r.MembersCount > 0 {
+		tp.AddRow("MEMBERS", strconv.Itoa(r.MembersCount))
+	}
+	if r.AdminsCount > 0 {
+		tp.AddRow("ADMINS", strconv.Itoa(r.AdminsCount))
+	}
+	if r.OnlineCount > 0 {
+		tp.AddRow("ONLINE", strconv.Itoa(r.OnlineCount))
+	}
+	if r.SlowmodeSeconds > 0 {
+		tp.AddRow("SLOW_MODE", strconv.Itoa(r.SlowmodeSeconds)+"s")
+	}
+	if r.PinnedMsgID > 0 {
+		tp.AddRow("PINNED_MSG", strconv.Itoa(r.PinnedMsgID))
+	}
+	if r.LinkedChatID != 0 {
+		tp.AddRow("LINKED_CHAT", strconv.FormatInt(r.LinkedChatID, 10))
+	}
 	return tp.Render()
 }
 
@@ -249,6 +295,24 @@ type ChatMembershipRow struct {
 	Peer          PeerRef `json:"peer"`
 	AlreadyMember bool    `json:"already_member,omitempty"`
 	Role          string  `json:"role,omitempty"` // "member" | "admin" | "creator"
+}
+
+// ChatPhotoRow is emitted by `chat photo set` / `clear`.
+type ChatPhotoRow struct {
+	Action string  `json:"action"` // "set" | "clear"
+	Peer   PeerRef `json:"peer"`
+}
+
+// WriteChatPhotoJSON emits one ndjson line.
+func WriteChatPhotoJSON(w io.Writer, r ChatPhotoRow) error {
+	b, err := json.Marshal(r)
+	if err != nil {
+		return err
+	}
+	if _, err := w.Write(append(b, '\n')); err != nil {
+		return err
+	}
+	return nil
 }
 
 // DiscussionRow is emitted by `channel discussion link` / `unlink`. Group is

@@ -90,7 +90,7 @@ client commands route through when present).
 | `tg chat info <ref>` | Show one user, chat, bot, or channel. `--full` adds members/admins/online counts, about, linked discussion group, pinned message, and slow mode (supergroups/channels only). |
 | `tg chat create <title>` | Create a supergroup. `--forum` enables topics; `--about` sets the description. |
 | `tg chat delete <ref>` | Delete a supergroup or channel (irreversible). Prompts unless `--yes`. |
-| `tg chat edit <ref>` | Edit a supergroup: `--title`, `--about`, `--public <name>` / `--private`; toggles: `--forum`/`--no-forum`, `--hide-members`/`--show-members`, `--hide-history`/`--show-history`, `--slow-mode <s>`, `--no-forwards`/`--allow-forwards`. |
+| `tg chat edit <ref>` | Edit a supergroup: `--title`, `--about`, `--public <name>` / `--private`; toggles: `--forum`/`--no-forum`, `--hide-members`/`--show-members`, `--hide-history`/`--show-history`, `--slow-mode <s>`, `--no-forwards`/`--allow-forwards`, `--need-approval`/`--no-need-approval` (public only). |
 | `tg chat topic list <ref>` | List a forum supergroup's topics. `--search` filters by title; `--limit` caps results (single page only, ~100 max — pagination not implemented). |
 | `tg chat topic create <ref> <title>` | Create a topic. `--icon-color`, `--icon-emoji`, and `--random-id` (idempotent retry). |
 | `tg chat topic info <ref> <topic-id>` | Show details for one topic. |
@@ -106,7 +106,9 @@ client commands route through when present).
 | `tg channel discussion unlink <channel>` | Unlink the channel's discussion group. |
 | `tg channel discussion candidates` | List supergroups eligible to be a discussion group. |
 | `tg chat mark-read <ref>` | Mark a chat as read. `--max-id` limits the range. |
-| `tg chat join <ref>` | Join a channel, group, or invite link. |
+| `tg chat join <ref>` | Join a channel, group, or invite link (request-needed links report `requested`). |
+| `tg chat join list <ref>` | List pending join requests. `--link` limits to one invite link. |
+| `tg chat join approve <ref> <user>...` / `deny ...` | Approve/reject specific users, or `--all` (optionally `--link`) for every pending request. |
 | `tg chat leave <ref>` | Leave a channel or supergroup. Prompts unless `--yes`. |
 | `tg chat mute <ref>` | Mute notifications with `--duration`, `--until`, or `--forever`. |
 | `tg chat unmute <ref>` | Restore notifications. |
@@ -116,8 +118,11 @@ client commands route through when present).
 | `tg chat unpin <ref>` | Unpin a chat from the top of the chat list. |
 | `tg chat photo set <ref> <path>` | Set a group/channel photo (`-` reads stdin). Also available as `tg channel photo set`. |
 | `tg chat photo clear <ref>` | Remove a group/channel photo. Also `tg channel photo clear`. |
-| `tg chat member list <ref>` | List members. `--filter recent\|admins\|bots\|kicked\|banned\|contacts`, `--search`, `--limit`. |
+| `tg chat member list <ref>` | List members. `--filter recent\|admins\|bots\|kicked\|banned\|contacts`, `--search`, `--limit`; `--via-link <link>` lists users who joined via that invite link. |
 | `tg chat invite <ref> <user>...` | Add users to a group or channel. Each row reports `invited` true/false plus a `skip_reason` (e.g. `privacy_restricted`) when Telegram declined to add a user. |
+| `tg chat invite create <ref>` | Create an invite link. `--title`, `--expire <RFC3339\|dur>`, `--usage-limit <n>`, `--request-needed`. |
+| `tg chat invite list <ref>` | List invite links. `--revoked`, `--admin <user>`, `--limit`. |
+| `tg chat invite revoke <ref> <link>` / `delete <ref> <link>` | Revoke a link, or delete a revoked one. |
 | `tg chat ban <ref> <user>` / `tg chat unban <ref> <user>` | Ban (remove + block) or unban a member. Ban prompts unless `--yes`. |
 | `tg chat promote <ref> <user>` / `tg chat demote <ref> <user>` | Grant or revoke admin rights. |
 | `tg msg list <ref>` | List message history. |

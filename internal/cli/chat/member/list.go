@@ -24,6 +24,7 @@ type Options struct {
 	Filter    string
 	Q         string
 	Limit     int
+	ViaLink   string
 	Exporter  output.Exporter
 	IOStreams *ui.IOStreams
 	Fetch     actionchat.MembersFunc
@@ -52,6 +53,7 @@ func NewList(f *runtime.Invocation, runF func(*Options) error) *cobra.Command {
 	cmd.Flags().StringVar(&opts.Q, "search", "",
 		"Substring search (valid only with --filter kicked|banned|contacts)")
 	cmd.Flags().IntVar(&opts.Limit, "limit", 30, "Max members (cap 1000)")
+	cmd.Flags().StringVar(&opts.ViaLink, "via-link", "", "List users who joined via this invite link (ignores --filter)")
 	command.SetMeta(cmd, command.Meta{NeedsAccount: true, NeedsClient: true})
 	output.AddJSONFlags(cmd, &opts.Exporter,
 		[]string{"user_id", "username", "first_name", "last_name", "is_bot", "role", "joined_at"})
@@ -61,10 +63,11 @@ func NewList(f *runtime.Invocation, runF func(*Options) error) *cobra.Command {
 // Run executes the members logic using opts.Fetch for data retrieval.
 func Run(ctx context.Context, opts *Options) error {
 	rows, err := actionchat.Members(ctx, actionchat.MembersRequest{
-		RawRef: opts.RawRef,
-		Filter: opts.Filter,
-		Q:      opts.Q,
-		Limit:  opts.Limit,
+		RawRef:  opts.RawRef,
+		Filter:  opts.Filter,
+		Q:       opts.Q,
+		Limit:   opts.Limit,
+		ViaLink: opts.ViaLink,
 	}, opts.Fetch)
 	if err != nil {
 		return err

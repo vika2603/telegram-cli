@@ -4,6 +4,7 @@ package root
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/spf13/cobra"
 
@@ -162,6 +163,20 @@ func newRootPreRun(f *runtime.Invocation) func(*cobra.Command, []string) error {
 			if v, err := cmd.Flags().GetInt("flood-wait-max"); err == nil {
 				f.FloodWaitMax = &v
 			}
+		}
+		// --wait / --no-wait override flood_wait.mode (flag > config).
+		wantWait := cmd.Flags().Changed("wait")
+		wantNoWait := cmd.Flags().Changed("no-wait")
+		if wantWait && wantNoWait {
+			return fmt.Errorf("%w: --wait and --no-wait are mutually exclusive", command.ErrUsage)
+		}
+		switch {
+		case wantWait:
+			t := true
+			f.WaitFlood = &t
+		case wantNoWait:
+			no := false
+			f.WaitFlood = &no
 		}
 
 		m := command.MetaFrom(cmd)

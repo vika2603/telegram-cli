@@ -22,6 +22,7 @@ import (
 // Options holds the resolved flags and injected dependencies for Run.
 type Options struct {
 	RawRef    string
+	Full      bool
 	Exporter  output.Exporter
 	IOStreams *ui.IOStreams
 	Fetch     actionchat.ShowFunc
@@ -45,15 +46,16 @@ func New(f *runtime.Invocation, runF func(*Options) error) *cobra.Command {
 			return Run(cmd.Context(), opts)
 		},
 	}
+	cmd.Flags().BoolVar(&opts.Full, "full", false, "Fetch full info (members count, about, linked discussion group, slow mode; supergroups/channels only)")
 	command.SetMeta(cmd, command.Meta{NeedsAccount: true, NeedsClient: true})
 	output.AddJSONFlags(cmd, &opts.Exporter,
-		[]string{"peer", "title", "type", "unread", "pinned", "archived", "muted", "top_message", "last"})
+		[]string{"peer", "title", "type", "unread", "pinned", "archived", "muted", "top_message", "last", "about", "members_count", "admins_count", "online_count", "linked_chat_id", "pinned_msg_id", "slowmode_seconds"})
 	return cmd
 }
 
 // Run executes the show logic using opts.Fetch for data retrieval.
 func Run(ctx context.Context, opts *Options) error {
-	row, err := actionchat.Show(ctx, actionchat.ShowRequest{RawRef: opts.RawRef}, opts.Fetch)
+	row, err := actionchat.Show(ctx, actionchat.ShowRequest{RawRef: opts.RawRef, Full: opts.Full}, opts.Fetch)
 	if err != nil {
 		return err
 	}
@@ -69,9 +71,13 @@ func newFetch(f *runtime.Invocation) actionchat.ShowFunc {
 		if err != nil {
 			return output.ChatRow{}, err
 		}
+		method := "chat.resolve"
+		if q.Full {
+			method = "chat.full"
+		}
 		if cl, _ := runtime.MaybeDialDaemon(ctx, f, acct); cl != nil {
 			defer func() { _ = cl.Close() }()
-			raw, err := cl.Call(ctx, "chat.resolve", q)
+			raw, err := cl.Call(ctx, method, q)
 			if err != nil {
 				return output.ChatRow{}, err
 			}
@@ -84,8 +90,12 @@ func newFetch(f *runtime.Invocation) actionchat.ShowFunc {
 
 		var row output.ChatRow
 		err = f.WithPeers(ctx, acct, runtime.ClientOptsFrom(f, acct),
-			func(ctx context.Context, _ *tg.Client, _ *peers.Manager, res *peer.Resolver) error {
-				row, err = telegram.ShowChat(ctx, res, q)
+			func(ctx context.Context, api *tg.Client, _ *peers.Manager, res *peer.Resolver) error {
+				if q.Full {
+					row, err = telegram.ShowChatFull(ctx, api, res, q)
+				} else {
+					row, err = telegram.ShowChat(ctx, res, q)
+				}
 				return err
 			})
 		return row, err

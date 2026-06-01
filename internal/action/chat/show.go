@@ -9,14 +9,17 @@ import (
 	"github.com/vika2603/telegram-cli/internal/ref"
 )
 
-// ShowRequest is the raw request for `tg chat show`.
+// ShowRequest is the raw request for `tg chat info`.
 type ShowRequest struct {
 	RawRef string
+	Full   bool
 }
 
 // ShowQuery is the validated query passed to the Telegram data loader.
+// Full requests an extra getFullChannel round-trip for members/about/etc.
 type ShowQuery struct {
-	Ref ref.Ref
+	Ref  ref.Ref
+	Full bool
 }
 
 // ShowFunc loads one chat row after the request has been validated.
@@ -29,7 +32,7 @@ func Show(ctx context.Context, req ShowRequest, fetch ShowFunc) (output.ChatRow,
 		return output.ChatRow{}, fmt.Errorf("%w: %s", command.ErrUsage, err.Error())
 	}
 	if fetch == nil {
-		return output.ChatRow{}, fmt.Errorf("%w: chat show called without fetch function", command.ErrPrecondition)
+		return output.ChatRow{}, fmt.Errorf("%w: chat info called without fetch function", command.ErrPrecondition)
 	}
-	return fetch(ctx, ShowQuery{Ref: parsed})
+	return fetch(ctx, ShowQuery{Ref: parsed, Full: req.Full})
 }

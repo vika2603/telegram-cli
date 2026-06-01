@@ -49,6 +49,12 @@ func New(f *runtime.Invocation, runF func(*Options) error) *cobra.Command {
 	}
 	command.SetMeta(cmd, command.Meta{NeedsAccount: true, NeedsClient: true})
 	output.AddJSONFlags(cmd, &opts.Exporter, []string{"peer", "invited", "skip_reason"})
+	// Invite-link management lives under the same verb: `tg chat invite <ref>
+	// <user>...` still adds users, while these subcommands manage links.
+	cmd.AddCommand(newCreate(f, nil))
+	cmd.AddCommand(newList(f, nil))
+	cmd.AddCommand(newRevoke(f, nil))
+	cmd.AddCommand(newDelete(f, nil))
 	return cmd
 }
 

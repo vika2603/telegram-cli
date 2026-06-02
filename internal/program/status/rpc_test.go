@@ -7,6 +7,8 @@ import (
 
 	"github.com/gotd/td/tgerr"
 	"github.com/stretchr/testify/require"
+
+	"github.com/vika2603/telegram-cli/internal/command"
 )
 
 func rpcErr(typ string, code int) error {
@@ -63,6 +65,16 @@ func TestRPC_UnmappedRPCStaysUnknown(t *testing.T) {
 
 func TestRPC_MessageNilEmpty(t *testing.T) {
 	require.Empty(t, Message(nil))
+}
+
+// TestRPC_SentinelWinsOverRPC: when an error is both a tg sentinel and carries
+// a mapped RPC type, Code and Message must agree on the sentinel (not the RPC
+// classification), while rpc_error still surfaces the raw enum.
+func TestRPC_SentinelWinsOverRPC(t *testing.T) {
+	err := fmt.Errorf("%w: %w", command.ErrUnsupported, rpcErr("CHAT_ADMIN_REQUIRED", 403))
+	require.Equal(t, CodeUnsupported, Code(err))
+	require.Equal(t, err.Error(), Message(err)) // sentinel message, not the RPC friendly one
+	require.Equal(t, "CHAT_ADMIN_REQUIRED", RPCType(err))
 }
 
 func TestRPCType_SurfacesEnum(t *testing.T) {

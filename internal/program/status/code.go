@@ -41,53 +41,64 @@ func Code(err error) ErrorCode {
 	if _, ok := telegramsession.AsFloodWait(err); ok {
 		return CodeFloodWait
 	}
+	if code, ok := sentinelCode(err); ok {
+		return code
+	}
+	// Classify known raw Telegram RPC errors that the telegram layer returned
+	// unwrapped, instead of letting them fall to "unknown".
+	if cls, ok := matchRPC(err); ok {
+		return cls.code
+	}
+	return CodeUnknown
+}
+
+// sentinelCode maps tg's own error sentinels to their stable code. The second
+// return reports whether any sentinel matched; callers fall back to RPC
+// classification (then "unknown") when it doesn't. Code and Message share this
+// so the JSON code and message always come from the same classification step.
+func sentinelCode(err error) (ErrorCode, bool) {
 	switch {
 	case errors.Is(err, command.ErrUsage), errors.Is(err, config.ErrInvalid):
-		return CodeUsage
+		return CodeUsage, true
 	case errors.Is(err, telegramsession.ErrAuth):
-		return CodeAuthRequired
+		return CodeAuthRequired, true
 	case errors.Is(err, telegrampeer.ErrNotFound):
-		return CodePeerNotFound
+		return CodePeerNotFound, true
 	case errors.Is(err, telegrampeer.ErrForbidden):
-		return CodePeerForbidden
+		return CodePeerForbidden, true
 	case errors.Is(err, telegramsession.ErrFloodWait):
-		return CodeFloodWait
+		return CodeFloodWait, true
 	case errors.Is(err, telegramsession.ErrNetwork):
-		return CodeNetwork
+		return CodeNetwork, true
 	case errors.Is(err, telegramsession.ErrRateExhausted):
-		return CodeRateExhausted
+		return CodeRateExhausted, true
 	case errors.Is(err, command.ErrPrecondition):
-		return CodePrecondition
+		return CodePrecondition, true
 	case errors.Is(err, command.ErrUnsupported):
-		return CodeUnsupported
+		return CodeUnsupported, true
 	case errors.Is(err, account.ErrBusy):
-		return CodeBusy
+		return CodeBusy, true
 	case errors.Is(err, telegrampeer.ErrAmbiguous):
-		return CodePeerAmbiguous
+		return CodePeerAmbiguous, true
 	case errors.Is(err, telegrammessage.ErrNotFound):
-		return CodeMessageNotFnd
+		return CodeMessageNotFound, true
 	case errors.Is(err, telegrampeer.ErrCacheMiss):
-		return CodeCacheMiss
+		return CodeCacheMiss, true
 	case errors.Is(err, telegrammessage.ErrNoMedia):
-		return CodeNoMedia
+		return CodeNoMedia, true
 	case errors.Is(err, telegrammessage.ErrNoLink):
-		return CodeNoLink
+		return CodeNoLink, true
 	case errors.Is(err, command.ErrNotConfirmed):
-		return CodeNotConfirmed
+		return CodeNotConfirmed, true
 	case errors.Is(err, telegrammessage.ErrRevokeRequired):
-		return CodeRevokeReq
+		return CodeRevokeReq, true
 	case errors.Is(err, telegramsession.ErrCurrent):
-		return CodeCurrentSess
+		return CodeCurrentSess, true
 	case errors.Is(err, telegramchat.ErrInvalidInvite):
-		return CodeInvalidInvite
+		return CodeInvalidInvite, true
 	case errors.Is(err, telegramsession.ErrBadPassword):
-		return CodeBadPassword
+		return CodeBadPassword, true
 	default:
-		// Classify known raw Telegram RPC errors that the telegram layer
-		// returned unwrapped, instead of letting them fall to "unknown".
-		if cls, ok := matchRPC(err); ok {
-			return cls.code
-		}
-		return CodeUnknown
+		return CodeUnknown, false
 	}
 }

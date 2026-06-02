@@ -75,6 +75,12 @@ func Message(err error) string {
 	if err == nil {
 		return ""
 	}
+	// A sentinel-classified error already carries an authored message (the
+	// fmt.Errorf wrap); only override the message for raw RPC errors that the
+	// sentinel path doesn't handle. This keeps Message in lockstep with Code.
+	if _, ok := sentinelCode(err); ok {
+		return err.Error()
+	}
 	if cls, ok := matchRPC(err); ok {
 		return cls.message
 	}

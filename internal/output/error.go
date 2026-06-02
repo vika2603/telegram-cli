@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/vika2603/telegram-cli/internal/command"
 	"github.com/vika2603/telegram-cli/internal/program/status"
@@ -38,16 +39,23 @@ func EmitError(stderr io.Writer, mode string, err error) int {
 	if mode != "json" && errors.Is(err, command.ErrCancel) {
 		return code
 	}
+	rpcType := status.RPCType(err)
 	if mode == "json" {
 		errObj := map[string]any{
 			"code":    status.Code(err),
-			"message": err.Error(),
+			"message": status.Message(err),
+		}
+		// Preserve the exact Telegram error enum (e.g. CHAT_ADMIN_REQUIRED)
+		// so scripts can match it programmatically, even when we friendly-map
+		// the code/message or don't classify it at all.
+		if rpcType != "" {
+			errObj["rpc_error"] = rpcType
 		}
 		mergeDetail := func(detail map[string]any) {
 			for k, v := range detail {
-				// Don't let detailers overwrite the base shape — code
-				// and message stay authoritative.
-				if k == "code" || k == "message" {
+				// Don't let detailers overwrite the base shape — code,
+				// message, and rpc_error stay authoritative.
+				if k == "code" || k == "message" || k == "rpc_error" {
 					continue
 				}
 				errObj[k] = v
@@ -70,7 +78,13 @@ func EmitError(stderr io.Writer, mode string, err error) int {
 		b, _ := json.Marshal(obj) //nolint:errchkjson // obj holds only string/int/map values; Marshal cannot fail for these types
 		_, _ = stderr.Write(append(b, '\n'))
 	} else {
-		_, _ = fmt.Fprintln(stderr, "error: "+err.Error())
+		msg := status.Message(err)
+		// Keep the raw Telegram enum visible in human mode too, unless the
+		// message already contains it (unclassified errors print it raw).
+		if rpcType != "" && !strings.Contains(msg, rpcType) {
+			msg += " (" + rpcType + ")"
+		}
+		_, _ = fmt.Fprintln(stderr, "error: "+msg)
 	}
 	return code
 }

@@ -83,6 +83,11 @@ func MapExitCode(err error) int {
 	case errors.Is(err, command.ErrNotConfirmed):
 		return 73
 	default:
+		// Classify known raw Telegram RPC errors so they map to a stable
+		// exit code instead of the catch-all 1.
+		if cls, ok := matchRPC(err); ok {
+			return cls.exit
+		}
 		return 1
 	}
 }

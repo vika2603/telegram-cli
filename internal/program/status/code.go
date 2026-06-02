@@ -82,6 +82,11 @@ func Code(err error) string {
 	case errors.Is(err, telegramsession.ErrBadPassword):
 		return "bad_password"
 	default:
+		// Classify known raw Telegram RPC errors that the telegram layer
+		// returned unwrapped, instead of letting them fall to "unknown".
+		if cls, ok := matchRPC(err); ok {
+			return cls.code
+		}
 		return "unknown"
 	}
 }

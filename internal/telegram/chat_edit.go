@@ -3,6 +3,7 @@ package telegram
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/gotd/td/tg"
 
@@ -88,6 +89,9 @@ func EditChat(ctx context.Context, api *tg.Client, resolver *peer.Resolver, q ac
 	}
 	if q.JoinRequest != nil {
 		if _, err := api.ChannelsToggleJoinRequest(ctx, &tg.ChannelsToggleJoinRequestRequest{Channel: inCh, Enabled: *q.JoinRequest}); err != nil {
+			if strings.Contains(err.Error(), "CHAT_PUBLIC_REQUIRED") {
+				return output.ChatRow{}, fmt.Errorf("%w: join approval can only be toggled on public groups/channels (set a public username first, or use a request-needed invite link for private ones)", command.ErrUnsupported)
+			}
 			return output.ChatRow{}, err
 		}
 	}

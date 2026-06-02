@@ -238,6 +238,9 @@ Precedence: **flag > env > config file > default**.
 
 Under `--json`, errors are emitted on stderr as a single JSON object with
 `error.code`, `error.message`, and `exit_code` fields. stdout stays data-only.
+When the failure is a Telegram RPC error, `error.rpc_error` carries the exact
+Telegram enum (e.g. `CHAT_ADMIN_REQUIRED`) for programmatic matching — present
+even for errors that aren't mapped to a friendly `code`/`message`.
 
 ## Shell completion
 

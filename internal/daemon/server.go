@@ -441,7 +441,7 @@ func errorFrameFromErr(id uint64, err error) Frame {
 		}
 	}
 	return Frame{ID: id, Error: &FrameError{
-		Code:     status.Code(err),
+		Code:     string(status.Code(err)),
 		ExitCode: status.MapExitCode(err),
 		Message:  err.Error(),
 		Detail:   detail,

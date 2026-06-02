@@ -113,6 +113,52 @@ func TestEmitError_rawGotdFloodWaitSurfacesRetryAfter(t *testing.T) {
 	require.Equal(t, 13, obj.Error.RetryAfterSeconds, "must extract seconds from FLOOD_WAIT_<N>")
 }
 
+// TestEmitError_rpcErrorSurfacesEnumAndFriendlyMessage covers the
+// RPC-classification path: a raw Telegram RPC error gets a stable code,
+// a friendly message, and the original enum preserved under rpc_error.
+func TestEmitError_rpcErrorSurfacesEnumAndFriendlyMessage(t *testing.T) {
+	var buf bytes.Buffer
+	raw := tgerr.New(403, "CHAT_ADMIN_REQUIRED")
+	code := EmitError(&buf, "json", fmt.Errorf("editAdmin: %w", raw))
+	require.Equal(t, 5, code)
+
+	var obj struct {
+		Error struct {
+			Code     string `json:"code"`
+			Message  string `json:"message"`
+			RPCError string `json:"rpc_error"`
+		} `json:"error"`
+		ExitCode int `json:"exit_code"`
+	}
+	require.NoError(t, json.Unmarshal(bytes.TrimSpace(buf.Bytes()), &obj))
+	require.Equal(t, "peer_forbidden", obj.Error.Code)
+	require.Equal(t, "CHAT_ADMIN_REQUIRED", obj.Error.RPCError)
+	require.NotContains(t, obj.Error.Message, "rpc error")
+	require.Equal(t, 5, obj.ExitCode)
+}
+
+// TestEmitError_unmappedRPCKeepsEnum: an RPC error we don't friendly-map
+// still surfaces its enum under rpc_error (code stays unknown).
+func TestEmitError_unmappedRPCKeepsEnum(t *testing.T) {
+	var buf bytes.Buffer
+	EmitError(&buf, "json", tgerr.New(400, "SOME_FUTURE_ERROR"))
+	var raw map[string]any
+	require.NoError(t, json.Unmarshal(bytes.TrimSpace(buf.Bytes()), &raw))
+	errBlock := raw["error"].(map[string]any)
+	require.Equal(t, "unknown", errBlock["code"])
+	require.Equal(t, "SOME_FUTURE_ERROR", errBlock["rpc_error"])
+}
+
+// TestEmitError_nonRPCOmitsRPCField: non-Telegram errors carry no rpc_error.
+func TestEmitError_nonRPCOmitsRPCField(t *testing.T) {
+	var buf bytes.Buffer
+	EmitError(&buf, "json", fmt.Errorf("boom: %w", command.ErrUsage))
+	var raw map[string]any
+	require.NoError(t, json.Unmarshal(bytes.TrimSpace(buf.Bytes()), &raw))
+	errBlock := raw["error"].(map[string]any)
+	require.NotContains(t, errBlock, "rpc_error")
+}
+
 // TestEmitError_nonDetailerOmitsField asserts no spurious key on
 // errors that don't implement ErrorDetailer.
 func TestEmitError_nonDetailerOmitsField(t *testing.T) {

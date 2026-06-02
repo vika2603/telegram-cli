@@ -21,15 +21,16 @@ type RemoteCoded interface {
 	RemoteCode() string
 }
 
-// Code returns the stable string code used in JSON error output.
-func Code(err error) string {
+// Code returns the stable code used in JSON error output. See the ErrorCode
+// type for the full enum.
+func Code(err error) ErrorCode {
 	// Errors arriving via the daemon IPC are already classified by
 	// the daemon side; respect the wire code so the daemon and local
 	// paths produce identical envelopes.
 	var rc RemoteCoded
 	if errors.As(err, &rc) {
 		if code := rc.RemoteCode(); code != "" {
-			return code
+			return ErrorCode(code)
 		}
 	}
 	// gotd surfaces FLOOD_WAIT as a raw *tgerr.Error in most call
@@ -38,50 +39,66 @@ func Code(err error) string {
 	// form as flood_wait — otherwise the raw form falls all the way
 	// to "unknown" and agents lose the most retry-critical signal.
 	if _, ok := telegramsession.AsFloodWait(err); ok {
-		return "flood_wait"
+		return CodeFloodWait
 	}
+	if code, ok := sentinelCode(err); ok {
+		return code
+	}
+	// Classify known raw Telegram RPC errors that the telegram layer returned
+	// unwrapped, instead of letting them fall to "unknown".
+	if cls, ok := matchRPC(err); ok {
+		return cls.code
+	}
+	return CodeUnknown
+}
+
+// sentinelCode maps tg's own error sentinels to their stable code. The second
+// return reports whether any sentinel matched; callers fall back to RPC
+// classification (then "unknown") when it doesn't. Code and Message share this
+// so the JSON code and message always come from the same classification step.
+func sentinelCode(err error) (ErrorCode, bool) {
 	switch {
 	case errors.Is(err, command.ErrUsage), errors.Is(err, config.ErrInvalid):
-		return "usage"
+		return CodeUsage, true
 	case errors.Is(err, telegramsession.ErrAuth):
-		return "auth_required"
+		return CodeAuthRequired, true
 	case errors.Is(err, telegrampeer.ErrNotFound):
-		return "peer_not_found"
+		return CodePeerNotFound, true
 	case errors.Is(err, telegrampeer.ErrForbidden):
-		return "peer_forbidden"
+		return CodePeerForbidden, true
 	case errors.Is(err, telegramsession.ErrFloodWait):
-		return "flood_wait"
+		return CodeFloodWait, true
 	case errors.Is(err, telegramsession.ErrNetwork):
-		return "network"
+		return CodeNetwork, true
 	case errors.Is(err, telegramsession.ErrRateExhausted):
-		return "rate_exhausted"
+		return CodeRateExhausted, true
 	case errors.Is(err, command.ErrPrecondition):
-		return "precondition"
+		return CodePrecondition, true
 	case errors.Is(err, command.ErrUnsupported):
-		return "unsupported"
+		return CodeUnsupported, true
 	case errors.Is(err, account.ErrBusy):
-		return "busy"
+		return CodeBusy, true
 	case errors.Is(err, telegrampeer.ErrAmbiguous):
-		return "peer_ambiguous"
+		return CodePeerAmbiguous, true
 	case errors.Is(err, telegrammessage.ErrNotFound):
-		return "message_not_found"
+		return CodeMessageNotFound, true
 	case errors.Is(err, telegrampeer.ErrCacheMiss):
-		return "cache_miss"
+		return CodeCacheMiss, true
 	case errors.Is(err, telegrammessage.ErrNoMedia):
-		return "no_media"
+		return CodeNoMedia, true
 	case errors.Is(err, telegrammessage.ErrNoLink):
-		return "no_link"
+		return CodeNoLink, true
 	case errors.Is(err, command.ErrNotConfirmed):
-		return "not_confirmed"
+		return CodeNotConfirmed, true
 	case errors.Is(err, telegrammessage.ErrRevokeRequired):
-		return "revoke_required"
+		return CodeRevokeReq, true
 	case errors.Is(err, telegramsession.ErrCurrent):
-		return "current_session"
+		return CodeCurrentSess, true
 	case errors.Is(err, telegramchat.ErrInvalidInvite):
-		return "invalid_invite"
+		return CodeInvalidInvite, true
 	case errors.Is(err, telegramsession.ErrBadPassword):
-		return "bad_password"
+		return CodeBadPassword, true
 	default:
-		return "unknown"
+		return CodeUnknown, false
 	}
 }

@@ -124,7 +124,7 @@ client commands route through when present).
 | `tg chat invite list <ref>` | List invite links. `--revoked`, `--admin <user>`, `--limit`. |
 | `tg chat invite revoke <ref> <link>` / `delete <ref> <link>` | Revoke a link, or delete a revoked one. |
 | `tg chat ban <ref> <user>` / `tg chat unban <ref> <user>` | Ban (remove + block) or unban a member. Ban prompts unless `--yes`. |
-| `tg chat promote <ref> <user>` / `tg chat demote <ref> <user>` | Grant or revoke admin rights. Promote takes `--title <rank>` (custom admin title, ≤16 chars). |
+| `tg chat admin promote <ref> <user>` / `tg chat admin demote <ref> <user>` | Grant or revoke admin rights. Promote takes `--title <rank>` (custom admin title, ≤16 chars). |
 | `tg chat member set-perms <ref> <user>` | Set a member's permissions with `--deny`/`--allow` keywords (`send,media,stickers,bots,polls,links,invite,pin,info,topics`) and optional `--until <RFC3339\|dur>` (default permanent). |
 | `tg chat member unset-perms <ref> <user>` | Clear all permission restrictions on a member. |
 | `tg chat perms <ref>` | Set the group's default member permissions with `--deny`/`--allow` (same keywords). |

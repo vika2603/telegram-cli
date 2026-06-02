@@ -1,4 +1,4 @@
-// Package admin implements "tg chat promote <ref> <user>" and "tg chat demote <ref> <user>".
+// Package admin implements "tg chat admin promote" and "tg chat admin demote".
 package admin
 
 import (
@@ -30,12 +30,23 @@ type Options struct {
 	Promote   actionchat.PromoteFunc
 }
 
-// NewPromote builds the cobra command for "tg chat promote".
+// New builds the "tg chat admin" command group.
+func New(f *runtime.Invocation) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "admin",
+		Short: "Manage group/channel administrators",
+	}
+	cmd.AddCommand(NewPromote(f, nil))
+	cmd.AddCommand(NewDemote(f, nil))
+	return cmd
+}
+
+// NewPromote builds the cobra command for "tg chat admin promote".
 func NewPromote(f *runtime.Invocation, runF func(*Options) error) *cobra.Command {
 	return adminCmd(f, runF, false)
 }
 
-// NewDemote builds the cobra command for "tg chat demote".
+// NewDemote builds the cobra command for "tg chat admin demote".
 func NewDemote(f *runtime.Invocation, runF func(*Options) error) *cobra.Command {
 	return adminCmd(f, runF, true)
 }

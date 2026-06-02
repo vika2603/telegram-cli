@@ -53,8 +53,7 @@ func New(f *runtime.Invocation) *cobra.Command {
 	cmd.AddCommand(invite.New(f, nil))
 	cmd.AddCommand(ban.NewBan(f, nil))
 	cmd.AddCommand(ban.NewUnban(f, nil))
-	cmd.AddCommand(admin.NewPromote(f, nil))
-	cmd.AddCommand(admin.NewDemote(f, nil))
+	cmd.AddCommand(admin.New(f))
 	cmd.AddCommand(perms.New(f, nil))
 	return cmd
 }

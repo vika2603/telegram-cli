@@ -12,7 +12,10 @@ import (
 )
 
 func TestStickerToken_RoundTrip(t *testing.T) {
-	in := actionmessage.StickerDoc{ID: 12345, AccessHash: -98765, FileReference: []byte{0x01, 0x02, 0xff, 0x00}}
+	in := actionmessage.StickerDoc{
+		ID: 12345, AccessHash: -98765, FileReference: []byte{0x01, 0x02, 0xff, 0x00},
+		SetID: 555, SetAccessHash: -777,
+	}
 	tok := actionmessage.EncodeStickerToken(in)
 	require.Greater(t, len(tok), 4)
 
@@ -22,6 +25,8 @@ func TestStickerToken_RoundTrip(t *testing.T) {
 	require.Equal(t, in.ID, out.ID)
 	require.Equal(t, in.AccessHash, out.AccessHash)
 	require.Equal(t, in.FileReference, out.FileReference)
+	require.Equal(t, in.SetID, out.SetID)
+	require.Equal(t, in.SetAccessHash, out.SetAccessHash)
 }
 
 func TestStickerToken_NotATokenFallsThrough(t *testing.T) {

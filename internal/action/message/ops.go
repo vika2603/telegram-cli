@@ -61,12 +61,16 @@ type StickerSource struct {
 	Doc *StickerDoc
 }
 
-// StickerDoc is the input document triple needed to send a sticker directly:
-// id + access hash + the (short-lived) file reference.
+// StickerDoc is the input document needed to send a sticker directly: id +
+// access hash + the (short-lived) file reference. SetID/SetAccessHash identify
+// the owning sticker set (0 if none) so an expired file reference can be
+// refreshed by re-fetching just that set.
 type StickerDoc struct {
 	ID            int64
 	AccessHash    int64
 	FileReference []byte
+	SetID         int64
+	SetAccessHash int64
 }
 
 // Attachment is one file sent by `tg msg send --file`.

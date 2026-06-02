@@ -18,10 +18,12 @@ const stickerTokenPrefix = "stk_"
 // self-contained, copy-pasteable handle. The file reference is short-lived, so
 // a token only stays valid for a while after listing.
 func EncodeStickerToken(doc StickerDoc) string {
-	buf := make([]byte, 16+len(doc.FileReference))
+	buf := make([]byte, 32+len(doc.FileReference))
 	binary.BigEndian.PutUint64(buf[0:8], uint64(doc.ID))
 	binary.BigEndian.PutUint64(buf[8:16], uint64(doc.AccessHash))
-	copy(buf[16:], doc.FileReference)
+	binary.BigEndian.PutUint64(buf[16:24], uint64(doc.SetID))
+	binary.BigEndian.PutUint64(buf[24:32], uint64(doc.SetAccessHash))
+	copy(buf[32:], doc.FileReference)
 	return stickerTokenPrefix + base64.RawURLEncoding.EncodeToString(buf)
 }
 
@@ -33,13 +35,15 @@ func DecodeStickerToken(s string) (*StickerDoc, bool, error) {
 		return nil, false, nil
 	}
 	raw, err := base64.RawURLEncoding.DecodeString(s[len(stickerTokenPrefix):])
-	if err != nil || len(raw) < 16 {
+	if err != nil || len(raw) < 32 {
 		return nil, false, fmt.Errorf("%w: invalid sticker ref %q", command.ErrUsage, s)
 	}
 	return &StickerDoc{
 		ID:            int64(binary.BigEndian.Uint64(raw[0:8])),
 		AccessHash:    int64(binary.BigEndian.Uint64(raw[8:16])),
-		FileReference: raw[16:],
+		SetID:         int64(binary.BigEndian.Uint64(raw[16:24])),
+		SetAccessHash: int64(binary.BigEndian.Uint64(raw[24:32])),
+		FileReference: raw[32:],
 	}, true, nil
 }
 

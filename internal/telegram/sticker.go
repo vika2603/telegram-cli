@@ -2,6 +2,7 @@ package telegram
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/gotd/td/tg"
@@ -123,15 +124,69 @@ func stickerRowsFromDocs(docs []tg.DocumentClass) []output.StickerRow {
 		if !ok {
 			continue
 		}
+		setID, setHash := stickerSet(doc)
 		rows = append(rows, output.StickerRow{
-			Kind:  "sticker",
-			Ref:   actionmessage.EncodeStickerToken(actionmessage.StickerDoc{ID: doc.ID, AccessHash: doc.AccessHash, FileReference: doc.FileReference}),
+			Kind: "sticker",
+			Ref: actionmessage.EncodeStickerToken(actionmessage.StickerDoc{
+				ID: doc.ID, AccessHash: doc.AccessHash, FileReference: doc.FileReference,
+				SetID: setID, SetAccessHash: setHash,
+			}),
 			ID:    doc.ID,
 			Emoji: stickerEmoji(doc),
 			Type:  stickerType(doc),
 		})
 	}
 	return rows
+}
+
+// inputMediaFromStickerDoc builds the send media for a sticker ref handle.
+func inputMediaFromStickerDoc(doc *actionmessage.StickerDoc) *tg.InputMediaDocument {
+	return &tg.InputMediaDocument{ID: &tg.InputDocument{
+		ID:            doc.ID,
+		AccessHash:    doc.AccessHash,
+		FileReference: doc.FileReference,
+	}}
+}
+
+// refreshStickerRef re-fetches the sticker's owning set and returns the doc
+// with a fresh file reference. Used to recover from FILE_REFERENCE_EXPIRED.
+func refreshStickerRef(ctx context.Context, api *tg.Client, doc *actionmessage.StickerDoc) (*actionmessage.StickerDoc, error) {
+	set, err := api.MessagesGetStickerSet(ctx, &tg.MessagesGetStickerSetRequest{
+		Stickerset: &tg.InputStickerSetID{ID: doc.SetID, AccessHash: doc.SetAccessHash},
+	})
+	if err != nil {
+		return nil, err
+	}
+	full, ok := set.(*tg.MessagesStickerSet)
+	if !ok {
+		return nil, errors.New("sticker set unavailable")
+	}
+	for _, dc := range full.Documents {
+		d, ok := dc.AsNotEmpty()
+		if !ok || d.ID != doc.ID {
+			continue
+		}
+		return &actionmessage.StickerDoc{
+			ID: d.ID, AccessHash: d.AccessHash, FileReference: d.FileReference,
+			SetID: doc.SetID, SetAccessHash: doc.SetAccessHash,
+		}, nil
+	}
+	return nil, errors.New("sticker no longer in set")
+}
+
+// stickerSet returns the owning set's id and access hash, or (0, 0) if the
+// sticker belongs to no set (so its file reference can't be set-refreshed).
+func stickerSet(doc *tg.Document) (id, accessHash int64) {
+	for _, attr := range doc.Attributes {
+		s, ok := attr.(*tg.DocumentAttributeSticker)
+		if !ok {
+			continue
+		}
+		if set, ok := s.Stickerset.(*tg.InputStickerSetID); ok {
+			return set.ID, set.AccessHash
+		}
+	}
+	return 0, 0
 }
 
 func stickerEmoji(doc *tg.Document) string {

@@ -18,6 +18,7 @@ import (
 	"github.com/gotd/td/telegram/query"
 	msgquery "github.com/gotd/td/telegram/query/messages"
 	"github.com/gotd/td/tg"
+	"github.com/gotd/td/tgerr"
 
 	actionmessage "github.com/vika2603/telegram-cli/internal/action/message"
 	"github.com/vika2603/telegram-cli/internal/command"
@@ -133,12 +134,15 @@ func sendSticker(
 ) (tg.UpdatesClass, error) {
 	// A ref handle from `msg sticker list` carries the full input document.
 	if src.Doc != nil {
-		media := &tg.InputMediaDocument{ID: &tg.InputDocument{
-			ID:            src.Doc.ID,
-			AccessHash:    src.Doc.AccessHash,
-			FileReference: src.Doc.FileReference,
-		}}
-		return b.Media(ctx, gotdmessage.Media(media))
+		upd, err := b.Media(ctx, gotdmessage.Media(inputMediaFromStickerDoc(src.Doc)))
+		// The handle's file reference is short-lived; on expiry, re-fetch the
+		// owning set for a fresh one and retry once.
+		if err != nil && tgerr.Is(err, tg.ErrFileReferenceExpired, tg.ErrFileReferenceInvalid) && src.Doc.SetID != 0 {
+			if fresh, rerr := refreshStickerRef(ctx, api, src.Doc); rerr == nil {
+				return b.Media(ctx, gotdmessage.Media(inputMediaFromStickerDoc(fresh)))
+			}
+		}
+		return upd, err
 	}
 	srcResolved, err := resolver.Resolve(ctx, src.Peer)
 	if err != nil {

@@ -6,10 +6,12 @@ import (
 	"fmt"
 
 	"github.com/gotd/td/tg"
+	"github.com/gotd/td/tgerr"
 
 	actionmessage "github.com/vika2603/telegram-cli/internal/action/message"
 	"github.com/vika2603/telegram-cli/internal/command"
 	"github.com/vika2603/telegram-cli/internal/output"
+	"github.com/vika2603/telegram-cli/internal/telegram/peer"
 )
 
 // ListStickers performs the RPC for `tg msg sticker list`.
@@ -139,13 +141,64 @@ func stickerRowsFromDocs(docs []tg.DocumentClass) []output.StickerRow {
 	return rows
 }
 
+// inputDocFromStickerDoc builds a tg input document from a sticker ref handle.
+func inputDocFromStickerDoc(doc *actionmessage.StickerDoc) *tg.InputDocument {
+	return &tg.InputDocument{ID: doc.ID, AccessHash: doc.AccessHash, FileReference: doc.FileReference}
+}
+
 // inputMediaFromStickerDoc builds the send media for a sticker ref handle.
 func inputMediaFromStickerDoc(doc *actionmessage.StickerDoc) *tg.InputMediaDocument {
-	return &tg.InputMediaDocument{ID: &tg.InputDocument{
-		ID:            doc.ID,
-		AccessHash:    doc.AccessHash,
-		FileReference: doc.FileReference,
-	}}
+	return &tg.InputMediaDocument{ID: inputDocFromStickerDoc(doc)}
+}
+
+// resolveStickerInputDocument turns a sticker source (ref handle or message
+// ref) into a sendable input document.
+func resolveStickerInputDocument(ctx context.Context, api *tg.Client, resolver *peer.Resolver, src *actionmessage.StickerSource) (*tg.InputDocument, error) {
+	if src.Doc != nil {
+		return inputDocFromStickerDoc(src.Doc), nil
+	}
+	resolved, err := resolver.Resolve(ctx, src.Peer)
+	if err != nil {
+		return nil, err
+	}
+	elem, err := getMessageByID(ctx, api, resolved.InputPeer, src.MessageID)
+	if err != nil {
+		return nil, err
+	}
+	doc, ok := stickerInputDocument(elem)
+	if !ok {
+		return nil, fmt.Errorf("%w: %s is not a sticker", command.ErrUsage, src.Peer.String())
+	}
+	return doc, nil
+}
+
+// FaveSticker performs the RPC for `tg msg sticker fave` / `unfave`. On an
+// expired ref it refreshes from the owning set and retries once.
+func FaveSticker(ctx context.Context, api *tg.Client, resolver *peer.Resolver, q actionmessage.FaveQuery) (output.FaveResult, error) {
+	doc, err := resolveStickerInputDocument(ctx, api, resolver, q.Source)
+	if err != nil {
+		return output.FaveResult{}, err
+	}
+	err = faveStickerCall(ctx, api, doc, q.Unfave)
+	if err != nil && tgerr.Is(err, tg.ErrFileReferenceExpired, tg.ErrFileReferenceInvalid) && q.Source.Doc != nil && q.Source.Doc.SetID != 0 {
+		if fresh, rerr := refreshStickerRef(ctx, api, q.Source.Doc); rerr == nil {
+			doc = inputDocFromStickerDoc(fresh)
+			err = faveStickerCall(ctx, api, doc, q.Unfave)
+		}
+	}
+	if err != nil {
+		return output.FaveResult{}, err
+	}
+	action := "fave"
+	if q.Unfave {
+		action = "unfave"
+	}
+	return output.FaveResult{Action: action, ID: doc.ID}, nil
+}
+
+func faveStickerCall(ctx context.Context, api *tg.Client, doc *tg.InputDocument, unfave bool) error {
+	_, err := api.MessagesFaveSticker(ctx, &tg.MessagesFaveStickerRequest{ID: doc, Unfave: unfave})
+	return err
 }
 
 // refreshStickerRef re-fetches the sticker's owning set and returns the doc

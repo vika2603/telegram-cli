@@ -47,6 +47,51 @@ func DecodeStickerToken(s string) (*StickerDoc, bool, error) {
 	}, true, nil
 }
 
+// parseStickerSource interprets a sticker argument as either a `msg sticker
+// list` ref token or a message ref.
+func parseStickerSource(raw string) (*StickerSource, error) {
+	src := &StickerSource{}
+	if doc, ok, err := DecodeStickerToken(raw); err != nil {
+		return nil, err
+	} else if ok {
+		src.Doc = doc
+		return src, nil
+	}
+	mref, err := parseMessageRef(raw)
+	if err != nil {
+		return nil, err
+	}
+	src.Peer, src.MessageID = mref.Peer, mref.MessageID
+	return src, nil
+}
+
+// FaveRequest is the raw request for `tg msg sticker fave` / `unfave`.
+type FaveRequest struct {
+	RawRef string
+	Unfave bool
+}
+
+// FaveQuery is the normalized payload passed to Telegram.
+type FaveQuery struct {
+	Source *StickerSource
+	Unfave bool
+}
+
+// FaveFunc adds or removes a sticker from favorites.
+type FaveFunc func(context.Context, FaveQuery) (output.FaveResult, error)
+
+// FaveSticker validates and dispatches `tg msg sticker fave` / `unfave`.
+func FaveSticker(ctx context.Context, req FaveRequest, do FaveFunc) (output.FaveResult, error) {
+	src, err := parseStickerSource(req.RawRef)
+	if err != nil {
+		return output.FaveResult{}, err
+	}
+	if do == nil {
+		return output.FaveResult{}, fmt.Errorf("%w: msg sticker fave called without fave function", command.ErrPrecondition)
+	}
+	return do(ctx, FaveQuery{Source: src, Unfave: req.Unfave})
+}
+
 // StickerListSource selects which sticker collection to list.
 type StickerListSource string
 

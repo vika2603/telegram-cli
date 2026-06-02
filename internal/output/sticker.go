@@ -20,6 +20,20 @@ type StickerRow struct {
 	Count int    `json:"count,omitempty"` // stickers in set (set)
 }
 
+// FaveResult is emitted by `tg msg sticker fave` / `unfave`.
+type FaveResult struct {
+	Action string `json:"action"` // "fave" | "unfave"
+	ID     int64  `json:"id"`
+}
+
+// RenderFave prints a fave/unfave confirmation.
+func RenderFave(io *ui.IOStreams, r FaveResult) error {
+	tp := NewTablePrinter(io)
+	tp.AddRow("ACTION", r.Action)
+	tp.AddRow("ID", strconv.FormatInt(r.ID, 10))
+	return tp.Render()
+}
+
 // RenderStickers prints sticker rows (or set rows) as a table.
 func RenderStickers(io *ui.IOStreams, rows []StickerRow) error {
 	tp := NewTablePrinter(io)

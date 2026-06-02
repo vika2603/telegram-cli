@@ -51,38 +51,39 @@ type VoteQuery struct {
 	MessageID int
 	OptionIdx []int // 0-based option indexes
 	Retract   bool
-	Show      bool // no vote: just read the poll
 }
 
-// VoteFunc reads or votes on a poll and returns its current state.
-type VoteFunc func(context.Context, VoteQuery) (output.PollInfo, error)
+// VoteFunc casts (or retracts) a vote on a poll.
+type VoteFunc func(context.Context, VoteQuery) (output.VoteResult, error)
 
-// Vote validates and dispatches `tg msg vote`. With no options and no
-// --retract it just reads the poll.
-func Vote(ctx context.Context, req VoteRequest, do VoteFunc) (output.PollInfo, error) {
+// Vote validates and dispatches `tg msg vote`. It only votes: pass option
+// numbers to vote, or --retract to take a vote back.
+func Vote(ctx context.Context, req VoteRequest, do VoteFunc) (output.VoteResult, error) {
 	mref, err := parseMessageRef(req.RawMessageRef)
 	if err != nil {
-		return output.PollInfo{}, err
+		return output.VoteResult{}, err
 	}
 	if req.Retract && len(req.Options) > 0 {
-		return output.PollInfo{}, fmt.Errorf("%w: --retract takes no options", command.ErrUsage)
+		return output.VoteResult{}, fmt.Errorf("%w: --retract takes no options", command.ErrUsage)
+	}
+	if !req.Retract && len(req.Options) == 0 {
+		return output.VoteResult{}, fmt.Errorf("%w: give one or more option numbers, or --retract", command.ErrUsage)
 	}
 	idx := make([]int, 0, len(req.Options))
 	for _, n := range req.Options {
 		if n < 1 {
-			return output.PollInfo{}, fmt.Errorf("%w: option numbers are 1-based (got %d)", command.ErrUsage, n)
+			return output.VoteResult{}, fmt.Errorf("%w: option numbers are 1-based (got %d)", command.ErrUsage, n)
 		}
 		idx = append(idx, n-1)
 	}
 	if do == nil {
-		return output.PollInfo{}, fmt.Errorf("%w: msg vote called without vote function", command.ErrPrecondition)
+		return output.VoteResult{}, fmt.Errorf("%w: msg vote called without vote function", command.ErrPrecondition)
 	}
 	return do(ctx, VoteQuery{
 		Ref:       mref.Peer,
 		MessageID: mref.MessageID,
 		OptionIdx: idx,
 		Retract:   req.Retract,
-		Show:      len(idx) == 0 && !req.Retract,
 	})
 }
 

@@ -43,29 +43,28 @@ func SendPoll(ctx context.Context, api *tg.Client, resolver *peer.Resolver, q ac
 	return sentMessageRows("poll", upd), nil
 }
 
-// VotePoll reads a poll and optionally casts (or retracts) a vote, returning
-// the poll's current state.
-func VotePoll(ctx context.Context, api *tg.Client, resolver *peer.Resolver, q actionmessage.VoteQuery) (output.PollInfo, error) {
+// VotePoll casts (or retracts) a vote on a poll. It does not read back tallies
+// — use `msg list` to see results.
+func VotePoll(ctx context.Context, api *tg.Client, resolver *peer.Resolver, q actionmessage.VoteQuery) (output.VoteResult, error) {
 	resolved, err := resolver.Resolve(ctx, q.Ref)
 	if err != nil {
-		return output.PollInfo{}, err
-	}
-	media, err := fetchPollMedia(ctx, api, resolved.InputPeer, q.MessageID)
-	if err != nil {
-		return output.PollInfo{}, err
-	}
-	if q.Show {
-		return pollInfoFromMedia(media), nil
-	}
-	if !q.Retract && !media.Poll.MultipleChoice && len(q.OptionIdx) > 1 {
-		return output.PollInfo{}, fmt.Errorf("%w: this poll is single-choice; pick exactly one option", command.ErrUsage)
+		return output.VoteResult{}, err
 	}
 
-	options := make([][]byte, 0, len(q.OptionIdx))
+	var options [][]byte
 	if !q.Retract {
+		// Fetch the poll once to map option numbers to their wire bytes.
+		media, err := fetchPollMedia(ctx, api, resolved.InputPeer, q.MessageID)
+		if err != nil {
+			return output.VoteResult{}, err
+		}
+		if !media.Poll.MultipleChoice && len(q.OptionIdx) > 1 {
+			return output.VoteResult{}, fmt.Errorf("%w: this poll is single-choice; pick exactly one option", command.ErrUsage)
+		}
+		options = make([][]byte, 0, len(q.OptionIdx))
 		for _, i := range q.OptionIdx {
 			if i < 0 || i >= len(media.Poll.Answers) {
-				return output.PollInfo{}, fmt.Errorf("%w: option %d is out of range (poll has %d options)", command.ErrUsage, i+1, len(media.Poll.Answers))
+				return output.VoteResult{}, fmt.Errorf("%w: option %d is out of range (poll has %d options)", command.ErrUsage, i+1, len(media.Poll.Answers))
 			}
 			options = append(options, media.Poll.Answers[i].Option)
 		}
@@ -75,14 +74,13 @@ func VotePoll(ctx context.Context, api *tg.Client, resolver *peer.Resolver, q ac
 		MsgID:   q.MessageID,
 		Options: options,
 	}); err != nil {
-		return output.PollInfo{}, err
+		return output.VoteResult{}, err
 	}
-	// Re-fetch for the updated tallies.
-	fresh, err := fetchPollMedia(ctx, api, resolved.InputPeer, q.MessageID)
-	if err != nil {
-		return output.PollInfo{}, err
+	action := "vote"
+	if q.Retract {
+		action = "retract"
 	}
-	return pollInfoFromMedia(fresh), nil
+	return output.VoteResult{Action: action, MessageID: q.MessageID}, nil
 }
 
 func fetchPollMedia(ctx context.Context, api *tg.Client, inputPeer tg.InputPeerClass, msgID int) (*tg.MessageMediaPoll, error) {
@@ -99,31 +97,4 @@ func fetchPollMedia(ctx context.Context, api *tg.Client, inputPeer tg.InputPeerC
 		return nil, fmt.Errorf("%w: message %d is not a poll", command.ErrUsage, msgID)
 	}
 	return media, nil
-}
-
-func pollInfoFromMedia(m *tg.MessageMediaPoll) output.PollInfo {
-	info := output.PollInfo{
-		Question: m.Poll.Question.Text,
-		Multiple: m.Poll.MultipleChoice,
-		Quiz:     m.Poll.Quiz,
-		Public:   m.Poll.PublicVoters,
-		Closed:   m.Poll.Closed,
-	}
-	if tv, ok := m.Results.GetTotalVoters(); ok {
-		info.TotalVoters = tv
-	}
-	tally := make(map[string]tg.PollAnswerVoters, len(m.Results.Results))
-	for _, r := range m.Results.Results {
-		tally[string(r.Option)] = r
-	}
-	for _, a := range m.Poll.Answers {
-		opt := output.PollOption{Text: a.Text.Text}
-		if r, ok := tally[string(a.Option)]; ok {
-			opt.Voters = r.Voters
-			opt.Chosen = r.Chosen
-			opt.Correct = r.Correct
-		}
-		info.Options = append(info.Options, opt)
-	}
-	return info
 }

@@ -133,7 +133,7 @@ client commands route through when present).
 | `tg msg sticker list` | List your stickers to get a sendable `ref`. `--recent` (default), `--faved`, `--installed` (sets), `--all` (recent+faved+all sets expanded; slow). |
 | `tg msg sticker fave <ref>` / `tg msg sticker unfave <ref>` | Add or remove a sticker from favorites (`<ref>` is a list ref or `<msg-ref>`). |
 | `tg msg poll <ref> <question> <option>...` | Send a poll (≥2 options). `--multiple`, `--public` (default anonymous); `--correct <n>` makes it a quiz with optional `--explanation`. |
-| `tg msg vote <msg-ref> [option-number...]` | Vote on a poll by 1-based option number (multiple numbers for multiple-choice polls); omit numbers to just view the poll; `--retract` to take back your vote. |
+| `tg msg vote <msg-ref> <option-number>...` | Vote on a poll by 1-based option number (multiple numbers for multiple-choice polls); `--retract` to take back your vote. |
 | `tg msg download <msg-ref>` | Download photo, video, document, or other message media. Defaults to the media filename; use `-o/--output` for a file path or existing directory. |
 | `tg msg edit <msg-ref>` | Edit a message. |
 | `tg msg delete <msg-ref>...` | Delete messages. Add `--revoke` when deleting for everyone is required. |

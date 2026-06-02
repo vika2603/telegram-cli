@@ -71,36 +71,45 @@ func TestPoll_CorrectOutOfRange(t *testing.T) {
 	require.ErrorIs(t, err, command.ErrUsage)
 }
 
-func TestVote_ShowWhenNoOptions(t *testing.T) {
+func TestVote_OptionsAreZeroBased(t *testing.T) {
 	_, err := actionmessage.Vote(context.Background(), actionmessage.VoteRequest{
-		RawMessageRef: "@grp:42",
-	}, func(_ context.Context, q actionmessage.VoteQuery) (output.PollInfo, error) {
+		RawMessageRef: "@grp:42", Options: []int{1, 3},
+	}, func(_ context.Context, q actionmessage.VoteQuery) (output.VoteResult, error) {
 		require.Equal(t, "grp", q.Ref.Value)
 		require.Equal(t, 42, q.MessageID)
-		require.True(t, q.Show)
-		require.Empty(t, q.OptionIdx)
-		return output.PollInfo{}, nil
+		require.Equal(t, []int{0, 2}, q.OptionIdx)
+		return output.VoteResult{Action: "vote", MessageID: 42}, nil
 	})
 	require.NoError(t, err)
 }
 
-func TestVote_OptionsAreZeroBased(t *testing.T) {
+func TestVote_Retract(t *testing.T) {
 	_, err := actionmessage.Vote(context.Background(), actionmessage.VoteRequest{
-		RawMessageRef: "@grp:42", Options: []int{1, 3},
-	}, func(_ context.Context, q actionmessage.VoteQuery) (output.PollInfo, error) {
-		require.Equal(t, []int{0, 2}, q.OptionIdx)
-		require.False(t, q.Show)
-		return output.PollInfo{}, nil
+		RawMessageRef: "@grp:42", Retract: true,
+	}, func(_ context.Context, q actionmessage.VoteQuery) (output.VoteResult, error) {
+		require.True(t, q.Retract)
+		require.Empty(t, q.OptionIdx)
+		return output.VoteResult{Action: "retract", MessageID: 42}, nil
 	})
 	require.NoError(t, err)
+}
+
+func TestVote_RequiresOptionsOrRetract(t *testing.T) {
+	_, err := actionmessage.Vote(context.Background(), actionmessage.VoteRequest{
+		RawMessageRef: "@grp:42",
+	}, func(context.Context, actionmessage.VoteQuery) (output.VoteResult, error) {
+		t.Fatal("must not dispatch")
+		return output.VoteResult{}, nil
+	})
+	require.ErrorIs(t, err, command.ErrUsage)
 }
 
 func TestVote_RetractRejectsOptions(t *testing.T) {
 	_, err := actionmessage.Vote(context.Background(), actionmessage.VoteRequest{
 		RawMessageRef: "@grp:42", Options: []int{1}, Retract: true,
-	}, func(context.Context, actionmessage.VoteQuery) (output.PollInfo, error) {
+	}, func(context.Context, actionmessage.VoteQuery) (output.VoteResult, error) {
 		t.Fatal("must not dispatch")
-		return output.PollInfo{}, nil
+		return output.VoteResult{}, nil
 	})
 	require.ErrorIs(t, err, command.ErrUsage)
 }
@@ -108,9 +117,9 @@ func TestVote_RetractRejectsOptions(t *testing.T) {
 func TestVote_RejectsNonPositiveOption(t *testing.T) {
 	_, err := actionmessage.Vote(context.Background(), actionmessage.VoteRequest{
 		RawMessageRef: "@grp:42", Options: []int{0},
-	}, func(context.Context, actionmessage.VoteQuery) (output.PollInfo, error) {
+	}, func(context.Context, actionmessage.VoteQuery) (output.VoteResult, error) {
 		t.Fatal("must not dispatch")
-		return output.PollInfo{}, nil
+		return output.VoteResult{}, nil
 	})
 	require.ErrorIs(t, err, command.ErrUsage)
 }

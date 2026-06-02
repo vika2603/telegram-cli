@@ -33,8 +33,8 @@ type Options struct {
 func New(f *runtime.Invocation, runF func(*Options) error) *cobra.Command {
 	opts := &Options{}
 	cmd := &cobra.Command{
-		Use:   "vote <msg-ref> [option-number...]",
-		Short: "Vote on a poll, or show it when no option is given",
+		Use:   "vote <msg-ref> <option-number>...",
+		Short: "Vote on a poll by option number (or --retract)",
 		Args:  cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.RawMessageRef = args[0]
@@ -53,8 +53,7 @@ func New(f *runtime.Invocation, runF func(*Options) error) *cobra.Command {
 	}
 	cmd.Flags().BoolVar(&opts.Retract, "retract", false, "Retract your vote")
 	command.SetMeta(cmd, command.Meta{NeedsAccount: true, NeedsClient: true})
-	output.AddJSONFlags(cmd, &opts.Exporter,
-		[]string{"question", "options", "total_voters", "multiple", "quiz", "public", "closed"})
+	output.AddJSONFlags(cmd, &opts.Exporter, []string{"action", "message_id"})
 	return cmd
 }
 
@@ -72,7 +71,7 @@ func parseOptionNumbers(args []string) ([]int, error) {
 
 // Run validates and dispatches.
 func Run(ctx context.Context, opts *Options) error {
-	info, err := actionmessage.Vote(ctx, actionmessage.VoteRequest{
+	res, err := actionmessage.Vote(ctx, actionmessage.VoteRequest{
 		RawMessageRef: opts.RawMessageRef,
 		Options:       opts.Options,
 		Retract:       opts.Retract,
@@ -81,23 +80,23 @@ func Run(ctx context.Context, opts *Options) error {
 		return err
 	}
 	if opts.Exporter != nil {
-		return opts.Exporter.Write(opts.IOStreams, info)
+		return opts.Exporter.Write(opts.IOStreams, res)
 	}
-	return output.RenderPoll(opts.IOStreams, info)
+	return output.RenderVote(opts.IOStreams, res)
 }
 
 func newDo(f *runtime.Invocation) actionmessage.VoteFunc {
-	return func(ctx context.Context, q actionmessage.VoteQuery) (output.PollInfo, error) {
+	return func(ctx context.Context, q actionmessage.VoteQuery) (output.VoteResult, error) {
 		acct, err := f.Account("")
 		if err != nil {
-			return output.PollInfo{}, err
+			return output.VoteResult{}, err
 		}
-		var info output.PollInfo
+		var res output.VoteResult
 		err = f.WithPeers(ctx, acct, runtime.ClientOptsFrom(f, acct),
-			func(ctx context.Context, api *tg.Client, _ *peers.Manager, res *peer.Resolver) error {
-				info, err = telegram.VotePoll(ctx, api, res, q)
+			func(ctx context.Context, api *tg.Client, _ *peers.Manager, resolver *peer.Resolver) error {
+				res, err = telegram.VotePoll(ctx, api, resolver, q)
 				return err
 			})
-		return info, err
+		return res, err
 	}
 }

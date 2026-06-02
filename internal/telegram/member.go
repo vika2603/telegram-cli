@@ -152,13 +152,40 @@ func SetMemberAdmin(ctx context.Context, api *tg.Client, resolver *peer.Resolver
 		}
 	}
 
+	// editAdmin always overwrites the rank, so when --title was not given on a
+	// promote, read the member's current rank and re-send it to avoid silently
+	// clearing an existing title.
+	rank := q.Title
+	if !q.Demote && !q.SetTitle {
+		rank = currentAdminRank(ctx, api, inCh, userResolved.InputPeer)
+	}
+
 	if _, err := api.ChannelsEditAdmin(ctx, &tg.ChannelsEditAdminRequest{
 		Channel:     inCh,
 		UserID:      inUser,
 		AdminRights: rights,
-		Rank:        q.Title,
+		Rank:        rank,
 	}); err != nil {
 		return output.PeerRef{}, err
 	}
 	return output.PeerRefFromResolved(userResolved), nil
+}
+
+// currentAdminRank returns the participant's existing admin rank (title), or
+// "" if they are not currently an admin/creator or the lookup fails.
+func currentAdminRank(ctx context.Context, api *tg.Client, ch tg.InputChannelClass, participant tg.InputPeerClass) string {
+	got, err := api.ChannelsGetParticipant(ctx, &tg.ChannelsGetParticipantRequest{
+		Channel:     ch,
+		Participant: participant,
+	})
+	if err != nil {
+		return ""
+	}
+	switch p := got.Participant.(type) {
+	case *tg.ChannelParticipantAdmin:
+		return p.Rank
+	case *tg.ChannelParticipantCreator:
+		return p.Rank
+	}
+	return ""
 }

@@ -89,11 +89,13 @@ func TestUnban_SkipsConfirmation(t *testing.T) {
 
 func TestPromote_TitlePassesThrough(t *testing.T) {
 	_, err := actionchat.Promote(context.Background(), actionchat.PromoteRequest{
-		RawRef:  "@grp",
-		RawUser: "@alice",
-		Title:   "客服",
+		RawRef:   "@grp",
+		RawUser:  "@alice",
+		Title:    "客服",
+		SetTitle: true,
 	}, func(_ context.Context, q actionchat.PromoteQuery) (output.PeerRef, error) {
 		require.Equal(t, "客服", q.Title)
+		require.True(t, q.SetTitle)
 		require.False(t, q.Demote)
 		return output.PeerRef{}, nil
 	})

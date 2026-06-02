@@ -25,6 +25,7 @@ type Options struct {
 	RawUser   string
 	Demote    bool
 	Title     string
+	SetTitle  bool
 	Exporter  output.Exporter
 	IOStreams *ui.IOStreams
 	Promote   actionchat.PromoteFunc
@@ -68,6 +69,7 @@ func adminCmd(f *runtime.Invocation, runF func(*Options) error, demote bool) *co
 			opts.RawRef = args[0]
 			opts.RawUser = args[1]
 			opts.IOStreams = f.IOStreams
+			opts.SetTitle = cmd.Flags().Changed("title")
 			if runF != nil {
 				return runF(opts)
 			}
@@ -76,7 +78,7 @@ func adminCmd(f *runtime.Invocation, runF func(*Options) error, demote bool) *co
 		},
 	}
 	if !demote {
-		cmd.Flags().StringVar(&opts.Title, "title", "", "Custom admin title/rank (<=16 chars)")
+		cmd.Flags().StringVar(&opts.Title, "title", "", "Custom admin title/rank (<=16 chars); omit to keep the current title, pass \"\" to clear it")
 	}
 	command.SetMeta(cmd, command.Meta{NeedsAccount: true, NeedsClient: true})
 	output.AddJSONFlags(cmd, &opts.Exporter, []string{"ref", "id", "kind", "title", "username"})
@@ -86,10 +88,11 @@ func adminCmd(f *runtime.Invocation, runF func(*Options) error, demote bool) *co
 // Run executes the promote/demote logic.
 func Run(ctx context.Context, opts *Options) error {
 	pr, err := actionchat.Promote(ctx, actionchat.PromoteRequest{
-		RawRef:  opts.RawRef,
-		RawUser: opts.RawUser,
-		Demote:  opts.Demote,
-		Title:   opts.Title,
+		RawRef:   opts.RawRef,
+		RawUser:  opts.RawUser,
+		Demote:   opts.Demote,
+		Title:    opts.Title,
+		SetTitle: opts.SetTitle,
 	}, opts.Promote)
 	if err != nil {
 		return err

@@ -102,20 +102,22 @@ func Ban(ctx context.Context, req BanRequest, do BanFunc) (output.PeerRef, error
 // Promote / Demote
 // ---------------------------------------------------------------------------
 
-// PromoteRequest is the raw request for `tg chat promote` / `tg chat demote`.
+// PromoteRequest is the raw request for `tg chat admin promote` / `demote`.
 type PromoteRequest struct {
-	RawRef  string
-	RawUser string
-	Demote  bool
-	Title   string // custom admin rank/title (promote only, <=16 chars)
+	RawRef   string
+	RawUser  string
+	Demote   bool
+	Title    string // custom admin rank/title (promote only, <=16 chars)
+	SetTitle bool   // whether --title was given; if false, keep the current rank
 }
 
 // PromoteQuery is the normalized payload passed to the Telegram layer.
 type PromoteQuery struct {
-	Ref    ref.Ref
-	User   ref.Ref
-	Demote bool
-	Title  string
+	Ref      ref.Ref
+	User     ref.Ref
+	Demote   bool
+	Title    string
+	SetTitle bool
 }
 
 // PromoteFunc promotes or demotes a user and returns the affected peer.
@@ -137,5 +139,5 @@ func Promote(ctx context.Context, req PromoteRequest, do PromoteFunc) (output.Pe
 	if do == nil {
 		return output.PeerRef{}, fmt.Errorf("%w: chat promote called without promote function", command.ErrPrecondition)
 	}
-	return do(ctx, PromoteQuery{Ref: parsed, User: userRef, Demote: req.Demote, Title: req.Title})
+	return do(ctx, PromoteQuery{Ref: parsed, User: userRef, Demote: req.Demote, Title: req.Title, SetTitle: req.SetTitle})
 }

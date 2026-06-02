@@ -131,6 +131,15 @@ func sendSticker(
 	b *gotdmessage.RequestBuilder,
 	src *actionmessage.StickerSource,
 ) (tg.UpdatesClass, error) {
+	// A ref handle from `msg sticker list` carries the full input document.
+	if src.Doc != nil {
+		media := &tg.InputMediaDocument{ID: &tg.InputDocument{
+			ID:            src.Doc.ID,
+			AccessHash:    src.Doc.AccessHash,
+			FileReference: src.Doc.FileReference,
+		}}
+		return b.Media(ctx, gotdmessage.Media(media))
+	}
 	srcResolved, err := resolver.Resolve(ctx, src.Peer)
 	if err != nil {
 		return nil, err

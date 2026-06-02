@@ -50,11 +50,23 @@ type SendQuery struct {
 	Stdin    io.Reader
 }
 
-// StickerSource locates an existing sticker to resend: the peer that holds the
-// source message and that message's id.
+// StickerSource locates the sticker to send. Exactly one variant is set:
+// either a message reference (resend the sticker from a message) or a
+// self-contained Doc handle decoded from a `msg sticker list` ref token.
 type StickerSource struct {
+	// by message reference
 	Peer      ref.Ref
 	MessageID int
+	// by ref token (from `msg sticker list`)
+	Doc *StickerDoc
+}
+
+// StickerDoc is the input document triple needed to send a sticker directly:
+// id + access hash + the (short-lived) file reference.
+type StickerDoc struct {
+	ID            int64
+	AccessHash    int64
+	FileReference []byte
 }
 
 // Attachment is one file sent by `tg msg send --file`.
@@ -162,13 +174,23 @@ func normalizeStickerSend(req SendRequest) (SendQuery, error) {
 	if err != nil {
 		return SendQuery{}, fmt.Errorf("%w: %s", command.ErrUsage, err.Error())
 	}
-	src, err := parseMessageRef(req.Sticker)
-	if err != nil {
+	source := &StickerSource{}
+	if doc, ok, err := DecodeStickerToken(req.Sticker); err != nil {
 		return SendQuery{}, err
+	} else if ok {
+		// A self-contained ref handle from `msg sticker list`.
+		source.Doc = doc
+	} else {
+		// Otherwise a message ref: resend the sticker from that message.
+		src, err := parseMessageRef(req.Sticker)
+		if err != nil {
+			return SendQuery{}, err
+		}
+		source.Peer, source.MessageID = src.Peer, src.MessageID
 	}
 	return SendQuery{
 		Ref:      target,
-		Sticker:  &StickerSource{Peer: src.Peer, MessageID: src.MessageID},
+		Sticker:  source,
 		ReplyTo:  req.ReplyTo,
 		Silent:   req.Silent,
 		Schedule: req.Schedule,

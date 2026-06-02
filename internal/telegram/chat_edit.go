@@ -3,6 +3,7 @@ package telegram
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/gotd/td/tg"
 
@@ -25,7 +26,8 @@ func EditChat(ctx context.Context, api *tg.Client, resolver *peer.Resolver, q ac
 	// (supergroups/channels only). About and no-forwards work on the InputPeer
 	// directly, so they don't force a channel. Resolve it once and reuse below.
 	needsChannel := q.Title != nil || q.Username != nil || q.Forum != nil ||
-		q.HideMembers != nil || q.HideHistory != nil || q.SlowMode != nil || q.Signatures != nil
+		q.HideMembers != nil || q.HideHistory != nil || q.SlowMode != nil ||
+		q.Signatures != nil || q.JoinRequest != nil
 	var inCh tg.InputChannelClass
 	if needsChannel {
 		var ok bool
@@ -82,6 +84,14 @@ func EditChat(ctx context.Context, api *tg.Client, resolver *peer.Resolver, q ac
 	}
 	if q.Signatures != nil {
 		if _, err := api.ChannelsToggleSignatures(ctx, &tg.ChannelsToggleSignaturesRequest{Channel: inCh, Enabled: *q.Signatures}); err != nil {
+			return output.ChatRow{}, err
+		}
+	}
+	if q.JoinRequest != nil {
+		if _, err := api.ChannelsToggleJoinRequest(ctx, &tg.ChannelsToggleJoinRequestRequest{Channel: inCh, Enabled: *q.JoinRequest}); err != nil {
+			if strings.Contains(err.Error(), "CHAT_PUBLIC_REQUIRED") {
+				return output.ChatRow{}, fmt.Errorf("%w: join approval can only be toggled on public groups/channels (set a public username first, or use a request-needed invite link for private ones)", command.ErrUnsupported)
+			}
 			return output.ChatRow{}, err
 		}
 	}

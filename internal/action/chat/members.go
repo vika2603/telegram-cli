@@ -13,18 +13,20 @@ const maxMembersLimit = 1000
 
 // MembersRequest is the raw request for `tg chat member list`.
 type MembersRequest struct {
-	RawRef string
-	Filter string
-	Q      string
-	Limit  int
+	RawRef  string
+	Filter  string
+	Q       string
+	Limit   int
+	ViaLink string // when set, list users who joined via this invite link
 }
 
 // MembersQuery is the normalized request passed to the Telegram layer.
 type MembersQuery struct {
-	Ref    ref.Ref
-	Filter string
-	Q      string
-	Limit  int
+	Ref     ref.Ref
+	Filter  string
+	Q       string
+	Limit   int
+	ViaLink string
 }
 
 // MembersFunc loads member rows after validation.
@@ -47,11 +49,14 @@ var memberFiltersAcceptingQ = map[string]bool{
 
 // Members validates the request and delegates member loading.
 func Members(ctx context.Context, req MembersRequest, fetch MembersFunc) ([]output.MemberRow, error) {
-	if !validMemberFilters[req.Filter] {
-		return nil, fmt.Errorf("%w: invalid --filter %q", command.ErrUsage, req.Filter)
-	}
-	if req.Q != "" && !memberFiltersAcceptingQ[req.Filter] {
-		return nil, fmt.Errorf("%w: --q is incompatible with --filter %s", command.ErrUsage, req.Filter)
+	// --via-link switches to "joined via this invite link" and ignores --filter.
+	if req.ViaLink == "" {
+		if !validMemberFilters[req.Filter] {
+			return nil, fmt.Errorf("%w: invalid --filter %q", command.ErrUsage, req.Filter)
+		}
+		if req.Q != "" && !memberFiltersAcceptingQ[req.Filter] {
+			return nil, fmt.Errorf("%w: --search is incompatible with --filter %s", command.ErrUsage, req.Filter)
+		}
 	}
 	if req.Limit <= 0 {
 		return nil, fmt.Errorf("%w: --limit must be positive", command.ErrUsage)
@@ -67,9 +72,10 @@ func Members(ctx context.Context, req MembersRequest, fetch MembersFunc) ([]outp
 		return nil, fmt.Errorf("%w: %s", command.ErrUsage, err.Error())
 	}
 	return fetch(ctx, MembersQuery{
-		Ref:    parsed,
-		Filter: req.Filter,
-		Q:      req.Q,
-		Limit:  req.Limit,
+		Ref:     parsed,
+		Filter:  req.Filter,
+		Q:       req.Q,
+		Limit:   req.Limit,
+		ViaLink: req.ViaLink,
 	})
 }

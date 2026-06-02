@@ -1,5 +1,4 @@
-// Package member implements the "tg chat member" command group.
-package member
+package join
 
 import (
 	"context"
@@ -18,24 +17,21 @@ import (
 	"github.com/vika2603/telegram-cli/internal/ui"
 )
 
-// Options holds the resolved flags and injected dependencies for Run.
-type Options struct {
+// ListOptions holds flags/deps for `join list`.
+type ListOptions struct {
 	RawRef    string
-	Filter    string
-	Q         string
+	Link      string
 	Limit     int
-	ViaLink   string
 	Exporter  output.Exporter
 	IOStreams *ui.IOStreams
-	Fetch     actionchat.MembersFunc
+	Fetch     actionchat.JoinListFunc
 }
 
-// NewList builds the cobra command for "tg chat member list".
-func NewList(f *runtime.Invocation, runF func(*Options) error) *cobra.Command {
-	opts := &Options{}
+func newList(f *runtime.Invocation, runF func(*ListOptions) error) *cobra.Command {
+	opts := &ListOptions{}
 	cmd := &cobra.Command{
 		Use:               "list <ref>",
-		Short:             "List members of a group or channel",
+		Short:             "List pending join requests",
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: complete.PeerRefs(f),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -44,30 +40,23 @@ func NewList(f *runtime.Invocation, runF func(*Options) error) *cobra.Command {
 			if runF != nil {
 				return runF(opts)
 			}
-			opts.Fetch = newFetch(f)
-			return Run(cmd.Context(), opts)
+			opts.Fetch = newListFn(f)
+			return runList(cmd.Context(), opts)
 		},
 	}
-	cmd.Flags().StringVar(&opts.Filter, "filter", "recent",
-		"Filter: recent|admins|bots|kicked|banned|contacts")
-	cmd.Flags().StringVar(&opts.Q, "search", "",
-		"Substring search (valid only with --filter kicked|banned|contacts)")
-	cmd.Flags().IntVar(&opts.Limit, "limit", 30, "Max members (cap 1000)")
-	cmd.Flags().StringVar(&opts.ViaLink, "via-link", "", "List users who joined via this invite link (ignores --filter)")
+	cmd.Flags().StringVar(&opts.Link, "link", "", "Only requests that came via this invite link")
+	cmd.Flags().IntVar(&opts.Limit, "limit", 100, "Max requests to list")
 	command.SetMeta(cmd, command.Meta{NeedsAccount: true, NeedsClient: true})
 	output.AddJSONFlags(cmd, &opts.Exporter,
 		[]string{"user_id", "username", "first_name", "last_name", "is_bot", "role", "joined_at"})
 	return cmd
 }
 
-// Run executes the members logic using opts.Fetch for data retrieval.
-func Run(ctx context.Context, opts *Options) error {
-	rows, err := actionchat.Members(ctx, actionchat.MembersRequest{
-		RawRef:  opts.RawRef,
-		Filter:  opts.Filter,
-		Q:       opts.Q,
-		Limit:   opts.Limit,
-		ViaLink: opts.ViaLink,
+func runList(ctx context.Context, opts *ListOptions) error {
+	rows, err := actionchat.JoinList(ctx, actionchat.JoinListRequest{
+		RawRef: opts.RawRef,
+		Link:   opts.Link,
+		Limit:  opts.Limit,
 	}, opts.Fetch)
 	if err != nil {
 		return err
@@ -78,8 +67,8 @@ func Run(ctx context.Context, opts *Options) error {
 	return output.RenderMembers(opts.IOStreams, rows)
 }
 
-func newFetch(f *runtime.Invocation) actionchat.MembersFunc {
-	return func(ctx context.Context, q actionchat.MembersQuery) ([]output.MemberRow, error) {
+func newListFn(f *runtime.Invocation) actionchat.JoinListFunc {
+	return func(ctx context.Context, q actionchat.JoinListQuery) ([]output.MemberRow, error) {
 		acct, err := f.Account("")
 		if err != nil {
 			return nil, err
@@ -87,7 +76,7 @@ func newFetch(f *runtime.Invocation) actionchat.MembersFunc {
 		var rows []output.MemberRow
 		err = f.WithPeers(ctx, acct, runtime.ClientOptsFrom(f, acct),
 			func(ctx context.Context, api *tg.Client, _ *peers.Manager, res *peer.Resolver) error {
-				rows, err = telegram.ListChatMembers(ctx, api, res, q)
+				rows, err = telegram.ListJoinRequests(ctx, api, res, q)
 				return err
 			})
 		return rows, err

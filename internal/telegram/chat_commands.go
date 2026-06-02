@@ -115,6 +115,11 @@ func JoinChat(ctx context.Context, api *tg.Client, resolver *peer.Resolver, q ac
 			case strings.Contains(msg, "USER_ALREADY_PARTICIPANT"):
 				row.AlreadyMember = true
 				return fillInviteTarget(ctx, api, q.Ref, row), nil
+			case strings.Contains(msg, "INVITE_REQUEST_SENT"):
+				// request-needed link: the join request was sent and now
+				// awaits admin approval — a success, not an error.
+				row.Requested = true
+				return fillInviteTarget(ctx, api, q.Ref, row), nil
 			}
 			return output.ChatMembershipRow{}, err
 		}
@@ -171,6 +176,39 @@ func ListChatMembers(ctx context.Context, api *tg.Client, resolver *peer.Resolve
 	inCh, ok := inputChannelFromPeer(resolved.InputPeer)
 	if !ok {
 		return nil, fmt.Errorf("%w: members are only available in supergroups and channels", command.ErrUnsupported)
+	}
+
+	// --via-link lists users who joined through an invite link
+	// (messages.getChatInviteImporters) rather than channel participants.
+	if q.ViaLink != "" {
+		req := &tg.MessagesGetChatInviteImportersRequest{
+			Peer:       resolved.InputPeer,
+			Limit:      q.Limit,
+			OffsetUser: &tg.InputUserEmpty{},
+		}
+		req.SetLink(q.ViaLink)
+		res, err := api.MessagesGetChatInviteImporters(ctx, req)
+		if err != nil {
+			return nil, err
+		}
+		users := make(map[int64]*tg.User, len(res.Users))
+		for _, uc := range res.Users {
+			if u, ok := uc.(*tg.User); ok {
+				users[u.ID] = u
+			}
+		}
+		rows := make([]output.MemberRow, 0, len(res.Importers))
+		for _, imp := range res.Importers {
+			row := output.MemberRow{UserID: imp.UserID, Role: "member", JoinedAt: fmtUnix(imp.Date)}
+			if u, ok := users[imp.UserID]; ok {
+				row.FirstName = u.FirstName
+				row.LastName = u.LastName
+				row.Username = u.Username
+				row.IsBot = u.Bot
+			}
+			rows = append(rows, row)
+		}
+		return rows, nil
 	}
 
 	var filter tg.ChannelParticipantsFilterClass

@@ -44,7 +44,12 @@ func New(f *runtime.Invocation, runF func(*Options) error) *cobra.Command {
 		},
 	}
 	command.SetMeta(cmd, command.Meta{NeedsAccount: true, NeedsClient: true})
-	output.AddJSONFlags(cmd, &opts.Exporter, []string{"action", "peer", "already_member", "role"})
+	output.AddJSONFlags(cmd, &opts.Exporter, []string{"action", "peer", "already_member", "requested", "role"})
+	// Join-request moderation lives under the same verb: `tg chat join <ref>`
+	// still joins, while these subcommands manage incoming requests.
+	cmd.AddCommand(newList(f, nil))
+	cmd.AddCommand(newApprove(f, nil))
+	cmd.AddCommand(newDeny(f, nil))
 	return cmd
 }
 

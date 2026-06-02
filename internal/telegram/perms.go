@@ -55,6 +55,11 @@ func applyRightKeys(b *tg.ChatBannedRights, allow, deny []string) {
 	}
 	set(deny, true)
 	set(allow, false)
+	// Reset the flag bitfield so it is re-derived purely from the bool fields
+	// on encode. gotd's SetFlags only *sets* bits for true bools and never
+	// clears them; carrying the readback base's stale flags would otherwise
+	// keep an "allowed" (false) right denied on the wire.
+	b.Flags = 0
 }
 
 // deniedRightKeys reverses applyRightKeys for display: keywords whose primary

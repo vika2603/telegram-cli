@@ -31,14 +31,14 @@ type Options struct {
 	Do         actionchat.RestrictFunc
 }
 
-// NewRestrict builds "tg chat restrict".
+// NewRestrict builds "tg chat member set-perms".
 func NewRestrict(f *runtime.Invocation, runF func(*Options) error) *cobra.Command {
-	return restrictCmd(f, runF, false, "restrict", "Restrict a member's permissions (optionally for a duration)")
+	return restrictCmd(f, runF, false, "set-perms", "Set a member's permissions with --allow/--deny (optional duration)")
 }
 
-// NewUnrestrict builds "tg chat unrestrict".
+// NewUnrestrict builds "tg chat member unset-perms".
 func NewUnrestrict(f *runtime.Invocation, runF func(*Options) error) *cobra.Command {
-	return restrictCmd(f, runF, true, "unrestrict", "Lift all restrictions on a member")
+	return restrictCmd(f, runF, true, "unset-perms", "Clear all permission restrictions on a member")
 }
 
 func restrictCmd(f *runtime.Invocation, runF func(*Options) error, unrestrict bool, use, short string) *cobra.Command {

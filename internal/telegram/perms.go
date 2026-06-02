@@ -89,7 +89,7 @@ func RestrictMember(ctx context.Context, api *tg.Client, resolver *peer.Resolver
 	}
 	inCh, ok := inputChannelFromPeer(groupResolved.InputPeer)
 	if !ok {
-		return output.RightsRow{}, fmt.Errorf("%w: restrictions are only supported in supergroups", command.ErrUnsupported)
+		return output.RightsRow{}, fmt.Errorf("%w: member permissions are only supported in supergroups", command.ErrUnsupported)
 	}
 	userResolved, err := resolver.Resolve(ctx, q.User)
 	if err != nil {
@@ -105,7 +105,7 @@ func RestrictMember(ctx context.Context, api *tg.Client, resolver *peer.Resolver
 		}); ignoreNotModified(err) != nil {
 			return output.RightsRow{}, err
 		}
-		return output.RightsRow{Action: "unrestrict", Peer: &pr}, nil
+		return output.RightsRow{Action: "unset-perms", Peer: &pr}, nil
 	}
 
 	// Start from the user's current banned rights (incremental).
@@ -127,7 +127,7 @@ func RestrictMember(ctx context.Context, api *tg.Client, resolver *peer.Resolver
 	}); ignoreNotModified(err) != nil {
 		return output.RightsRow{}, err
 	}
-	row := output.RightsRow{Action: "restrict", Peer: &pr, Denied: deniedRightKeys(base)}
+	row := output.RightsRow{Action: "set-perms", Peer: &pr, Denied: deniedRightKeys(base)}
 	if q.UntilDate > 0 {
 		row.Until = fmtUnix(q.UntilDate)
 	}

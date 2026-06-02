@@ -26,10 +26,10 @@ func TestRestrict_ParsesKeysAndUntil(t *testing.T) {
 		require.Equal(t, []string{"send", "media"}, q.Deny)
 		require.Equal(t, int(now.Add(time.Hour).Unix()), q.UntilDate)
 		require.False(t, q.Unrestrict)
-		return output.RightsRow{Action: "restrict"}, nil
+		return output.RightsRow{Action: "set-perms"}, nil
 	})
 	require.NoError(t, err)
-	require.Equal(t, "restrict", row.Action)
+	require.Equal(t, "set-perms", row.Action)
 }
 
 func TestRestrict_RejectsUnknownKey(t *testing.T) {
@@ -57,7 +57,7 @@ func TestUnrestrict_SetsFlag(t *testing.T) {
 		RawRef: "@grp", RawUser: "@alice",
 	}, func(_ context.Context, q actionchat.RestrictQuery) (output.RightsRow, error) {
 		require.True(t, q.Unrestrict)
-		return output.RightsRow{Action: "unrestrict"}, nil
+		return output.RightsRow{Action: "unset-perms"}, nil
 	})
 	require.NoError(t, err)
 }

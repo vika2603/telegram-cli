@@ -71,7 +71,7 @@ func Restrict(ctx context.Context, req RestrictRequest, do RestrictFunc) (output
 		return output.RightsRow{}, fmt.Errorf("%w: pass --deny and/or --allow with permission keywords", command.ErrUsage)
 	}
 	if do == nil {
-		return output.RightsRow{}, fmt.Errorf("%w: chat restrict called without do function", command.ErrPrecondition)
+		return output.RightsRow{}, fmt.Errorf("%w: chat member set-perms called without do function", command.ErrPrecondition)
 	}
 	return do(ctx, q)
 }
@@ -87,7 +87,7 @@ func Unrestrict(ctx context.Context, req RestrictRequest, do RestrictFunc) (outp
 		return output.RightsRow{}, fmt.Errorf("%w: invalid user ref %q: %s", command.ErrUsage, req.RawUser, err.Error())
 	}
 	if do == nil {
-		return output.RightsRow{}, fmt.Errorf("%w: chat unrestrict called without do function", command.ErrPrecondition)
+		return output.RightsRow{}, fmt.Errorf("%w: chat member unset-perms called without do function", command.ErrPrecondition)
 	}
 	return do(ctx, RestrictQuery{Ref: parsed, User: user, Unrestrict: true})
 }

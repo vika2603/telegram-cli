@@ -13,7 +13,7 @@ import (
 // lists the permission keywords currently revoked; Until is the restriction
 // expiry (empty = permanent).
 type RightsRow struct {
-	Action string   `json:"action"` // "restrict" | "unrestrict" | "perms"
+	Action string   `json:"action"` // "set-perms" | "unset-perms" | "perms"
 	Peer   *PeerRef `json:"peer,omitempty"`
 	Denied []string `json:"denied,omitempty"`
 	Until  string   `json:"until,omitempty"`

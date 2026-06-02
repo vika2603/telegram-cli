@@ -38,6 +38,54 @@ type PollQuery struct {
 // PollFunc sends a poll.
 type PollFunc func(context.Context, PollQuery) ([]output.SendResultRow, error)
 
+// VoteRequest is the raw request for `tg msg vote`.
+type VoteRequest struct {
+	RawMessageRef string
+	Options       []int // 1-based option numbers to vote for
+	Retract       bool
+}
+
+// VoteQuery is the normalized payload passed to Telegram.
+type VoteQuery struct {
+	Ref       ref.Ref
+	MessageID int
+	OptionIdx []int // 0-based option indexes
+	Retract   bool
+	Show      bool // no vote: just read the poll
+}
+
+// VoteFunc reads or votes on a poll and returns its current state.
+type VoteFunc func(context.Context, VoteQuery) (output.PollInfo, error)
+
+// Vote validates and dispatches `tg msg vote`. With no options and no
+// --retract it just reads the poll.
+func Vote(ctx context.Context, req VoteRequest, do VoteFunc) (output.PollInfo, error) {
+	mref, err := parseMessageRef(req.RawMessageRef)
+	if err != nil {
+		return output.PollInfo{}, err
+	}
+	if req.Retract && len(req.Options) > 0 {
+		return output.PollInfo{}, fmt.Errorf("%w: --retract takes no options", command.ErrUsage)
+	}
+	idx := make([]int, 0, len(req.Options))
+	for _, n := range req.Options {
+		if n < 1 {
+			return output.PollInfo{}, fmt.Errorf("%w: option numbers are 1-based (got %d)", command.ErrUsage, n)
+		}
+		idx = append(idx, n-1)
+	}
+	if do == nil {
+		return output.PollInfo{}, fmt.Errorf("%w: msg vote called without vote function", command.ErrPrecondition)
+	}
+	return do(ctx, VoteQuery{
+		Ref:       mref.Peer,
+		MessageID: mref.MessageID,
+		OptionIdx: idx,
+		Retract:   req.Retract,
+		Show:      len(idx) == 0 && !req.Retract,
+	})
+}
+
 // Poll validates and dispatches `tg msg poll`.
 func Poll(ctx context.Context, req PollRequest, do PollFunc) ([]output.SendResultRow, error) {
 	parsed, err := ref.ParseRef(req.RawRef)

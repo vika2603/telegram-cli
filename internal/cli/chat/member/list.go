@@ -56,7 +56,7 @@ func NewList(f *runtime.Invocation, runF func(*Options) error) *cobra.Command {
 	cmd.Flags().StringVar(&opts.ViaLink, "via-link", "", "List users who joined via this invite link (ignores --filter)")
 	command.SetMeta(cmd, command.Meta{NeedsAccount: true, NeedsClient: true})
 	output.AddJSONFlags(cmd, &opts.Exporter,
-		[]string{"user_id", "username", "first_name", "last_name", "is_bot", "role", "joined_at"})
+		[]string{"user_id", "username", "first_name", "last_name", "is_bot", "role", "rank", "joined_at"})
 	return cmd
 }
 

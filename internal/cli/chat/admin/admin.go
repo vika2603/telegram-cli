@@ -1,4 +1,4 @@
-// Package admin implements "tg chat promote <ref> <user>" and "tg chat demote <ref> <user>".
+// Package admin implements "tg chat admin promote" and "tg chat admin demote".
 package admin
 
 import (
@@ -24,17 +24,30 @@ type Options struct {
 	RawRef    string
 	RawUser   string
 	Demote    bool
+	Title     string
+	SetTitle  bool
 	Exporter  output.Exporter
 	IOStreams *ui.IOStreams
 	Promote   actionchat.PromoteFunc
 }
 
-// NewPromote builds the cobra command for "tg chat promote".
+// New builds the "tg chat admin" command group.
+func New(f *runtime.Invocation) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "admin",
+		Short: "Manage group/channel administrators",
+	}
+	cmd.AddCommand(NewPromote(f, nil))
+	cmd.AddCommand(NewDemote(f, nil))
+	return cmd
+}
+
+// NewPromote builds the cobra command for "tg chat admin promote".
 func NewPromote(f *runtime.Invocation, runF func(*Options) error) *cobra.Command {
 	return adminCmd(f, runF, false)
 }
 
-// NewDemote builds the cobra command for "tg chat demote".
+// NewDemote builds the cobra command for "tg chat admin demote".
 func NewDemote(f *runtime.Invocation, runF func(*Options) error) *cobra.Command {
 	return adminCmd(f, runF, true)
 }
@@ -56,12 +69,16 @@ func adminCmd(f *runtime.Invocation, runF func(*Options) error, demote bool) *co
 			opts.RawRef = args[0]
 			opts.RawUser = args[1]
 			opts.IOStreams = f.IOStreams
+			opts.SetTitle = cmd.Flags().Changed("title")
 			if runF != nil {
 				return runF(opts)
 			}
 			opts.Promote = newPromoteFn(f)
 			return Run(cmd.Context(), opts)
 		},
+	}
+	if !demote {
+		cmd.Flags().StringVar(&opts.Title, "title", "", "Custom admin title/rank (<=16 chars); omit to keep the current title, pass \"\" to clear it")
 	}
 	command.SetMeta(cmd, command.Meta{NeedsAccount: true, NeedsClient: true})
 	output.AddJSONFlags(cmd, &opts.Exporter, []string{"ref", "id", "kind", "title", "username"})
@@ -71,9 +88,11 @@ func adminCmd(f *runtime.Invocation, runF func(*Options) error, demote bool) *co
 // Run executes the promote/demote logic.
 func Run(ctx context.Context, opts *Options) error {
 	pr, err := actionchat.Promote(ctx, actionchat.PromoteRequest{
-		RawRef:  opts.RawRef,
-		RawUser: opts.RawUser,
-		Demote:  opts.Demote,
+		RawRef:   opts.RawRef,
+		RawUser:  opts.RawUser,
+		Demote:   opts.Demote,
+		Title:    opts.Title,
+		SetTitle: opts.SetTitle,
 	}, opts.Promote)
 	if err != nil {
 		return err

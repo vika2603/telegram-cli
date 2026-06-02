@@ -265,11 +265,11 @@ func ListChatMembers(ctx context.Context, api *tg.Client, resolver *peer.Resolve
 		}
 
 		for _, p := range cp.Participants {
-			userID, role, date := participantInfo(p)
+			userID, role, rank, date := participantInfo(p)
 			if userID == 0 {
 				continue
 			}
-			row := output.MemberRow{UserID: userID, Role: role, JoinedAt: fmtUnix(date)}
+			row := output.MemberRow{UserID: userID, Role: role, Rank: rank, JoinedAt: fmtUnix(date)}
 			if u, ok := users[userID]; ok {
 				row.FirstName = u.FirstName
 				row.LastName = u.LastName
@@ -283,30 +283,31 @@ func ListChatMembers(ctx context.Context, api *tg.Client, resolver *peer.Resolve
 	return rows, nil
 }
 
-// participantInfo extracts the user ID, role string, and join date from a
-// ChannelParticipantClass variant.
-func participantInfo(p tg.ChannelParticipantClass) (userID int64, role string, date int) {
+// participantInfo extracts the user ID, role string, custom admin rank
+// (title), and join date from a ChannelParticipantClass variant. Rank is only
+// set for creators and admins that carry one.
+func participantInfo(p tg.ChannelParticipantClass) (userID int64, role, rank string, date int) {
 	switch v := p.(type) {
 	case *tg.ChannelParticipantCreator:
-		return v.UserID, "creator", 0
+		return v.UserID, "creator", v.Rank, 0
 	case *tg.ChannelParticipantAdmin:
-		return v.UserID, "admin", v.Date
+		return v.UserID, "admin", v.Rank, v.Date
 	case *tg.ChannelParticipantSelf:
-		return v.UserID, "member", v.Date
+		return v.UserID, "member", "", v.Date
 	case *tg.ChannelParticipant:
-		return v.UserID, "member", v.Date
+		return v.UserID, "member", "", v.Date
 	case *tg.ChannelParticipantBanned:
 		if pu, ok := v.Peer.(*tg.PeerUser); ok {
-			return pu.UserID, "banned", v.Date
+			return pu.UserID, "banned", "", v.Date
 		}
-		return 0, "", 0
+		return 0, "", "", 0
 	case *tg.ChannelParticipantLeft:
 		if pu, ok := v.Peer.(*tg.PeerUser); ok {
-			return pu.UserID, "left", 0
+			return pu.UserID, "left", "", 0
 		}
-		return 0, "", 0
+		return 0, "", "", 0
 	}
-	return 0, "", 0
+	return 0, "", "", 0
 }
 
 func fillInviteTarget(ctx context.Context, api *tg.Client, target ref.Ref, row output.ChatMembershipRow) output.ChatMembershipRow {

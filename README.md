@@ -118,13 +118,16 @@ client commands route through when present).
 | `tg chat unpin <ref>` | Unpin a chat from the top of the chat list. |
 | `tg chat photo set <ref> <path>` | Set a group/channel photo (`-` reads stdin). Also available as `tg channel photo set`. |
 | `tg chat photo clear <ref>` | Remove a group/channel photo. Also `tg channel photo clear`. |
-| `tg chat member list <ref>` | List members. `--filter recent\|admins\|bots\|kicked\|banned\|contacts`, `--search`, `--limit`; `--via-link <link>` lists users who joined via that invite link. |
+| `tg chat member list <ref>` | List members (admins show their custom `rank`/title). `--filter recent\|admins\|bots\|kicked\|banned\|contacts`, `--search`, `--limit`; `--via-link <link>` lists users who joined via that invite link. |
 | `tg chat invite <ref> <user>...` | Add users to a group or channel. Each row reports `invited` true/false plus a `skip_reason` (e.g. `privacy_restricted`) when Telegram declined to add a user. |
 | `tg chat invite create <ref>` | Create an invite link. `--title`, `--expire <RFC3339\|dur>`, `--usage-limit <n>`, `--request-needed`. |
 | `tg chat invite list <ref>` | List invite links. `--revoked`, `--admin <user>`, `--limit`. |
 | `tg chat invite revoke <ref> <link>` / `delete <ref> <link>` | Revoke a link, or delete a revoked one. |
 | `tg chat ban <ref> <user>` / `tg chat unban <ref> <user>` | Ban (remove + block) or unban a member. Ban prompts unless `--yes`. |
-| `tg chat promote <ref> <user>` / `tg chat demote <ref> <user>` | Grant or revoke admin rights. |
+| `tg chat admin promote <ref> <user>` / `tg chat admin demote <ref> <user>` | Grant or revoke admin rights. Promote takes `--title <rank>` (custom admin title, ≤16 chars); omit `--title` to keep the current title, pass `--title ""` to clear it. |
+| `tg chat member set-perms <ref> <user>` | Set a member's permissions with `--deny`/`--allow` keywords (`send,media,stickers,bots,polls,links,invite,pin,info,topics`) and optional `--until <RFC3339\|dur>` (default permanent). |
+| `tg chat member unset-perms <ref> <user>` | Clear all permission restrictions on a member. |
+| `tg chat perms <ref>` | Set the group's default member permissions with `--deny`/`--allow` (same keywords). |
 | `tg msg list <ref>` | List message history. |
 | `tg msg send <ref> [text...]` | Send text. Repeat `--file <path>` to attach one or more files; text becomes the first media caption. Use `--name` to override upload filenames. |
 | `tg msg download <msg-ref>` | Download photo, video, document, or other message media. Defaults to the media filename; use `-o/--output` for a file path or existing directory. |

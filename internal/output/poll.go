@@ -42,8 +42,5 @@ func RenderPoll(io *ui.IOStreams, p PollInfo) error {
 		}
 		tp.AddRow(strconv.Itoa(i+1), o.Text, strconv.Itoa(o.Voters), flags)
 	}
-	if err := tp.Render(); err != nil {
-		return err
-	}
-	return nil
+	return tp.Render()
 }

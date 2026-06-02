@@ -85,8 +85,8 @@ func VotePoll(ctx context.Context, api *tg.Client, resolver *peer.Resolver, q ac
 	return pollInfoFromMedia(fresh), nil
 }
 
-func fetchPollMedia(ctx context.Context, api *tg.Client, peer tg.InputPeerClass, msgID int) (*tg.MessageMediaPoll, error) {
-	elem, err := getMessageByID(ctx, api, peer, msgID)
+func fetchPollMedia(ctx context.Context, api *tg.Client, inputPeer tg.InputPeerClass, msgID int) (*tg.MessageMediaPoll, error) {
+	elem, err := getMessageByID(ctx, api, inputPeer, msgID)
 	if err != nil {
 		return nil, err
 	}

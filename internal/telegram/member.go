@@ -156,7 +156,7 @@ func SetMemberAdmin(ctx context.Context, api *tg.Client, resolver *peer.Resolver
 		Channel:     inCh,
 		UserID:      inUser,
 		AdminRights: rights,
-		Rank:        "",
+		Rank:        q.Title,
 	}); err != nil {
 		return output.PeerRef{}, err
 	}

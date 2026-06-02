@@ -87,6 +87,31 @@ func TestUnban_SkipsConfirmation(t *testing.T) {
 	require.True(t, called)
 }
 
+func TestPromote_TitlePassesThrough(t *testing.T) {
+	_, err := actionchat.Promote(context.Background(), actionchat.PromoteRequest{
+		RawRef:  "@grp",
+		RawUser: "@alice",
+		Title:   "客服",
+	}, func(_ context.Context, q actionchat.PromoteQuery) (output.PeerRef, error) {
+		require.Equal(t, "客服", q.Title)
+		require.False(t, q.Demote)
+		return output.PeerRef{}, nil
+	})
+	require.NoError(t, err)
+}
+
+func TestPromote_RejectsLongTitle(t *testing.T) {
+	_, err := actionchat.Promote(context.Background(), actionchat.PromoteRequest{
+		RawRef:  "@grp",
+		RawUser: "@alice",
+		Title:   "this-title-is-way-too-long-for-telegram",
+	}, func(context.Context, actionchat.PromoteQuery) (output.PeerRef, error) {
+		t.Fatal("must not dispatch with an over-long title")
+		return output.PeerRef{}, nil
+	})
+	require.ErrorIs(t, err, command.ErrUsage)
+}
+
 func TestPromote_DemoteFlagPassesThrough(t *testing.T) {
 	_, err := actionchat.Promote(context.Background(), actionchat.PromoteRequest{
 		RawRef:  "@grp",

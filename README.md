@@ -124,7 +124,10 @@ client commands route through when present).
 | `tg chat invite list <ref>` | List invite links. `--revoked`, `--admin <user>`, `--limit`. |
 | `tg chat invite revoke <ref> <link>` / `delete <ref> <link>` | Revoke a link, or delete a revoked one. |
 | `tg chat ban <ref> <user>` / `tg chat unban <ref> <user>` | Ban (remove + block) or unban a member. Ban prompts unless `--yes`. |
-| `tg chat promote <ref> <user>` / `tg chat demote <ref> <user>` | Grant or revoke admin rights. |
+| `tg chat promote <ref> <user>` / `tg chat demote <ref> <user>` | Grant or revoke admin rights. Promote takes `--title <rank>` (custom admin title, ≤16 chars). |
+| `tg chat restrict <ref> <user>` | Restrict a member with `--deny`/`--allow` keywords (`send,media,stickers,bots,polls,links,invite,pin,info,topics`) and optional `--until <RFC3339\|dur>` (default permanent). |
+| `tg chat unrestrict <ref> <user>` | Lift all restrictions on a member. |
+| `tg chat perms <ref>` | Set the group's default member permissions with `--deny`/`--allow` (same keywords). |
 | `tg msg list <ref>` | List message history. |
 | `tg msg send <ref> [text...]` | Send text. Repeat `--file <path>` to attach one or more files; text becomes the first media caption. Use `--name` to override upload filenames. |
 | `tg msg download <msg-ref>` | Download photo, video, document, or other message media. Defaults to the media filename; use `-o/--output` for a file path or existing directory. |

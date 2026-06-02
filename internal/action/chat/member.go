@@ -3,6 +3,7 @@ package chat
 import (
 	"context"
 	"fmt"
+	"unicode/utf8"
 
 	"github.com/vika2603/telegram-cli/internal/command"
 	"github.com/vika2603/telegram-cli/internal/output"
@@ -106,6 +107,7 @@ type PromoteRequest struct {
 	RawRef  string
 	RawUser string
 	Demote  bool
+	Title   string // custom admin rank/title (promote only, <=16 chars)
 }
 
 // PromoteQuery is the normalized payload passed to the Telegram layer.
@@ -113,6 +115,7 @@ type PromoteQuery struct {
 	Ref    ref.Ref
 	User   ref.Ref
 	Demote bool
+	Title  string
 }
 
 // PromoteFunc promotes or demotes a user and returns the affected peer.
@@ -128,8 +131,11 @@ func Promote(ctx context.Context, req PromoteRequest, do PromoteFunc) (output.Pe
 	if err != nil {
 		return output.PeerRef{}, fmt.Errorf("%w: invalid user ref %q: %s", command.ErrUsage, req.RawUser, err.Error())
 	}
+	if utf8.RuneCountInString(req.Title) > 16 {
+		return output.PeerRef{}, fmt.Errorf("%w: --title must be at most 16 characters", command.ErrUsage)
+	}
 	if do == nil {
 		return output.PeerRef{}, fmt.Errorf("%w: chat promote called without promote function", command.ErrPrecondition)
 	}
-	return do(ctx, PromoteQuery{Ref: parsed, User: userRef, Demote: req.Demote})
+	return do(ctx, PromoteQuery{Ref: parsed, User: userRef, Demote: req.Demote, Title: req.Title})
 }

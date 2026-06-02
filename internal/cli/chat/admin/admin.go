@@ -24,6 +24,7 @@ type Options struct {
 	RawRef    string
 	RawUser   string
 	Demote    bool
+	Title     string
 	Exporter  output.Exporter
 	IOStreams *ui.IOStreams
 	Promote   actionchat.PromoteFunc
@@ -63,6 +64,9 @@ func adminCmd(f *runtime.Invocation, runF func(*Options) error, demote bool) *co
 			return Run(cmd.Context(), opts)
 		},
 	}
+	if !demote {
+		cmd.Flags().StringVar(&opts.Title, "title", "", "Custom admin title/rank (<=16 chars)")
+	}
 	command.SetMeta(cmd, command.Meta{NeedsAccount: true, NeedsClient: true})
 	output.AddJSONFlags(cmd, &opts.Exporter, []string{"ref", "id", "kind", "title", "username"})
 	return cmd
@@ -74,6 +78,7 @@ func Run(ctx context.Context, opts *Options) error {
 		RawRef:  opts.RawRef,
 		RawUser: opts.RawUser,
 		Demote:  opts.Demote,
+		Title:   opts.Title,
 	}, opts.Promote)
 	if err != nil {
 		return err

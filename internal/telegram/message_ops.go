@@ -105,6 +105,8 @@ func SendMessage(ctx context.Context, api *tg.Client, resolver *peer.Resolver, q
 
 	var upd tg.UpdatesClass
 	switch {
+	case q.Sticker != nil:
+		upd, err = sendSticker(ctx, api, resolver, b, q.Sticker)
 	case len(q.Attachments) > 0:
 		upd, err = sendAttachments(ctx, b, q)
 	case q.Parse == "html":
@@ -117,6 +119,59 @@ func SendMessage(ctx context.Context, api *tg.Client, resolver *peer.Resolver, q
 	}
 
 	return sentMessageRows("send", upd), nil
+}
+
+// sendSticker resends an existing sticker: it fetches the source message,
+// extracts its sticker document, and re-sends it to the target via its input
+// document reference.
+func sendSticker(
+	ctx context.Context,
+	api *tg.Client,
+	resolver *peer.Resolver,
+	b *gotdmessage.RequestBuilder,
+	src *actionmessage.StickerSource,
+) (tg.UpdatesClass, error) {
+	srcResolved, err := resolver.Resolve(ctx, src.Peer)
+	if err != nil {
+		return nil, err
+	}
+	elem, err := getMessageByID(ctx, api, srcResolved.InputPeer, src.MessageID)
+	if err != nil {
+		return nil, err
+	}
+	doc, ok := stickerInputDocument(elem)
+	if !ok {
+		return nil, fmt.Errorf("%w: %s is not a sticker", command.ErrUsage, src.Peer.String())
+	}
+	return b.Media(ctx, gotdmessage.Media(&tg.InputMediaDocument{ID: doc}))
+}
+
+// stickerInputDocument extracts a resendable input document from a message,
+// but only when the document is a sticker.
+func stickerInputDocument(elem msgquery.Elem) (*tg.InputDocument, bool) {
+	msg, ok := elem.Msg.(*tg.Message)
+	if !ok {
+		return nil, false
+	}
+	media, ok := msg.Media.(*tg.MessageMediaDocument)
+	if !ok {
+		return nil, false
+	}
+	doc, ok := media.Document.AsNotEmpty()
+	if !ok {
+		return nil, false
+	}
+	isSticker := false
+	for _, attr := range doc.Attributes {
+		if _, ok := attr.(*tg.DocumentAttributeSticker); ok {
+			isSticker = true
+			break
+		}
+	}
+	if !isSticker {
+		return nil, false
+	}
+	return doc.AsInput(), true
 }
 
 func sendAttachments(

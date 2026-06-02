@@ -46,6 +46,46 @@ func TestSend_RejectsMarkdownParse(t *testing.T) {
 	require.Contains(t, err.Error(), "markdown")
 }
 
+func TestSend_StickerParsesSourceRef(t *testing.T) {
+	rows, err := actionmessage.Send(context.Background(), actionmessage.SendRequest{
+		RawRef:  "@bob",
+		Sticker: "@alice:42",
+	}, func(_ context.Context, q actionmessage.SendQuery) ([]output.SendResultRow, error) {
+		require.Equal(t, "bob", q.Ref.Value)
+		require.NotNil(t, q.Sticker)
+		require.Equal(t, "alice", q.Sticker.Peer.Value)
+		require.Equal(t, 42, q.Sticker.MessageID)
+		require.Empty(t, q.Text)
+		return []output.SendResultRow{{Action: "send", MessageID: 7}}, nil
+	})
+	require.NoError(t, err)
+	require.Equal(t, "send", rows[0].Action)
+}
+
+func TestSend_StickerRejectsText(t *testing.T) {
+	_, err := actionmessage.Send(context.Background(), actionmessage.SendRequest{
+		RawRef:  "@bob",
+		Text:    "hi",
+		Sticker: "@alice:42",
+	}, func(context.Context, actionmessage.SendQuery) ([]output.SendResultRow, error) {
+		t.Fatal("send must not run when --sticker is combined with text")
+		return nil, nil
+	})
+	require.ErrorIs(t, err, command.ErrUsage)
+}
+
+func TestSend_StickerRejectsFile(t *testing.T) {
+	_, err := actionmessage.Send(context.Background(), actionmessage.SendRequest{
+		RawRef:  "@bob",
+		Files:   []string{"/tmp/x.webp"},
+		Sticker: "@alice:42",
+	}, func(context.Context, actionmessage.SendQuery) ([]output.SendResultRow, error) {
+		t.Fatal("send must not run when --sticker is combined with --file")
+		return nil, nil
+	})
+	require.ErrorIs(t, err, command.ErrUsage)
+}
+
 func TestEdit_RejectsMarkdownParse(t *testing.T) {
 	_, err := actionmessage.Edit(context.Background(), actionmessage.EditRequest{
 		RawMessageRef: "@alice:1",

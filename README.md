@@ -129,7 +129,7 @@ client commands route through when present).
 | `tg chat member unset-perms <ref> <user>` | Clear all permission restrictions on a member. |
 | `tg chat perms <ref>` | Set the group's default member permissions with `--deny`/`--allow` (same keywords). |
 | `tg msg list <ref>` | List message history. |
-| `tg msg send <ref> [text...]` | Send text. Repeat `--file <path>` to attach one or more files; text becomes the first media caption. Use `--name` to override upload filenames. |
+| `tg msg send <ref> [text...]` | Send text. Repeat `--file <path>` to attach one or more files; text becomes the first media caption. Use `--name` to override upload filenames. `--sticker <msg-ref>` resends an existing sticker (no text/`--file`). |
 | `tg msg download <msg-ref>` | Download photo, video, document, or other message media. Defaults to the media filename; use `-o/--output` for a file path or existing directory. |
 | `tg msg edit <msg-ref>` | Edit a message. |
 | `tg msg delete <msg-ref>...` | Delete messages. Add `--revoke` when deleting for everyone is required. |

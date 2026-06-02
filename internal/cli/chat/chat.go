@@ -21,7 +21,6 @@ import (
 	"github.com/vika2603/telegram-cli/internal/cli/chat/photo"
 	"github.com/vika2603/telegram-cli/internal/cli/chat/pin"
 	"github.com/vika2603/telegram-cli/internal/cli/chat/read"
-	"github.com/vika2603/telegram-cli/internal/cli/chat/restrict"
 	"github.com/vika2603/telegram-cli/internal/cli/chat/topic"
 	"github.com/vika2603/telegram-cli/internal/cli/chat/unarchive"
 	"github.com/vika2603/telegram-cli/internal/cli/chat/unmute"
@@ -56,8 +55,6 @@ func New(f *runtime.Invocation) *cobra.Command {
 	cmd.AddCommand(ban.NewUnban(f, nil))
 	cmd.AddCommand(admin.NewPromote(f, nil))
 	cmd.AddCommand(admin.NewDemote(f, nil))
-	cmd.AddCommand(restrict.NewRestrict(f, nil))
-	cmd.AddCommand(restrict.NewUnrestrict(f, nil))
 	cmd.AddCommand(perms.New(f, nil))
 	return cmd
 }

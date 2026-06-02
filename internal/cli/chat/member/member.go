@@ -3,6 +3,7 @@ package member
 import (
 	"github.com/spf13/cobra"
 
+	"github.com/vika2603/telegram-cli/internal/cli/chat/restrict"
 	"github.com/vika2603/telegram-cli/internal/runtime"
 )
 
@@ -13,5 +14,7 @@ func New(f *runtime.Invocation) *cobra.Command {
 		Short: "Members of a group or channel",
 	}
 	cmd.AddCommand(NewList(f, nil))
+	cmd.AddCommand(restrict.NewRestrict(f, nil))
+	cmd.AddCommand(restrict.NewUnrestrict(f, nil))
 	return cmd
 }

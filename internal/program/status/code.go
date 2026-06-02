@@ -21,15 +21,16 @@ type RemoteCoded interface {
 	RemoteCode() string
 }
 
-// Code returns the stable string code used in JSON error output.
-func Code(err error) string {
+// Code returns the stable code used in JSON error output. See the ErrorCode
+// type for the full enum.
+func Code(err error) ErrorCode {
 	// Errors arriving via the daemon IPC are already classified by
 	// the daemon side; respect the wire code so the daemon and local
 	// paths produce identical envelopes.
 	var rc RemoteCoded
 	if errors.As(err, &rc) {
 		if code := rc.RemoteCode(); code != "" {
-			return code
+			return ErrorCode(code)
 		}
 	}
 	// gotd surfaces FLOOD_WAIT as a raw *tgerr.Error in most call
@@ -38,55 +39,55 @@ func Code(err error) string {
 	// form as flood_wait — otherwise the raw form falls all the way
 	// to "unknown" and agents lose the most retry-critical signal.
 	if _, ok := telegramsession.AsFloodWait(err); ok {
-		return "flood_wait"
+		return CodeFloodWait
 	}
 	switch {
 	case errors.Is(err, command.ErrUsage), errors.Is(err, config.ErrInvalid):
-		return "usage"
+		return CodeUsage
 	case errors.Is(err, telegramsession.ErrAuth):
-		return "auth_required"
+		return CodeAuthRequired
 	case errors.Is(err, telegrampeer.ErrNotFound):
-		return "peer_not_found"
+		return CodePeerNotFound
 	case errors.Is(err, telegrampeer.ErrForbidden):
-		return "peer_forbidden"
+		return CodePeerForbidden
 	case errors.Is(err, telegramsession.ErrFloodWait):
-		return "flood_wait"
+		return CodeFloodWait
 	case errors.Is(err, telegramsession.ErrNetwork):
-		return "network"
+		return CodeNetwork
 	case errors.Is(err, telegramsession.ErrRateExhausted):
-		return "rate_exhausted"
+		return CodeRateExhausted
 	case errors.Is(err, command.ErrPrecondition):
-		return "precondition"
+		return CodePrecondition
 	case errors.Is(err, command.ErrUnsupported):
-		return "unsupported"
+		return CodeUnsupported
 	case errors.Is(err, account.ErrBusy):
-		return "busy"
+		return CodeBusy
 	case errors.Is(err, telegrampeer.ErrAmbiguous):
-		return "peer_ambiguous"
+		return CodePeerAmbiguous
 	case errors.Is(err, telegrammessage.ErrNotFound):
-		return "message_not_found"
+		return CodeMessageNotFnd
 	case errors.Is(err, telegrampeer.ErrCacheMiss):
-		return "cache_miss"
+		return CodeCacheMiss
 	case errors.Is(err, telegrammessage.ErrNoMedia):
-		return "no_media"
+		return CodeNoMedia
 	case errors.Is(err, telegrammessage.ErrNoLink):
-		return "no_link"
+		return CodeNoLink
 	case errors.Is(err, command.ErrNotConfirmed):
-		return "not_confirmed"
+		return CodeNotConfirmed
 	case errors.Is(err, telegrammessage.ErrRevokeRequired):
-		return "revoke_required"
+		return CodeRevokeReq
 	case errors.Is(err, telegramsession.ErrCurrent):
-		return "current_session"
+		return CodeCurrentSess
 	case errors.Is(err, telegramchat.ErrInvalidInvite):
-		return "invalid_invite"
+		return CodeInvalidInvite
 	case errors.Is(err, telegramsession.ErrBadPassword):
-		return "bad_password"
+		return CodeBadPassword
 	default:
 		// Classify known raw Telegram RPC errors that the telegram layer
 		// returned unwrapped, instead of letting them fall to "unknown".
 		if cls, ok := matchRPC(err); ok {
 			return cls.code
 		}
-		return "unknown"
+		return CodeUnknown
 	}
 }

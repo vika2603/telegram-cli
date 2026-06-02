@@ -43,6 +43,8 @@ var rpcErrors = map[string]rpcClass{
 	// "Bad request argument" family -> usage / exit 2.
 	tg.ErrHideRequesterMissing: {CodeUsage, 2, "no pending join request from this user"},
 	tg.ErrParticipantIDInvalid: {CodeUsage, 2, "that user can't be the target of this action (e.g. the group creator)"},
+	tg.ErrFileReferenceExpired: {CodeUsage, 2, "sticker reference expired; run `tg msg sticker list` again for a fresh ref"},
+	tg.ErrFileReferenceInvalid: {CodeUsage, 2, "sticker reference is no longer valid; run `tg msg sticker list` again for a fresh ref"},
 }
 
 // matchRPC returns the classification for a known raw Telegram RPC error

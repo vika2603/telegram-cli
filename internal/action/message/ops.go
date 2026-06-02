@@ -21,6 +21,7 @@ type SendRequest struct {
 	Text     string
 	Files    []string
 	Names    []string
+	Sticker  string // message ref of an existing sticker to resend
 	ReplyTo  int
 	Silent   bool
 	Schedule time.Time
@@ -34,16 +35,42 @@ type SendQuery struct {
 	Ref         ref.Ref
 	Text        string
 	Attachments []Attachment
-	ReplyTo     int
-	Silent      bool
-	Schedule    time.Time
-	Parse       string
+	// Sticker, when set, resends an existing sticker (referenced by message)
+	// instead of sending text/attachments. Mutually exclusive with both.
+	Sticker  *StickerSource
+	ReplyTo  int
+	Silent   bool
+	Schedule time.Time
+	Parse    string
 	// RandomID, when non-zero, is the message dedup key Telegram uses to
 	// drop duplicate sends. Reusing the same value across retries makes a
 	// resend idempotent. Zero means "let the client pick a fresh random
 	// id" (the default, non-idempotent behavior).
 	RandomID int64
 	Stdin    io.Reader
+}
+
+// StickerSource locates the sticker to send. Exactly one variant is set:
+// either a message reference (resend the sticker from a message) or a
+// self-contained Doc handle decoded from a `msg sticker list` ref token.
+type StickerSource struct {
+	// by message reference
+	Peer      ref.Ref
+	MessageID int
+	// by ref token (from `msg sticker list`)
+	Doc *StickerDoc
+}
+
+// StickerDoc is the input document needed to send a sticker directly: id +
+// access hash + the (short-lived) file reference. SetID/SetAccessHash identify
+// the owning sticker set (0 if none) so an expired file reference can be
+// refreshed by re-fetching just that set.
+type StickerDoc struct {
+	ID            int64
+	AccessHash    int64
+	FileReference []byte
+	SetID         int64
+	SetAccessHash int64
 }
 
 // Attachment is one file sent by `tg msg send --file`.
@@ -85,6 +112,9 @@ func Send(ctx context.Context, req SendRequest, do SendFunc) ([]output.SendResul
 
 // NormalizeSend resolves stdin-backed text and parses the peer ref.
 func NormalizeSend(req SendRequest) (SendQuery, error) {
+	if req.Sticker != "" {
+		return normalizeStickerSend(req)
+	}
 	switch req.Parse {
 	case "", "html":
 	case "markdown":
@@ -131,6 +161,34 @@ func NormalizeSend(req SendRequest) (SendQuery, error) {
 		Parse:       req.Parse,
 		RandomID:    req.RandomID,
 		Stdin:       req.Stdin,
+	}, nil
+}
+
+// normalizeStickerSend handles `tg msg send <ref> --sticker <msg-ref>`. A
+// sticker carries no caption and is sent on its own, so text and --file are
+// rejected.
+func normalizeStickerSend(req SendRequest) (SendQuery, error) {
+	if req.Text != "" {
+		return SendQuery{}, fmt.Errorf("%w: --sticker cannot be combined with message text", command.ErrUsage)
+	}
+	if len(compactStrings(req.Files)) > 0 {
+		return SendQuery{}, fmt.Errorf("%w: --sticker cannot be combined with --file", command.ErrUsage)
+	}
+	target, err := ref.ParseRef(req.RawRef)
+	if err != nil {
+		return SendQuery{}, fmt.Errorf("%w: %s", command.ErrUsage, err.Error())
+	}
+	source, err := parseStickerSource(req.Sticker)
+	if err != nil {
+		return SendQuery{}, err
+	}
+	return SendQuery{
+		Ref:      target,
+		Sticker:  source,
+		ReplyTo:  req.ReplyTo,
+		Silent:   req.Silent,
+		Schedule: req.Schedule,
+		RandomID: req.RandomID,
 	}, nil
 }
 

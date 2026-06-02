@@ -83,6 +83,57 @@ func VotePoll(ctx context.Context, api *tg.Client, resolver *peer.Resolver, q ac
 	return output.VoteResult{Action: action, MessageID: q.MessageID}, nil
 }
 
+// MessageDetail reads a single message by ref and returns its full row,
+// expanding poll content (question/options/tallies) when it is a poll.
+func MessageDetail(ctx context.Context, api *tg.Client, resolver *peer.Resolver, q actionmessage.InfoQuery) (output.MessageRow, error) {
+	resolved, err := resolver.Resolve(ctx, q.Ref)
+	if err != nil {
+		return output.MessageRow{}, err
+	}
+	elem, err := getMessageByID(ctx, api, resolved.InputPeer, q.MessageID)
+	if err != nil {
+		return output.MessageRow{}, err
+	}
+	m, ok := elem.Msg.(*tg.Message)
+	if !ok {
+		return output.MessageRow{}, telegrammessage.ErrNotFound
+	}
+	row := messageToRow(m, elem.Entities, output.PreferredRefFromResolved(resolved))
+	if mp, ok := m.Media.(*tg.MessageMediaPoll); ok {
+		pi := pollInfoFromMedia(mp)
+		row.Poll = &pi
+	}
+	return row, nil
+}
+
+func pollInfoFromMedia(m *tg.MessageMediaPoll) output.PollInfo {
+	info := output.PollInfo{
+		Question:   m.Poll.Question.Text,
+		Multiple:   m.Poll.MultipleChoice,
+		Quiz:       m.Poll.Quiz,
+		Public:     m.Poll.PublicVoters,
+		Closed:     m.Poll.Closed,
+		MinResults: m.Results.Min,
+	}
+	if tv, ok := m.Results.GetTotalVoters(); ok {
+		info.TotalVoters = tv
+	}
+	tally := make(map[string]tg.PollAnswerVoters, len(m.Results.Results))
+	for _, r := range m.Results.Results {
+		tally[string(r.Option)] = r
+	}
+	for _, a := range m.Poll.Answers {
+		opt := output.PollOption{Text: a.Text.Text}
+		if r, ok := tally[string(a.Option)]; ok {
+			opt.Voters = r.Voters
+			opt.Chosen = r.Chosen
+			opt.Correct = r.Correct
+		}
+		info.Options = append(info.Options, opt)
+	}
+	return info
+}
+
 func fetchPollMedia(ctx context.Context, api *tg.Client, inputPeer tg.InputPeerClass, msgID int) (*tg.MessageMediaPoll, error) {
 	elem, err := getMessageByID(ctx, api, inputPeer, msgID)
 	if err != nil {

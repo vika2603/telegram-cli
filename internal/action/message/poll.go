@@ -38,6 +38,32 @@ type PollQuery struct {
 // PollFunc sends a poll.
 type PollFunc func(context.Context, PollQuery) ([]output.SendResultRow, error)
 
+// InfoRequest is the raw request for `tg msg info`.
+type InfoRequest struct {
+	RawMessageRef string
+}
+
+// InfoQuery is the normalized payload passed to Telegram.
+type InfoQuery struct {
+	Ref       ref.Ref
+	MessageID int
+}
+
+// InfoFunc reads a single message's details.
+type InfoFunc func(context.Context, InfoQuery) (output.MessageRow, error)
+
+// MessageInfo validates and dispatches `tg msg info`.
+func MessageInfo(ctx context.Context, req InfoRequest, do InfoFunc) (output.MessageRow, error) {
+	mref, err := parseMessageRef(req.RawMessageRef)
+	if err != nil {
+		return output.MessageRow{}, err
+	}
+	if do == nil {
+		return output.MessageRow{}, fmt.Errorf("%w: msg info called without info function", command.ErrPrecondition)
+	}
+	return do(ctx, InfoQuery{Ref: mref.Peer, MessageID: mref.MessageID})
+}
+
 // VoteRequest is the raw request for `tg msg vote`.
 type VoteRequest struct {
 	RawMessageRef string

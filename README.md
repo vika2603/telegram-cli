@@ -129,6 +129,7 @@ client commands route through when present).
 | `tg chat member unset-perms <ref> <user>` | Clear all permission restrictions on a member. |
 | `tg chat perms <ref>` | Set the group's default member permissions with `--deny`/`--allow` (same keywords). |
 | `tg msg list <ref>` | List message history. |
+| `tg msg info <msg-ref>` | Show one message's details; for polls, expands the question, numbered options, and tallies. |
 | `tg msg send <ref> [text...]` | Send text. Repeat `--file <path>` to attach one or more files; text becomes the first media caption. Use `--name` to override upload filenames. `--sticker <ref>` sends a sticker — either a `msg sticker list` ref or a `<msg-ref>` of an existing sticker (no text/`--file`). |
 | `tg msg sticker list` | List your stickers to get a sendable `ref`. `--recent` (default), `--faved`, `--installed` (sets), `--all` (recent+faved+all sets expanded; slow). |
 | `tg msg sticker fave <ref>` / `tg msg sticker unfave <ref>` | Add or remove a sticker from favorites (`<ref>` is a list ref or `<msg-ref>`). |

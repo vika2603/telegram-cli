@@ -30,7 +30,8 @@ type MessageSummary struct {
 
 // MediaObject is the nested JSON shape for message media metadata.
 type MediaObject struct {
-	Type string `json:"type"`
+	Type string    `json:"type"`
+	Poll *PollInfo `json:"poll,omitempty"`
 }
 
 func peerObject(ref string, id int64, kind, title, username string) PeerObject {

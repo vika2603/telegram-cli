@@ -31,6 +31,7 @@ type MessageRow struct {
 	Reactions    []ReactionCount `json:"reactions,omitempty"`
 	HasMedia     bool            `json:"has_media,omitempty"`
 	MediaKind    string          `json:"media_kind,omitempty"` // "photo" | "video" | "document" | "voice" | "audio" | "sticker" | "poll" | "web_page" | "other"
+	Poll         *PollInfo       `json:"-"`                    // populated by `msg info` for poll messages
 	Views        int             `json:"views,omitempty"`
 	IsPinned     bool            `json:"is_pinned,omitempty"`
 }
@@ -121,7 +122,7 @@ func (r MessageRow) MarshalJSON() ([]byte, error) {
 	}
 	var media *MediaObject
 	if r.MediaKind != "" {
-		media = &MediaObject{Type: r.MediaKind}
+		media = &MediaObject{Type: r.MediaKind, Poll: r.Poll}
 	}
 	return json.Marshal(messageRowJSON{
 		Ref:       r.Ref,

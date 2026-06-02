@@ -11,6 +11,7 @@ import (
 	"github.com/vika2603/telegram-cli/internal/cli/msg/link"
 	"github.com/vika2603/telegram-cli/internal/cli/msg/list"
 	"github.com/vika2603/telegram-cli/internal/cli/msg/pin"
+	"github.com/vika2603/telegram-cli/internal/cli/msg/poll"
 	"github.com/vika2603/telegram-cli/internal/cli/msg/react"
 	"github.com/vika2603/telegram-cli/internal/cli/msg/schedulecancel"
 	"github.com/vika2603/telegram-cli/internal/cli/msg/schedulelist"
@@ -32,6 +33,7 @@ func New(f *runtime.Invocation) *cobra.Command {
 	cmd.AddCommand(download.New(f, nil))
 	cmd.AddCommand(send.New(f, nil))
 	cmd.AddCommand(sticker.New(f))
+	cmd.AddCommand(poll.New(f, nil))
 	cmd.AddCommand(edit.New(f, nil))
 	cmd.AddCommand(del.New(f, nil))
 	cmd.AddCommand(forward.New(f, nil))

@@ -79,10 +79,10 @@ func deniedRightKeys(b tg.ChatBannedRights) []string {
 	return out
 }
 
-// RestrictMember applies per-user restrictions via channels.editBanned. It
+// SetMemberPerms applies per-user permissions via channels.editBanned. It
 // starts from the user's current banned rights so --allow/--deny are
-// incremental; Unrestrict clears all restrictions.
-func RestrictMember(ctx context.Context, api *tg.Client, resolver *peer.Resolver, q actionchat.RestrictQuery) (output.RightsRow, error) {
+// incremental; Unset clears all restrictions.
+func SetMemberPerms(ctx context.Context, api *tg.Client, resolver *peer.Resolver, q actionchat.SetPermsQuery) (output.RightsRow, error) {
 	groupResolved, err := resolver.Resolve(ctx, q.Ref)
 	if err != nil {
 		return output.RightsRow{}, err
@@ -97,7 +97,7 @@ func RestrictMember(ctx context.Context, api *tg.Client, resolver *peer.Resolver
 	}
 	pr := output.PeerRefFromResolved(userResolved)
 
-	if q.Unrestrict {
+	if q.Unset {
 		if _, err := api.ChannelsEditBanned(ctx, &tg.ChannelsEditBannedRequest{
 			Channel:      inCh,
 			Participant:  userResolved.InputPeer,

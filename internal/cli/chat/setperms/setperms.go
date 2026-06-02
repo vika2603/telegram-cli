@@ -1,5 +1,5 @@
-// Package restrict implements "tg chat restrict" and "tg chat unrestrict".
-package restrict
+// Package setperms implements "tg chat member set-perms" and "unset-perms".
+package setperms
 
 import (
 	"context"
@@ -18,31 +18,31 @@ import (
 	"github.com/vika2603/telegram-cli/internal/ui"
 )
 
-// Options holds flags/deps for restrict / unrestrict.
+// Options holds flags/deps for set-perms / unset-perms.
 type Options struct {
-	RawRef     string
-	RawUser    string
-	Allow      []string
-	Deny       []string
-	Until      string
-	Unrestrict bool
-	Exporter   output.Exporter
-	IOStreams  *ui.IOStreams
-	Do         actionchat.RestrictFunc
+	RawRef    string
+	RawUser   string
+	Allow     []string
+	Deny      []string
+	Until     string
+	Unset     bool
+	Exporter  output.Exporter
+	IOStreams *ui.IOStreams
+	Do        actionchat.SetPermsFunc
 }
 
-// NewRestrict builds "tg chat member set-perms".
-func NewRestrict(f *runtime.Invocation, runF func(*Options) error) *cobra.Command {
-	return restrictCmd(f, runF, false, "set-perms", "Set a member's permissions with --allow/--deny (optional duration)")
+// NewSetPerms builds "tg chat member set-perms".
+func NewSetPerms(f *runtime.Invocation, runF func(*Options) error) *cobra.Command {
+	return setPermsCmd(f, runF, false, "set-perms", "Set a member's permissions with --allow/--deny (optional duration)")
 }
 
-// NewUnrestrict builds "tg chat member unset-perms".
-func NewUnrestrict(f *runtime.Invocation, runF func(*Options) error) *cobra.Command {
-	return restrictCmd(f, runF, true, "unset-perms", "Clear all permission restrictions on a member")
+// NewUnsetPerms builds "tg chat member unset-perms".
+func NewUnsetPerms(f *runtime.Invocation, runF func(*Options) error) *cobra.Command {
+	return setPermsCmd(f, runF, true, "unset-perms", "Clear all permission restrictions on a member")
 }
 
-func restrictCmd(f *runtime.Invocation, runF func(*Options) error, unrestrict bool, use, short string) *cobra.Command {
-	opts := &Options{Unrestrict: unrestrict}
+func setPermsCmd(f *runtime.Invocation, runF func(*Options) error, unset bool, use, short string) *cobra.Command {
+	opts := &Options{Unset: unset}
 	cmd := &cobra.Command{
 		Use:               use + " <ref> <user>",
 		Short:             short,
@@ -59,7 +59,7 @@ func restrictCmd(f *runtime.Invocation, runF func(*Options) error, unrestrict bo
 			return Run(cmd.Context(), opts)
 		},
 	}
-	if !unrestrict {
+	if !unset {
 		cmd.Flags().StringSliceVar(&opts.Deny, "deny", nil, "Revoke permissions: send,media,stickers,bots,polls,links,invite,pin,info,topics")
 		cmd.Flags().StringSliceVar(&opts.Allow, "allow", nil, "Grant permissions (same keywords)")
 		cmd.Flags().StringVar(&opts.Until, "until", "", "Restriction expiry: RFC3339 or duration (e.g. 1h, 7d); empty = permanent")
@@ -71,7 +71,7 @@ func restrictCmd(f *runtime.Invocation, runF func(*Options) error, unrestrict bo
 
 // Run validates and dispatches.
 func Run(ctx context.Context, opts *Options) error {
-	req := actionchat.RestrictRequest{
+	req := actionchat.SetPermsRequest{
 		RawRef:  opts.RawRef,
 		RawUser: opts.RawUser,
 		Allow:   opts.Allow,
@@ -82,10 +82,10 @@ func Run(ctx context.Context, opts *Options) error {
 		row output.RightsRow
 		err error
 	)
-	if opts.Unrestrict {
-		row, err = actionchat.Unrestrict(ctx, req, opts.Do)
+	if opts.Unset {
+		row, err = actionchat.UnsetPerms(ctx, req, opts.Do)
 	} else {
-		row, err = actionchat.Restrict(ctx, req, opts.Do)
+		row, err = actionchat.SetPerms(ctx, req, opts.Do)
 	}
 	if err != nil {
 		return err
@@ -96,8 +96,8 @@ func Run(ctx context.Context, opts *Options) error {
 	return output.RenderRights(opts.IOStreams, row)
 }
 
-func newDo(f *runtime.Invocation) actionchat.RestrictFunc {
-	return func(ctx context.Context, q actionchat.RestrictQuery) (output.RightsRow, error) {
+func newDo(f *runtime.Invocation) actionchat.SetPermsFunc {
+	return func(ctx context.Context, q actionchat.SetPermsQuery) (output.RightsRow, error) {
 		acct, err := f.Account("")
 		if err != nil {
 			return output.RightsRow{}, err
@@ -105,7 +105,7 @@ func newDo(f *runtime.Invocation) actionchat.RestrictFunc {
 		var row output.RightsRow
 		err = f.WithPeers(ctx, acct, runtime.ClientOptsFrom(f, acct),
 			func(ctx context.Context, api *tg.Client, _ *peers.Manager, res *peer.Resolver) error {
-				row, err = telegram.RestrictMember(ctx, api, res, q)
+				row, err = telegram.SetMemberPerms(ctx, api, res, q)
 				return err
 			})
 		return row, err

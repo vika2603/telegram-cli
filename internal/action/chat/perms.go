@@ -35,11 +35,12 @@ func validateRightKeys(keys []string) error {
 }
 
 // ---------------------------------------------------------------------------
-// restrict / unrestrict (per-user)
+// set-perms / unset-perms (per-user)
 // ---------------------------------------------------------------------------
 
-// RestrictRequest is the raw request for `tg chat restrict` / `unrestrict`.
-type RestrictRequest struct {
+// SetPermsRequest is the raw request for `tg chat member set-perms` /
+// `unset-perms`.
+type SetPermsRequest struct {
 	RawRef  string
 	RawUser string
 	Allow   []string
@@ -48,22 +49,22 @@ type RestrictRequest struct {
 	Now     time.Time
 }
 
-// RestrictQuery is the normalized payload passed to Telegram.
-type RestrictQuery struct {
-	Ref        ref.Ref
-	User       ref.Ref
-	Allow      []string
-	Deny       []string
-	UntilDate  int // unix seconds; 0 = permanent
-	Unrestrict bool
+// SetPermsQuery is the normalized payload passed to Telegram.
+type SetPermsQuery struct {
+	Ref       ref.Ref
+	User      ref.Ref
+	Allow     []string
+	Deny      []string
+	UntilDate int // unix seconds; 0 = permanent
+	Unset     bool
 }
 
-// RestrictFunc restricts or unrestricts a single member.
-type RestrictFunc func(context.Context, RestrictQuery) (output.RightsRow, error)
+// SetPermsFunc sets or clears a single member's permissions.
+type SetPermsFunc func(context.Context, SetPermsQuery) (output.RightsRow, error)
 
-// Restrict validates and dispatches `tg chat restrict`.
-func Restrict(ctx context.Context, req RestrictRequest, do RestrictFunc) (output.RightsRow, error) {
-	q, err := normalizeRestrict(req)
+// SetPerms validates and dispatches `tg chat member set-perms`.
+func SetPerms(ctx context.Context, req SetPermsRequest, do SetPermsFunc) (output.RightsRow, error) {
+	q, err := normalizeSetPerms(req)
 	if err != nil {
 		return output.RightsRow{}, err
 	}
@@ -76,8 +77,9 @@ func Restrict(ctx context.Context, req RestrictRequest, do RestrictFunc) (output
 	return do(ctx, q)
 }
 
-// Unrestrict validates and dispatches `tg chat unrestrict` (clears limits).
-func Unrestrict(ctx context.Context, req RestrictRequest, do RestrictFunc) (output.RightsRow, error) {
+// UnsetPerms validates and dispatches `tg chat member unset-perms` (clears
+// all limits).
+func UnsetPerms(ctx context.Context, req SetPermsRequest, do SetPermsFunc) (output.RightsRow, error) {
 	parsed, err := ref.ParseRef(req.RawRef)
 	if err != nil {
 		return output.RightsRow{}, fmt.Errorf("%w: %s", command.ErrUsage, err.Error())
@@ -89,23 +91,23 @@ func Unrestrict(ctx context.Context, req RestrictRequest, do RestrictFunc) (outp
 	if do == nil {
 		return output.RightsRow{}, fmt.Errorf("%w: chat member unset-perms called without do function", command.ErrPrecondition)
 	}
-	return do(ctx, RestrictQuery{Ref: parsed, User: user, Unrestrict: true})
+	return do(ctx, SetPermsQuery{Ref: parsed, User: user, Unset: true})
 }
 
-func normalizeRestrict(req RestrictRequest) (RestrictQuery, error) {
+func normalizeSetPerms(req SetPermsRequest) (SetPermsQuery, error) {
 	parsed, err := ref.ParseRef(req.RawRef)
 	if err != nil {
-		return RestrictQuery{}, fmt.Errorf("%w: %s", command.ErrUsage, err.Error())
+		return SetPermsQuery{}, fmt.Errorf("%w: %s", command.ErrUsage, err.Error())
 	}
 	user, err := ref.ParseRef(req.RawUser)
 	if err != nil {
-		return RestrictQuery{}, fmt.Errorf("%w: invalid user ref %q: %s", command.ErrUsage, req.RawUser, err.Error())
+		return SetPermsQuery{}, fmt.Errorf("%w: invalid user ref %q: %s", command.ErrUsage, req.RawUser, err.Error())
 	}
 	if err := validateRightKeys(req.Allow); err != nil {
-		return RestrictQuery{}, err
+		return SetPermsQuery{}, err
 	}
 	if err := validateRightKeys(req.Deny); err != nil {
-		return RestrictQuery{}, err
+		return SetPermsQuery{}, err
 	}
 	now := req.Now
 	if now.IsZero() {
@@ -113,9 +115,9 @@ func normalizeRestrict(req RestrictRequest) (RestrictQuery, error) {
 	}
 	until, err := parseExpire(req.Until, now)
 	if err != nil {
-		return RestrictQuery{}, err
+		return SetPermsQuery{}, err
 	}
-	return RestrictQuery{Ref: parsed, User: user, Allow: req.Allow, Deny: req.Deny, UntilDate: until}, nil
+	return SetPermsQuery{Ref: parsed, User: user, Allow: req.Allow, Deny: req.Deny, UntilDate: until}, nil
 }
 
 // ---------------------------------------------------------------------------

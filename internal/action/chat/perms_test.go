@@ -12,51 +12,51 @@ import (
 	"github.com/vika2603/telegram-cli/internal/output"
 )
 
-func TestRestrict_ParsesKeysAndUntil(t *testing.T) {
+func TestSetPerms_ParsesKeysAndUntil(t *testing.T) {
 	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
-	row, err := actionchat.Restrict(context.Background(), actionchat.RestrictRequest{
+	row, err := actionchat.SetPerms(context.Background(), actionchat.SetPermsRequest{
 		RawRef:  "@grp",
 		RawUser: "@alice",
 		Deny:    []string{"send", "media"},
 		Until:   "1h",
 		Now:     now,
-	}, func(_ context.Context, q actionchat.RestrictQuery) (output.RightsRow, error) {
+	}, func(_ context.Context, q actionchat.SetPermsQuery) (output.RightsRow, error) {
 		require.Equal(t, "grp", q.Ref.Value)
 		require.Equal(t, "alice", q.User.Value)
 		require.Equal(t, []string{"send", "media"}, q.Deny)
 		require.Equal(t, int(now.Add(time.Hour).Unix()), q.UntilDate)
-		require.False(t, q.Unrestrict)
+		require.False(t, q.Unset)
 		return output.RightsRow{Action: "set-perms"}, nil
 	})
 	require.NoError(t, err)
 	require.Equal(t, "set-perms", row.Action)
 }
 
-func TestRestrict_RejectsUnknownKey(t *testing.T) {
-	_, err := actionchat.Restrict(context.Background(), actionchat.RestrictRequest{
+func TestSetPerms_RejectsUnknownKey(t *testing.T) {
+	_, err := actionchat.SetPerms(context.Background(), actionchat.SetPermsRequest{
 		RawRef: "@grp", RawUser: "@alice", Deny: []string{"bogus"},
-	}, func(context.Context, actionchat.RestrictQuery) (output.RightsRow, error) {
+	}, func(context.Context, actionchat.SetPermsQuery) (output.RightsRow, error) {
 		t.Fatal("must not dispatch")
 		return output.RightsRow{}, nil
 	})
 	require.ErrorIs(t, err, command.ErrUsage)
 }
 
-func TestRestrict_RequiresAllowOrDeny(t *testing.T) {
-	_, err := actionchat.Restrict(context.Background(), actionchat.RestrictRequest{
+func TestSetPerms_RequiresAllowOrDeny(t *testing.T) {
+	_, err := actionchat.SetPerms(context.Background(), actionchat.SetPermsRequest{
 		RawRef: "@grp", RawUser: "@alice",
-	}, func(context.Context, actionchat.RestrictQuery) (output.RightsRow, error) {
+	}, func(context.Context, actionchat.SetPermsQuery) (output.RightsRow, error) {
 		t.Fatal("must not dispatch")
 		return output.RightsRow{}, nil
 	})
 	require.ErrorIs(t, err, command.ErrUsage)
 }
 
-func TestUnrestrict_SetsFlag(t *testing.T) {
-	_, err := actionchat.Unrestrict(context.Background(), actionchat.RestrictRequest{
+func TestUnsetPerms_SetsFlag(t *testing.T) {
+	_, err := actionchat.UnsetPerms(context.Background(), actionchat.SetPermsRequest{
 		RawRef: "@grp", RawUser: "@alice",
-	}, func(_ context.Context, q actionchat.RestrictQuery) (output.RightsRow, error) {
-		require.True(t, q.Unrestrict)
+	}, func(_ context.Context, q actionchat.SetPermsQuery) (output.RightsRow, error) {
+		require.True(t, q.Unset)
 		return output.RightsRow{Action: "unset-perms"}, nil
 	})
 	require.NoError(t, err)

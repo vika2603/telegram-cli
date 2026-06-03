@@ -2,6 +2,7 @@ package telegram
 
 import (
 	"context"
+	"sort"
 	"strconv"
 	"time"
 	"unicode/utf16"
@@ -30,9 +31,6 @@ func ListMessages(ctx context.Context, api *tg.Client, resolver *peer.Resolver, 
 	}
 	iter := hist.Iter()
 	for iter.Next(ctx) {
-		if len(rows) >= q.Limit {
-			break
-		}
 		el := iter.Value()
 		m, ok := el.Msg.(*tg.Message)
 		if !ok {
@@ -50,12 +48,103 @@ func ListMessages(ctx context.Context, api *tg.Client, resolver *peer.Resolver, 
 		if !q.MaxDate.IsZero() && t.After(q.MaxDate) {
 			continue
 		}
-		rows = append(rows, messageToRow(m, el.Entities, baseRef))
+		// Merge consecutive same-grouped_id messages into one album row. The
+		// album's first-encountered member anchors the row; later members fold
+		// in and don't count against the limit.
+		gid, _ := m.GetGroupedID()
+		if gid != 0 && len(rows) > 0 && rows[len(rows)-1].GroupedID == gid {
+			last := &rows[len(rows)-1]
+			last.Album = append(last.Album, albumItemFromMessage(m, baseRef))
+			if last.Text == "" {
+				last.Text = m.Message
+			}
+			continue
+		}
+		if len(rows) >= q.Limit {
+			break
+		}
+		row := messageToRow(m, el.Entities, baseRef)
+		if gid != 0 {
+			row.Album = []output.AlbumItem{albumItemFromMessage(m, baseRef)}
+			row.MediaKind, row.HasMedia = "", false
+		}
+		rows = append(rows, row)
+	}
+	for i := range rows {
+		sortAlbumItems(rows[i].Album)
 	}
 	if q.Asc {
 		reverseMessageRows(rows)
 	}
 	return rows, iter.Err()
+}
+
+// albumItemFromMessage builds a lean album member (kind-only media) for lists.
+func albumItemFromMessage(m *tg.Message, baseRef string) output.AlbumItem {
+	it := output.AlbumItem{ID: m.ID, Ref: ref.FormatMessageRef(baseRef, m.ID), Text: m.Message}
+	if media, ok := m.GetMedia(); ok && media != nil {
+		it.Media = &output.MediaObject{Type: searchMessageMediaKind(media)}
+	}
+	return it
+}
+
+func sortAlbumItems(items []output.AlbumItem) {
+	sort.Slice(items, func(i, j int) bool { return items[i].ID < items[j].ID })
+}
+
+// fetchAlbumMessages returns every message sharing groupedID near anchorID.
+// Album members are consecutive ids, so it fetches a small window around the
+// anchor and keeps the matches.
+func fetchAlbumMessages(ctx context.Context, api *tg.Client, inputPeer tg.InputPeerClass, anchorID int, groupedID int64) ([]*tg.Message, error) {
+	ids := make([]int, 0, 19)
+	for id := anchorID - 9; id <= anchorID+9; id++ {
+		if id > 0 {
+			ids = append(ids, id)
+		}
+	}
+	msgs, err := getMessagesByIDs(ctx, api, inputPeer, ids)
+	if err != nil {
+		return nil, err
+	}
+	var out []*tg.Message
+	for _, mc := range msgs {
+		m, ok := mc.(*tg.Message)
+		if !ok {
+			continue
+		}
+		if gid, ok := m.GetGroupedID(); ok && gid == groupedID {
+			out = append(out, m)
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
+	return out, nil
+}
+
+func getMessagesByIDs(ctx context.Context, api *tg.Client, inputPeer tg.InputPeerClass, ids []int) ([]tg.MessageClass, error) {
+	input := make([]tg.InputMessageClass, len(ids))
+	for i, id := range ids {
+		input[i] = &tg.InputMessageID{ID: id}
+	}
+	var res tg.MessagesMessagesClass
+	var err error
+	if inCh, ok := inputChannelFromPeer(inputPeer); ok {
+		res, err = api.ChannelsGetMessages(ctx, &tg.ChannelsGetMessagesRequest{Channel: inCh, ID: input})
+	} else {
+		res, err = api.MessagesGetMessages(ctx, input)
+	}
+	if err != nil {
+		return nil, err
+	}
+	switch v := res.(type) {
+	case *tg.MessagesMessages:
+		return v.Messages, nil
+	case *tg.MessagesMessagesSlice:
+		return v.Messages, nil
+	case *tg.MessagesChannelMessages:
+		return v.Messages, nil
+	default:
+		return nil, nil
+	}
 }
 
 func reverseMessageRows(rows []output.MessageRow) {

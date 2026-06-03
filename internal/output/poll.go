@@ -34,8 +34,8 @@ type VoteResult struct {
 	MessageID int    `json:"message_id"`
 }
 
-// RenderMessageDetail prints a single message's key fields, expanding poll
-// content (question + numbered options + tallies) when present.
+// RenderMessageDetail prints a single message's key fields, expanding media
+// detail, album members, and poll content when present.
 func RenderMessageDetail(io *ui.IOStreams, r MessageRow) error {
 	tp := NewTablePrinter(io)
 	tp.AddRow("REF", r.Ref)
@@ -46,17 +46,70 @@ func RenderMessageDetail(io *ui.IOStreams, r MessageRow) error {
 	if r.Text != "" {
 		tp.AddRow("TEXT", r.Text)
 	}
-	if r.MediaKind != "" {
-		tp.AddRow("MEDIA", r.MediaKind)
+	if len(r.Album) > 0 {
+		tp.AddRow("ALBUM", strconv.Itoa(len(r.Album))+" items")
+	} else if r.MediaDetail != nil {
+		for _, kv := range mediaDetailRows(r.MediaDetail) {
+			tp.AddRow(kv[0], kv[1])
+		}
 	}
 	if err := tp.Render(); err != nil {
 		return err
 	}
-	if r.Poll != nil {
+	for i, it := range r.Album {
 		_, _ = io.Out.Write([]byte("\n"))
-		return renderPollBody(io, *r.Poll)
+		at := NewTablePrinter(io)
+		at.AddRow("#", strconv.Itoa(i+1))
+		at.AddRow("REF", it.Ref)
+		if it.Media != nil {
+			for _, kv := range mediaDetailRows(it.Media) {
+				at.AddRow(kv[0], kv[1])
+			}
+		}
+		if err := at.Render(); err != nil {
+			return err
+		}
+	}
+	poll := pollOf(r)
+	if poll != nil {
+		_, _ = io.Out.Write([]byte("\n"))
+		return renderPollBody(io, *poll)
 	}
 	return nil
+}
+
+func pollOf(r MessageRow) *PollInfo {
+	if r.MediaDetail != nil {
+		return r.MediaDetail.Poll
+	}
+	return nil
+}
+
+// mediaDetailRows flattens a MediaObject into key/value rows for human output.
+func mediaDetailRows(m *MediaObject) [][2]string {
+	rows := [][2]string{{"MEDIA", m.Type}}
+	add := func(k, v string) {
+		if v != "" {
+			rows = append(rows, [2]string{k, v})
+		}
+	}
+	add("FILE_NAME", m.FileName)
+	if m.Size > 0 {
+		add("SIZE", strconv.FormatInt(m.Size, 10))
+	}
+	add("MIME", m.MIME)
+	if m.Width > 0 || m.Height > 0 {
+		add("DIMENSIONS", strconv.Itoa(m.Width)+"x"+strconv.Itoa(m.Height))
+	}
+	if m.Duration > 0 {
+		add("DURATION", strconv.Itoa(m.Duration)+"s")
+	}
+	add("EMOJI", m.Emoji)
+	add("STICKER_TYPE", m.StickerType)
+	add("TITLE", m.Title)
+	add("URL", m.URL)
+	add("SITE", m.SiteName)
+	return rows
 }
 
 func messageSenderName(r MessageRow) string {

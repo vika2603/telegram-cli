@@ -31,9 +31,18 @@ type MessageRow struct {
 	Reactions    []ReactionCount `json:"reactions,omitempty"`
 	HasMedia     bool            `json:"has_media,omitempty"`
 	MediaKind    string          `json:"media_kind,omitempty"` // "photo" | "video" | "document" | "voice" | "audio" | "sticker" | "poll" | "web_page" | "other"
-	Poll         *PollInfo       `json:"-"`                    // populated by `msg info` for poll messages
+	MediaDetail  *MediaObject    `json:"-"`                    // full media detail (set by `msg info`); list uses MediaKind only
+	Album        []AlbumItem     `json:"-"`                    // set when this row is a merged album (msg list/info)
 	Views        int             `json:"views,omitempty"`
 	IsPinned     bool            `json:"is_pinned,omitempty"`
+}
+
+// AlbumItem is one member of a merged album row.
+type AlbumItem struct {
+	ID    int          `json:"id"`
+	Ref   string       `json:"ref,omitempty"`
+	Text  string       `json:"text,omitempty"`
+	Media *MediaObject `json:"media,omitempty"`
 }
 
 // ReactionCount is one entry in a message's reactions list. Kind
@@ -111,6 +120,7 @@ func (r MessageRow) MarshalJSON() ([]byte, error) {
 		Forward   *ForwardInfo    `json:"forward,omitempty"`
 		Reactions []ReactionCount `json:"reactions,omitempty"`
 		Media     *MediaObject    `json:"media,omitempty"`
+		Album     []AlbumItem     `json:"album,omitempty"`
 		ReplyTo   *ReplyInfo      `json:"reply_to,omitempty"`
 		Views     int             `json:"views,omitempty"`
 		IsPinned  bool            `json:"is_pinned,omitempty"`
@@ -120,9 +130,14 @@ func (r MessageRow) MarshalJSON() ([]byte, error) {
 		p := peerObject(r.FromRef, r.FromID, r.FromKind, r.FromTitle, r.FromUsername)
 		from = &p
 	}
+	// An album row carries its members instead of a single media object.
 	var media *MediaObject
-	if r.MediaKind != "" {
-		media = &MediaObject{Type: r.MediaKind, Poll: r.Poll}
+	if len(r.Album) == 0 {
+		if r.MediaDetail != nil {
+			media = r.MediaDetail
+		} else if r.MediaKind != "" {
+			media = &MediaObject{Type: r.MediaKind}
+		}
 	}
 	return json.Marshal(messageRowJSON{
 		Ref:       r.Ref,
@@ -137,6 +152,7 @@ func (r MessageRow) MarshalJSON() ([]byte, error) {
 		Forward:   r.Forward,
 		Reactions: r.Reactions,
 		Media:     media,
+		Album:     r.Album,
 		ReplyTo:   r.ReplyTo,
 		Views:     r.Views,
 		IsPinned:  r.IsPinned,

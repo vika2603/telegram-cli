@@ -63,7 +63,7 @@ func New(f *runtime.Invocation, runF func(*Options) error) *cobra.Command {
 		[]string{
 			"ref", "id", "date", "edit_date", "grouped_id",
 			"from", "text", "entities", "buttons", "forward", "reactions",
-			"media", "reply_to", "views", "is_pinned",
+			"media", "album", "reply_to", "views", "is_pinned",
 		})
 	return cmd
 }

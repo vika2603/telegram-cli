@@ -233,6 +233,7 @@ func (s *Server) handleConn(parentCtx context.Context, conn net.Conn) {
 		DaemonVersion: version.Version,
 		Account:       s.account,
 		Schema:        ProtocolSchema,
+		Features:      DaemonFeatures(),
 	})
 	if err := writeFrame(hello); err != nil {
 		return

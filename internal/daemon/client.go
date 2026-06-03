@@ -143,6 +143,18 @@ func AttachClient(conn net.Conn) (*Client, error) {
 // Hello returns the welcome payload received at connect time.
 func (c *Client) Hello() HelloPayload { return c.hello }
 
+// SupportsMediaSend reports whether the connected daemon advertised the
+// media-send capability, i.e. it can relay sticker/GIF sends over IPC. When
+// false the caller must use the local path for media sends.
+func (c *Client) SupportsMediaSend() bool {
+	for _, f := range c.hello.Features {
+		if f == FeatureMediaSend {
+			return true
+		}
+	}
+	return false
+}
+
 // Stats fetches the daemon's live MetricsSnapshot via the built-in
 // daemon.stats RPC. Used by tg daemon status to surface real-time
 // observability alongside the host service manager's installed/

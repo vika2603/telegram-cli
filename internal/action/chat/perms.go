@@ -34,6 +34,36 @@ func validateRightKeys(keys []string) error {
 	return nil
 }
 
+// AdminRightKeys are the admin-rights keywords accepted by `promote --rights`.
+// Each maps (in the telegram layer) to one ChatAdminRights bit. "post"/"edit"
+// only apply to broadcast channels; "ban"/"topics" only apply to supergroups;
+// the rest apply to both.
+var AdminRightKeys = map[string]bool{
+	"info":           true, // change chat info
+	"post":           true, // post messages (broadcast)
+	"edit":           true, // edit others' messages (broadcast)
+	"delete":         true, // delete others' messages
+	"ban":            true, // ban/restrict users
+	"invite":         true, // add/invite users
+	"pin":            true, // pin messages
+	"add_admins":     true, // promote new admins
+	"anonymous":      true, // act anonymously
+	"call":           true, // manage video chats
+	"topics":         true, // manage forum topics
+	"post_stories":   true,
+	"edit_stories":   true,
+	"delete_stories": true,
+}
+
+func validateAdminRightKeys(keys []string) error {
+	for _, k := range keys {
+		if !AdminRightKeys[k] {
+			return fmt.Errorf("%w: unknown admin right %q (valid: info post edit delete ban invite pin add_admins anonymous call topics post_stories edit_stories delete_stories)", command.ErrUsage, k)
+		}
+	}
+	return nil
+}
+
 // ---------------------------------------------------------------------------
 // set-perms / unset-perms (per-user)
 // ---------------------------------------------------------------------------

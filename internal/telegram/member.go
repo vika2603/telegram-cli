@@ -112,43 +112,33 @@ func SetMemberBanned(ctx context.Context, api *tg.Client, resolver *peer.Resolve
 }
 
 // SetMemberAdmin promotes or demotes a user in a channel/supergroup via
-// channels.editAdmin. Promote grants a standard admin rights set; demote
-// clears all admin rights.
-func SetMemberAdmin(ctx context.Context, api *tg.Client, resolver *peer.Resolver, q actionchat.PromoteQuery) (output.PeerRef, error) {
+// channels.editAdmin. Promote grants either the keywords in q.Rights or, when
+// none are given, a broad default admin set; demote clears all admin rights.
+func SetMemberAdmin(ctx context.Context, api *tg.Client, resolver *peer.Resolver, q actionchat.PromoteQuery) (output.RightsRow, error) {
 	groupResolved, err := resolver.Resolve(ctx, q.Ref)
 	if err != nil {
-		return output.PeerRef{}, err
+		return output.RightsRow{}, err
 	}
 	inCh, ok := inputChannelFromPeer(groupResolved.InputPeer)
 	if !ok {
-		return output.PeerRef{}, fmt.Errorf("%w: promote is only supported on channels/supergroups", command.ErrUnsupported)
+		return output.RightsRow{}, fmt.Errorf("%w: promote is only supported on channels/supergroups", command.ErrUnsupported)
 	}
 
 	userResolved, err := resolver.Resolve(ctx, q.User)
 	if err != nil {
-		return output.PeerRef{}, err
+		return output.RightsRow{}, err
 	}
 	inUser, ok := inputUserFromPeer(userResolved.InputPeer)
 	if !ok {
-		return output.PeerRef{}, fmt.Errorf("%w: %s is not a user", command.ErrUsage, q.User.String())
+		return output.RightsRow{}, fmt.Errorf("%w: %s is not a user", command.ErrUsage, q.User.String())
 	}
 
-	// A broad admin set covering both supergroups and broadcast channels.
-	// PostMessages/EditMessages only apply to broadcast channels (ignored by
-	// supergroups); the rest apply to supergroups. AddAdmins is deliberately
-	// left off so a promoted admin can't mint further admins.
 	var rights tg.ChatAdminRights
 	if !q.Demote {
-		rights = tg.ChatAdminRights{
-			ChangeInfo:     true,
-			PostMessages:   true,
-			EditMessages:   true,
-			DeleteMessages: true,
-			BanUsers:       true,
-			InviteUsers:    true,
-			PinMessages:    true,
-			ManageCall:     true,
-			ManageTopics:   true,
+		if len(q.Rights) > 0 {
+			rights = adminRightsFromKeys(q.Rights)
+		} else {
+			rights = defaultAdminRights()
 		}
 	}
 
@@ -166,9 +156,109 @@ func SetMemberAdmin(ctx context.Context, api *tg.Client, resolver *peer.Resolver
 		AdminRights: rights,
 		Rank:        rank,
 	}); err != nil {
-		return output.PeerRef{}, err
+		return output.RightsRow{}, err
 	}
-	return output.PeerRefFromResolved(userResolved), nil
+	pr := output.PeerRefFromResolved(userResolved)
+	row := output.RightsRow{Action: "promote", Peer: &pr}
+	if q.Demote {
+		row.Action = "demote"
+	} else {
+		row.Granted = grantedAdminKeys(rights)
+	}
+	return row, nil
+}
+
+// adminKeyOrder is the canonical keyword order used when reporting granted
+// admin rights, matching the ChatAdminRights field layout.
+var adminKeyOrder = []string{
+	"info", "post", "edit", "delete", "ban", "invite", "pin",
+	"add_admins", "anonymous", "call", "topics",
+	"post_stories", "edit_stories", "delete_stories",
+}
+
+// defaultAdminRights is the broad admin set granted by `promote` when no
+// explicit --rights keywords are passed. PostMessages/EditMessages only apply
+// to broadcast channels (ignored by supergroups); the rest apply to
+// supergroups. AddAdmins is deliberately left off so a promoted admin can't
+// mint further admins.
+func defaultAdminRights() tg.ChatAdminRights {
+	return tg.ChatAdminRights{
+		ChangeInfo:     true,
+		PostMessages:   true,
+		EditMessages:   true,
+		DeleteMessages: true,
+		BanUsers:       true,
+		InviteUsers:    true,
+		PinMessages:    true,
+		ManageCall:     true,
+		ManageTopics:   true,
+	}
+}
+
+// adminRightsFromKeys builds a ChatAdminRights mask from the validated
+// keywords accepted by `promote --rights`.
+func adminRightsFromKeys(keys []string) tg.ChatAdminRights {
+	var r tg.ChatAdminRights
+	for _, k := range keys {
+		switch k {
+		case "info":
+			r.ChangeInfo = true
+		case "post":
+			r.PostMessages = true
+		case "edit":
+			r.EditMessages = true
+		case "delete":
+			r.DeleteMessages = true
+		case "ban":
+			r.BanUsers = true
+		case "invite":
+			r.InviteUsers = true
+		case "pin":
+			r.PinMessages = true
+		case "add_admins":
+			r.AddAdmins = true
+		case "anonymous":
+			r.Anonymous = true
+		case "call":
+			r.ManageCall = true
+		case "topics":
+			r.ManageTopics = true
+		case "post_stories":
+			r.PostStories = true
+		case "edit_stories":
+			r.EditStories = true
+		case "delete_stories":
+			r.DeleteStories = true
+		}
+	}
+	return r
+}
+
+// grantedAdminKeys reverses adminRightsFromKeys for display, in canonical order.
+func grantedAdminKeys(r tg.ChatAdminRights) []string {
+	set := map[string]bool{
+		"info":           r.ChangeInfo,
+		"post":           r.PostMessages,
+		"edit":           r.EditMessages,
+		"delete":         r.DeleteMessages,
+		"ban":            r.BanUsers,
+		"invite":         r.InviteUsers,
+		"pin":            r.PinMessages,
+		"add_admins":     r.AddAdmins,
+		"anonymous":      r.Anonymous,
+		"call":           r.ManageCall,
+		"topics":         r.ManageTopics,
+		"post_stories":   r.PostStories,
+		"edit_stories":   r.EditStories,
+		"delete_stories": r.DeleteStories,
+	}
+	var out []string
+	for _, k := range adminKeyOrder {
+		if set[k] {
+			out = append(out, k)
+		}
+	}
+	return out
 }
 
 // currentAdminRank returns the participant's existing admin rank (title), or

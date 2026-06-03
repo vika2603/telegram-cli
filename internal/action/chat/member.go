@@ -107,8 +107,9 @@ type PromoteRequest struct {
 	RawRef   string
 	RawUser  string
 	Demote   bool
-	Title    string // custom admin rank/title (promote only, <=16 chars)
-	SetTitle bool   // whether --title was given; if false, keep the current rank
+	Title    string   // custom admin rank/title (promote only, <=16 chars)
+	SetTitle bool     // whether --title was given; if false, keep the current rank
+	Rights   []string // admin rights to grant (promote only); empty = broad default set
 }
 
 // PromoteQuery is the normalized payload passed to the Telegram layer.
@@ -118,26 +119,33 @@ type PromoteQuery struct {
 	Demote   bool
 	Title    string
 	SetTitle bool
+	Rights   []string
 }
 
-// PromoteFunc promotes or demotes a user and returns the affected peer.
-type PromoteFunc func(context.Context, PromoteQuery) (output.PeerRef, error)
+// PromoteFunc promotes or demotes a user and returns the resulting rights row.
+type PromoteFunc func(context.Context, PromoteQuery) (output.RightsRow, error)
 
 // Promote validates the request and dispatches the promote/demote operation.
-func Promote(ctx context.Context, req PromoteRequest, do PromoteFunc) (output.PeerRef, error) {
+func Promote(ctx context.Context, req PromoteRequest, do PromoteFunc) (output.RightsRow, error) {
 	parsed, err := ref.ParseRef(req.RawRef)
 	if err != nil {
-		return output.PeerRef{}, fmt.Errorf("%w: %s", command.ErrUsage, err.Error())
+		return output.RightsRow{}, fmt.Errorf("%w: %s", command.ErrUsage, err.Error())
 	}
 	userRef, err := ref.ParseRef(req.RawUser)
 	if err != nil {
-		return output.PeerRef{}, fmt.Errorf("%w: invalid user ref %q: %s", command.ErrUsage, req.RawUser, err.Error())
+		return output.RightsRow{}, fmt.Errorf("%w: invalid user ref %q: %s", command.ErrUsage, req.RawUser, err.Error())
 	}
 	if utf8.RuneCountInString(req.Title) > 16 {
-		return output.PeerRef{}, fmt.Errorf("%w: --title must be at most 16 characters", command.ErrUsage)
+		return output.RightsRow{}, fmt.Errorf("%w: --title must be at most 16 characters", command.ErrUsage)
+	}
+	if req.Demote && len(req.Rights) > 0 {
+		return output.RightsRow{}, fmt.Errorf("%w: --rights cannot be combined with demote", command.ErrUsage)
+	}
+	if err := validateAdminRightKeys(req.Rights); err != nil {
+		return output.RightsRow{}, err
 	}
 	if do == nil {
-		return output.PeerRef{}, fmt.Errorf("%w: chat promote called without promote function", command.ErrPrecondition)
+		return output.RightsRow{}, fmt.Errorf("%w: chat promote called without promote function", command.ErrPrecondition)
 	}
-	return do(ctx, PromoteQuery{Ref: parsed, User: userRef, Demote: req.Demote, Title: req.Title, SetTitle: req.SetTitle})
+	return do(ctx, PromoteQuery{Ref: parsed, User: userRef, Demote: req.Demote, Title: req.Title, SetTitle: req.SetTitle, Rights: req.Rights})
 }

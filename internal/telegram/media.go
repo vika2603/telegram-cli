@@ -58,28 +58,20 @@ func mediaDetail(media tg.MessageMediaClass) *output.MediaObject {
 }
 
 func documentDetail(doc *tg.Document) *output.MediaObject {
-	o := &output.MediaObject{Type: "document", Size: doc.Size, MIME: doc.MimeType}
+	// Reuse the list kind logic so info and list agree (and stickers win over
+	// the video/audio attrs a sticker doc may also carry). Detail fields are
+	// filled from whatever attrs are present, regardless of the chosen kind.
+	o := &output.MediaObject{Type: searchMessageDocumentMediaKind(doc), Size: doc.Size, MIME: doc.MimeType}
 	for _, attr := range doc.Attributes {
 		switch a := attr.(type) {
 		case *tg.DocumentAttributeFilename:
 			o.FileName = a.FileName
 		case *tg.DocumentAttributeSticker:
-			o.Type = "sticker"
 			o.Emoji = a.Alt
-		case *tg.DocumentAttributeAnimated:
-			o.Type = "gif"
 		case *tg.DocumentAttributeVideo:
-			o.Type = "video"
-			if a.RoundMessage {
-				o.Type = "round_video"
-			}
 			o.Duration = int(a.Duration)
 			o.Width, o.Height = a.W, a.H
 		case *tg.DocumentAttributeAudio:
-			o.Type = "audio"
-			if a.Voice {
-				o.Type = "voice"
-			}
 			o.Duration = a.Duration
 			o.Performer, _ = a.GetPerformer()
 			o.AudioTitle, _ = a.GetTitle()
@@ -102,9 +94,14 @@ func documentDetail(doc *tg.Document) *output.MediaObject {
 
 func largestPhotoSize(ph *tg.Photo) (w, h int) {
 	for _, s := range ph.Sizes {
-		if ps, ok := s.(*tg.PhotoSize); ok {
-			if ps.W*ps.H > w*h {
-				w, h = ps.W, ps.H
+		switch sz := s.(type) {
+		case *tg.PhotoSize:
+			if sz.W*sz.H > w*h {
+				w, h = sz.W, sz.H
+			}
+		case *tg.PhotoSizeProgressive:
+			if sz.W*sz.H > w*h {
+				w, h = sz.W, sz.H
 			}
 		}
 	}

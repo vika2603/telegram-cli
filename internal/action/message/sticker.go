@@ -17,26 +17,35 @@ const stickerTokenPrefix = "stk_"
 // EncodeStickerToken packs a sticker's input-document triple into a
 // self-contained, copy-pasteable handle. The file reference is short-lived, so
 // a token only stays valid for a while after listing.
-func EncodeStickerToken(doc StickerDoc) string {
+func EncodeStickerToken(doc StickerDoc) string { return encodeDocToken(stickerTokenPrefix, doc) }
+
+// DecodeStickerToken reverses EncodeStickerToken. ok is false when s is not a
+// sticker token (so the caller can fall back to message-ref parsing); err is
+// returned only when s looks like a token but is malformed.
+func DecodeStickerToken(s string) (*StickerDoc, bool, error) {
+	return decodeDocToken(stickerTokenPrefix, s)
+}
+
+// encodeDocToken packs a document ref (id + access hash + file reference, plus
+// an optional owning set) into a prefixed, base64 handle. Shared by sticker and
+// gif refs via their distinct prefixes.
+func encodeDocToken(prefix string, doc StickerDoc) string {
 	buf := make([]byte, 32+len(doc.FileReference))
 	binary.BigEndian.PutUint64(buf[0:8], uint64(doc.ID))
 	binary.BigEndian.PutUint64(buf[8:16], uint64(doc.AccessHash))
 	binary.BigEndian.PutUint64(buf[16:24], uint64(doc.SetID))
 	binary.BigEndian.PutUint64(buf[24:32], uint64(doc.SetAccessHash))
 	copy(buf[32:], doc.FileReference)
-	return stickerTokenPrefix + base64.RawURLEncoding.EncodeToString(buf)
+	return prefix + base64.RawURLEncoding.EncodeToString(buf)
 }
 
-// DecodeStickerToken reverses EncodeStickerToken. ok is false when s is not a
-// sticker token (so the caller can fall back to message-ref parsing); err is
-// returned only when s looks like a token but is malformed.
-func DecodeStickerToken(s string) (*StickerDoc, bool, error) {
-	if len(s) <= len(stickerTokenPrefix) || s[:len(stickerTokenPrefix)] != stickerTokenPrefix {
+func decodeDocToken(prefix, s string) (*StickerDoc, bool, error) {
+	if len(s) <= len(prefix) || s[:len(prefix)] != prefix {
 		return nil, false, nil
 	}
-	raw, err := base64.RawURLEncoding.DecodeString(s[len(stickerTokenPrefix):])
+	raw, err := base64.RawURLEncoding.DecodeString(s[len(prefix):])
 	if err != nil || len(raw) < 32 {
-		return nil, false, fmt.Errorf("%w: invalid sticker ref %q", command.ErrUsage, s)
+		return nil, false, fmt.Errorf("%w: invalid media ref %q", command.ErrUsage, s)
 	}
 	return &StickerDoc{
 		ID:            int64(binary.BigEndian.Uint64(raw[0:8])),

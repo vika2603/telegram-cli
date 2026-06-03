@@ -32,6 +32,7 @@ type Options struct {
 	Files    []string
 	Names    []string
 	Sticker  string
+	Gif      string
 	ReplyTo  int
 	Silent   bool
 	Schedule time.Time
@@ -82,7 +83,8 @@ func New(f *runtime.Invocation, runF func(*Options) error) *cobra.Command {
 
 	cmd.Flags().StringArrayVar(&opts.Files, "file", nil, `File attachment; repeat for multiple files; "-" reads stdin bytes`)
 	cmd.Flags().StringArrayVar(&opts.Names, "name", nil, "Upload filename override; repeat to match --file")
-	cmd.Flags().StringVar(&opts.Sticker, "sticker", "", "Resend an existing sticker by message ref (no text/--file)")
+	cmd.Flags().StringVar(&opts.Sticker, "sticker", "", "Send a sticker by `msg sticker list` ref or message ref (no text/--file)")
+	cmd.Flags().StringVar(&opts.Gif, "gif", "", "Send a gif by `msg gif list` ref or message ref (no text/--file)")
 	cmd.Flags().IntVar(&opts.ReplyTo, "reply-to", 0, "Reply to message ID")
 	cmd.Flags().BoolVar(&opts.Silent, "silent", false, "Send without notification")
 	cmd.Flags().StringVar(&scheduleRaw, "schedule", "", "Schedule delivery (RFC3339)")
@@ -103,6 +105,7 @@ func Run(ctx context.Context, opts *Options) error {
 		Files:    opts.Files,
 		Names:    opts.Names,
 		Sticker:  opts.Sticker,
+		Gif:      opts.Gif,
 		ReplyTo:  opts.ReplyTo,
 		Silent:   opts.Silent,
 		Schedule: opts.Schedule,
@@ -179,7 +182,7 @@ func newSend(f *runtime.Invocation) actionmessage.SendFunc {
 // point. Schedule + Silent + Parse + ReplyTo are pure metadata and
 // stay supported.
 func canDaemonSend(q actionmessage.SendQuery) bool {
-	return len(q.Attachments) == 0 && q.Sticker == nil
+	return len(q.Attachments) == 0 && q.Sticker == nil && q.Gif == nil
 }
 
 func recordSentMessages(store *account.PeerStore, peerRef, text string, rows []output.SendResultRow) {

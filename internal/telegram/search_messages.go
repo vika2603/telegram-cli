@@ -253,6 +253,11 @@ func searchMessageMediaKind(media tg.MessageMediaClass) string {
 }
 
 func searchMessageDocumentMediaKind(doc *tg.Document) string {
+	// Priority matters: a gif is an mp4 carrying BOTH Animated and Video
+	// attributes, so Animated must win over Video; a sticker likewise carries
+	// Video/Image attrs. So sticker > gif, then fall back to video/audio.
+	var video *tg.DocumentAttributeVideo
+	var audio *tg.DocumentAttributeAudio
 	for _, attr := range doc.Attributes {
 		switch v := attr.(type) {
 		case *tg.DocumentAttributeSticker:
@@ -260,16 +265,22 @@ func searchMessageDocumentMediaKind(doc *tg.Document) string {
 		case *tg.DocumentAttributeAnimated:
 			return "gif"
 		case *tg.DocumentAttributeVideo:
-			if v.RoundMessage {
-				return "round_video"
-			}
-			return "video"
+			video = v
 		case *tg.DocumentAttributeAudio:
-			if v.Voice {
-				return "voice"
-			}
-			return "audio"
+			audio = v
 		}
+	}
+	switch {
+	case video != nil:
+		if video.RoundMessage {
+			return "round_video"
+		}
+		return "video"
+	case audio != nil:
+		if audio.Voice {
+			return "voice"
+		}
+		return "audio"
 	}
 	return "document"
 }

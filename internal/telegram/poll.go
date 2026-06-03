@@ -98,10 +98,17 @@ func MessageDetail(ctx context.Context, api *tg.Client, resolver *peer.Resolver,
 	if !ok {
 		return output.MessageRow{}, telegrammessage.ErrNotFound
 	}
-	row := messageToRow(m, elem.Entities, output.PreferredRefFromResolved(resolved))
-	if mp, ok := m.Media.(*tg.MessageMediaPoll); ok {
-		pi := pollInfoFromMedia(mp)
-		row.Poll = &pi
+	baseRef := output.PreferredRefFromResolved(resolved)
+	row := messageToRow(m, elem.Entities, baseRef)
+	if media, ok := m.GetMedia(); ok && media != nil {
+		row.MediaDetail = mediaDetail(media)
+	}
+	// Expand an album into its members (each with full media detail).
+	if gid, ok := m.GetGroupedID(); ok && gid != 0 {
+		if members, err := fetchAlbumMessages(ctx, api, resolved.InputPeer, m.ID, gid); err == nil && len(members) > 1 {
+			row.Album = albumItemsDetailed(members, baseRef)
+			row.MediaDetail, row.MediaKind, row.HasMedia = nil, "", false
+		}
 	}
 	return row, nil
 }

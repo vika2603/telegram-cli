@@ -303,3 +303,39 @@ func TestRenderMessages_TTYShowsForwardLabel(t *testing.T) {
 	require.NoError(t, output.RenderMessages(ios, rows))
 	require.Contains(t, stdout.String(), "fwd @src")
 }
+
+func TestMessageRow_MarshalsMediaDetail(t *testing.T) {
+	row := output.MessageRow{
+		ID: 7, Ref: "me:7", Date: "2026-01-01T00:00:00Z",
+		MediaKind:   "document",
+		MediaDetail: &output.MediaObject{Type: "document", FileName: "x.pdf", Size: 1024, MIME: "application/pdf"},
+	}
+	b, err := json.Marshal(row)
+	require.NoError(t, err)
+	var got map[string]any
+	require.NoError(t, json.Unmarshal(b, &got))
+	media := got["media"].(map[string]any)
+	require.Equal(t, "document", media["type"])
+	require.Equal(t, "x.pdf", media["file_name"])
+	require.EqualValues(t, 1024, media["size"])
+	require.NotContains(t, got, "album")
+}
+
+func TestMessageRow_MarshalsAlbumNotMedia(t *testing.T) {
+	row := output.MessageRow{
+		ID: 10, Ref: "me:10", Date: "2026-01-01T00:00:00Z",
+		MediaKind:   "photo", // should be ignored when Album is set
+		MediaDetail: &output.MediaObject{Type: "photo"},
+		Album: []output.AlbumItem{
+			{ID: 10, Ref: "me:10", Media: &output.MediaObject{Type: "photo"}},
+			{ID: 11, Ref: "me:11", Media: &output.MediaObject{Type: "photo"}},
+		},
+	}
+	b, err := json.Marshal(row)
+	require.NoError(t, err)
+	var got map[string]any
+	require.NoError(t, json.Unmarshal(b, &got))
+	require.NotContains(t, got, "media", "album rows must not also carry a single media object")
+	album := got["album"].([]any)
+	require.Len(t, album, 2)
+}

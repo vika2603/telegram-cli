@@ -44,7 +44,7 @@ func New(f *runtime.Invocation, runF func(*Options) error) *cobra.Command {
 	}
 	command.SetMeta(cmd, command.Meta{NeedsAccount: true, NeedsClient: true})
 	output.AddJSONFlags(cmd, &opts.Exporter,
-		[]string{"id", "ref", "date", "edit_date", "from", "text", "reply_to", "forward", "reactions", "media", "views", "is_pinned"})
+		[]string{"id", "ref", "date", "edit_date", "from", "text", "reply_to", "forward", "reactions", "media", "album", "views", "is_pinned"})
 	return cmd
 }
 

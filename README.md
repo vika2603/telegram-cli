@@ -130,9 +130,10 @@ client commands route through when present).
 | `tg chat perms <ref>` | Set the group's default member permissions with `--deny`/`--allow` (same keywords). |
 | `tg msg list <ref>` | List message history. Album members (same `grouped_id`) merge into one row with an `album` array (`--limit` counts an album as one). |
 | `tg msg info <msg-ref>` | Show one message's details: media info (file name/size/mime, dimensions, duration, sticker emoji, web-page title/url), album members (each with media detail), and poll content (question, numbered options, tallies). |
-| `tg msg send <ref> [text...]` | Send text. Repeat `--file <path>` to attach one or more files; text becomes the first media caption. Use `--name` to override upload filenames. `--sticker <ref>` sends a sticker — either a `msg sticker list` ref or a `<msg-ref>` of an existing sticker (no text/`--file`). |
+| `tg msg send <ref> [text...]` | Send text. Repeat `--file <path>` to attach one or more files; text becomes the first media caption. Use `--name` to override upload filenames. `--sticker <ref>` / `--gif <ref>` send a sticker/gif — either a `msg sticker list`/`msg gif list` ref or a `<msg-ref>` of an existing one (no text/`--file`). |
 | `tg msg sticker list` | List your stickers to get a sendable `ref`. `--recent` (default), `--faved`, `--installed` (sets), `--all` (recent+faved+all sets expanded; slow). |
 | `tg msg sticker fave <ref>` / `tg msg sticker unfave <ref>` | Add or remove a sticker from favorites (`<ref>` is a list ref or `<msg-ref>`). |
+| `tg msg gif list` | List your saved GIFs, each with a sendable `ref`. |
 | `tg msg poll <ref> <question> <option>...` | Send a poll (≥2 options). `--multiple`, `--public` (default anonymous); `--correct <n>` makes it a quiz with optional `--explanation`. |
 | `tg msg vote <msg-ref> <option-number>...` | Vote on a poll by 1-based option number (multiple numbers for multiple-choice polls); `--retract` to take back your vote. |
 | `tg msg download <msg-ref>` | Download photo, video, document, or other message media. Defaults to the media filename; use `-o/--output` for a file path or existing directory. |

@@ -8,6 +8,7 @@ import (
 	"github.com/vika2603/telegram-cli/internal/cli/msg/download"
 	"github.com/vika2603/telegram-cli/internal/cli/msg/edit"
 	"github.com/vika2603/telegram-cli/internal/cli/msg/forward"
+	"github.com/vika2603/telegram-cli/internal/cli/msg/gif"
 	"github.com/vika2603/telegram-cli/internal/cli/msg/info"
 	"github.com/vika2603/telegram-cli/internal/cli/msg/link"
 	"github.com/vika2603/telegram-cli/internal/cli/msg/list"
@@ -36,6 +37,7 @@ func New(f *runtime.Invocation) *cobra.Command {
 	cmd.AddCommand(download.New(f, nil))
 	cmd.AddCommand(send.New(f, nil))
 	cmd.AddCommand(sticker.New(f))
+	cmd.AddCommand(gif.New(f))
 	cmd.AddCommand(poll.New(f, nil))
 	cmd.AddCommand(vote.New(f, nil))
 	cmd.AddCommand(edit.New(f, nil))

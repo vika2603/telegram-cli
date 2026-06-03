@@ -21,7 +21,8 @@ type SendRequest struct {
 	Text     string
 	Files    []string
 	Names    []string
-	Sticker  string // message ref of an existing sticker to resend
+	Sticker  string // ref of a sticker to send (list ref or message ref)
+	Gif      string // ref of a gif to send (list ref or message ref)
 	ReplyTo  int
 	Silent   bool
 	Schedule time.Time
@@ -35,9 +36,10 @@ type SendQuery struct {
 	Ref         ref.Ref
 	Text        string
 	Attachments []Attachment
-	// Sticker, when set, resends an existing sticker (referenced by message)
-	// instead of sending text/attachments. Mutually exclusive with both.
+	// Sticker / Gif, when set, send that media instead of text/attachments.
+	// Mutually exclusive with text, --file, and each other.
 	Sticker  *StickerSource
+	Gif      *StickerSource
 	ReplyTo  int
 	Silent   bool
 	Schedule time.Time
@@ -112,8 +114,14 @@ func Send(ctx context.Context, req SendRequest, do SendFunc) ([]output.SendResul
 
 // NormalizeSend resolves stdin-backed text and parses the peer ref.
 func NormalizeSend(req SendRequest) (SendQuery, error) {
+	if req.Sticker != "" && req.Gif != "" {
+		return SendQuery{}, fmt.Errorf("%w: --sticker and --gif are mutually exclusive", command.ErrUsage)
+	}
 	if req.Sticker != "" {
 		return normalizeStickerSend(req)
+	}
+	if req.Gif != "" {
+		return normalizeGifSend(req)
 	}
 	switch req.Parse {
 	case "", "html":

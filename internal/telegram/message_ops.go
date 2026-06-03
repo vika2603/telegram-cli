@@ -108,6 +108,8 @@ func SendMessage(ctx context.Context, api *tg.Client, resolver *peer.Resolver, q
 	switch {
 	case q.Sticker != nil:
 		upd, err = sendSticker(ctx, api, resolver, b, q.Sticker)
+	case q.Gif != nil:
+		upd, err = sendGif(ctx, api, resolver, b, q.Gif)
 	case len(q.Attachments) > 0:
 		upd, err = sendAttachments(ctx, b, q)
 	case q.Parse == "html":

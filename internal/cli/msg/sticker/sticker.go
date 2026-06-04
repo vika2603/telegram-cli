@@ -27,7 +27,68 @@ func New(f *runtime.Invocation) *cobra.Command {
 	cmd.AddCommand(newList(f, nil))
 	cmd.AddCommand(newFave(f, nil, false, "fave", "Add a sticker to favorites"))
 	cmd.AddCommand(newFave(f, nil, true, "unfave", "Remove a sticker from favorites"))
+	cmd.AddCommand(newSet(f, nil, false, "add", "Install a sticker set"))
+	cmd.AddCommand(newSet(f, nil, true, "remove", "Uninstall a sticker set"))
 	return cmd
+}
+
+// SetOptions holds flags/deps for `sticker add` / `remove`.
+type SetOptions struct {
+	RawSet    string
+	Remove    bool
+	Exporter  output.Exporter
+	IOStreams *ui.IOStreams
+	Do        actionmessage.StickerSetFunc
+}
+
+func newSet(f *runtime.Invocation, runF func(*SetOptions) error, remove bool, use, short string) *cobra.Command {
+	opts := &SetOptions{Remove: remove}
+	cmd := &cobra.Command{
+		Use:   use + " <set>",
+		Short: short,
+		Long:  short + ". <set> is a sticker set short name or an https://t.me/addstickers/<name> link.",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			opts.RawSet = args[0]
+			opts.IOStreams = f.IOStreams
+			if runF != nil {
+				return runF(opts)
+			}
+			opts.Do = newSetDo(f)
+			return RunSet(cmd.Context(), opts)
+		},
+	}
+	command.SetMeta(cmd, command.Meta{NeedsAccount: true, NeedsClient: true})
+	output.AddJSONFlags(cmd, &opts.Exporter, []string{"action", "set", "title", "count", "archived"})
+	return cmd
+}
+
+// RunSet dispatches install/uninstall.
+func RunSet(ctx context.Context, opts *SetOptions) error {
+	res, err := actionmessage.InstallStickerSet(ctx, actionmessage.StickerSetRequest{RawSet: opts.RawSet, Remove: opts.Remove}, opts.Do)
+	if err != nil {
+		return err
+	}
+	if opts.Exporter != nil {
+		return opts.Exporter.Write(opts.IOStreams, res)
+	}
+	return output.RenderStickerSet(opts.IOStreams, res)
+}
+
+func newSetDo(f *runtime.Invocation) actionmessage.StickerSetFunc {
+	return func(ctx context.Context, q actionmessage.StickerSetQuery) (output.StickerSetResult, error) {
+		acct, err := f.Account("")
+		if err != nil {
+			return output.StickerSetResult{}, err
+		}
+		var res output.StickerSetResult
+		err = f.WithPeers(ctx, acct, runtime.ClientOptsFrom(f, acct),
+			func(ctx context.Context, api *tg.Client, _ *peers.Manager, _ *peer.Resolver) error {
+				res, err = telegram.InstallStickerSet(ctx, api, q)
+				return err
+			})
+		return res, err
+	}
 }
 
 // FaveOptions holds flags/deps for `sticker fave` / `unfave`.

@@ -34,6 +34,32 @@ func RenderFave(io *ui.IOStreams, r FaveResult) error {
 	return tp.Render()
 }
 
+// StickerSetResult is emitted by `tg msg sticker add` / `remove`.
+type StickerSetResult struct {
+	Action   string `json:"action"`             // "add" | "remove"
+	Set      string `json:"set"`                // set short name
+	Title    string `json:"title,omitempty"`    // set title
+	Count    int    `json:"count,omitempty"`    // stickers in set
+	Archived bool   `json:"archived,omitempty"` // add archived the set instead of installing
+}
+
+// RenderStickerSet prints an install/uninstall confirmation.
+func RenderStickerSet(io *ui.IOStreams, r StickerSetResult) error {
+	tp := NewTablePrinter(io)
+	tp.AddRow("ACTION", r.Action)
+	tp.AddRow("SET", r.Set)
+	if r.Title != "" {
+		tp.AddRow("TITLE", r.Title)
+	}
+	if r.Count > 0 {
+		tp.AddRow("COUNT", strconv.Itoa(r.Count))
+	}
+	if r.Archived {
+		tp.AddRow("ARCHIVED", "true")
+	}
+	return tp.Render()
+}
+
 // RenderStickers prints sticker rows (or set rows) as a table.
 func RenderStickers(io *ui.IOStreams, rows []StickerRow) error {
 	tp := NewTablePrinter(io)

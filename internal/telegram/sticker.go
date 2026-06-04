@@ -201,6 +201,46 @@ func faveStickerCall(ctx context.Context, api *tg.Client, doc *tg.InputDocument,
 	return err
 }
 
+// InstallStickerSet installs or (when q.Remove) uninstalls a sticker set by
+// short name. The set is fetched first to validate it exists and to surface
+// its title/count in the result.
+func InstallStickerSet(ctx context.Context, api *tg.Client, q actionmessage.StickerSetQuery) (output.StickerSetResult, error) {
+	input := &tg.InputStickerSetShortName{ShortName: q.ShortName}
+	got, err := api.MessagesGetStickerSet(ctx, &tg.MessagesGetStickerSetRequest{Stickerset: input})
+	if err != nil {
+		return output.StickerSetResult{}, err
+	}
+	full, ok := got.(*tg.MessagesStickerSet)
+	if !ok {
+		return output.StickerSetResult{}, fmt.Errorf("%w: sticker set %q is unavailable", command.ErrUnsupported, q.ShortName)
+	}
+	res := output.StickerSetResult{
+		Set:   full.Set.ShortName,
+		Title: full.Set.Title,
+		Count: full.Set.Count,
+	}
+
+	if q.Remove {
+		if _, err := api.MessagesUninstallStickerSet(ctx, input); err != nil {
+			return output.StickerSetResult{}, err
+		}
+		res.Action = "remove"
+		return res, nil
+	}
+
+	installed, err := api.MessagesInstallStickerSet(ctx, &tg.MessagesInstallStickerSetRequest{Stickerset: input})
+	if err != nil {
+		return output.StickerSetResult{}, err
+	}
+	res.Action = "add"
+	// Telegram may archive the set instead of installing it (e.g. when the
+	// installed-set limit is hit); surface that rather than implying success.
+	if _, ok := installed.(*tg.MessagesStickerSetInstallResultArchive); ok {
+		res.Archived = true
+	}
+	return res, nil
+}
+
 // refreshStickerRef re-fetches the sticker's owning set and returns the doc
 // with a fresh file reference. Used to recover from FILE_REFERENCE_EXPIRED.
 func refreshStickerRef(ctx context.Context, api *tg.Client, doc *actionmessage.StickerDoc) (*actionmessage.StickerDoc, error) {

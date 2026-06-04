@@ -3,7 +3,6 @@ package admin
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/gotd/td/telegram/peers"
 	"github.com/gotd/td/tg"
@@ -26,6 +25,7 @@ type Options struct {
 	Demote    bool
 	Title     string
 	SetTitle  bool
+	Rights    []string
 	Exporter  output.Exporter
 	IOStreams *ui.IOStreams
 	Promote   actionchat.PromoteFunc
@@ -79,54 +79,44 @@ func adminCmd(f *runtime.Invocation, runF func(*Options) error, demote bool) *co
 	}
 	if !demote {
 		cmd.Flags().StringVar(&opts.Title, "title", "", "Custom admin title/rank (<=16 chars); omit to keep the current title, pass \"\" to clear it")
+		cmd.Flags().StringSliceVar(&opts.Rights, "rights", nil, "Admin rights to grant: info,post,edit,delete,ban,invite,pin,add_admins,anonymous,call,topics,post_stories,edit_stories,delete_stories (default: broad set)")
 	}
 	command.SetMeta(cmd, command.Meta{NeedsAccount: true, NeedsClient: true})
-	output.AddJSONFlags(cmd, &opts.Exporter, []string{"ref", "id", "kind", "title", "username"})
+	output.AddJSONFlags(cmd, &opts.Exporter, []string{"action", "peer", "granted"})
 	return cmd
 }
 
 // Run executes the promote/demote logic.
 func Run(ctx context.Context, opts *Options) error {
-	pr, err := actionchat.Promote(ctx, actionchat.PromoteRequest{
+	row, err := actionchat.Promote(ctx, actionchat.PromoteRequest{
 		RawRef:   opts.RawRef,
 		RawUser:  opts.RawUser,
 		Demote:   opts.Demote,
 		Title:    opts.Title,
 		SetTitle: opts.SetTitle,
+		Rights:   opts.Rights,
 	}, opts.Promote)
 	if err != nil {
 		return err
 	}
 	if opts.Exporter != nil {
-		return opts.Exporter.Write(opts.IOStreams, pr)
+		return opts.Exporter.Write(opts.IOStreams, row)
 	}
-	verb := "promoted"
-	if opts.Demote {
-		verb = "demoted"
-	}
-	name := pr.Title
-	if pr.Username != "" {
-		name = "@" + pr.Username
-	}
-	if name == "" {
-		name = pr.Ref
-	}
-	_, err = fmt.Fprintf(opts.IOStreams.Out, "%s %s\n", verb, name)
-	return err
+	return output.RenderRights(opts.IOStreams, row)
 }
 
 func newPromoteFn(f *runtime.Invocation) actionchat.PromoteFunc {
-	return func(ctx context.Context, q actionchat.PromoteQuery) (output.PeerRef, error) {
+	return func(ctx context.Context, q actionchat.PromoteQuery) (output.RightsRow, error) {
 		acct, err := f.Account("")
 		if err != nil {
-			return output.PeerRef{}, err
+			return output.RightsRow{}, err
 		}
-		var pr output.PeerRef
+		var row output.RightsRow
 		err = f.WithPeers(ctx, acct, runtime.ClientOptsFrom(f, acct),
 			func(ctx context.Context, api *tg.Client, _ *peers.Manager, res *peer.Resolver) error {
-				pr, err = telegram.SetMemberAdmin(ctx, api, res, q)
+				row, err = telegram.SetMemberAdmin(ctx, api, res, q)
 				return err
 			})
-		return pr, err
+		return row, err
 	}
 }

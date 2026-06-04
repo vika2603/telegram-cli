@@ -21,7 +21,7 @@ var runLaunchctl = func(args ...string) (string, error) {
 }
 
 // labelPrefix is the launchd reverse-DNS prefix. The actual label
-// includes the account: e.g. "com.vika2603.telegram-cli.cuiko31".
+// includes the account: e.g. "com.vika2603.telegram-cli.<account>".
 const labelPrefix = "com.vika2603.telegram-cli"
 
 type launchdManager struct {

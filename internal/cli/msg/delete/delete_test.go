@@ -30,7 +30,7 @@ func TestRun_NoYesNoPrompter_Declined(t *testing.T) {
 	f.Prompter = stubPrompter{ok: false}
 	opts := &del.Options{
 		RawMessageRefs: []string{"@a:1"}, Prompter: f.Prompter, IOStreams: ios,
-		Delete: func(_ context.Context, _ actionmessage.DeleteQuery) error { return nil },
+		Delete: func(_ context.Context, _ actionmessage.DeleteQuery) (int, error) { return 0, nil },
 	}
 	err := del.Run(context.Background(), opts)
 	require.ErrorIs(t, err, command.ErrNotConfirmed)
@@ -42,11 +42,13 @@ func TestRun_YesSkipsPromptCallsDelete(t *testing.T) {
 	called := false
 	opts := &del.Options{
 		RawMessageRefs: []string{"@a:1", "@a:2"}, Yes: true, Prompter: f.Prompter, IOStreams: ios,
-		Delete: func(_ context.Context, _ actionmessage.DeleteQuery) error { called = true; return nil },
+		// Two refs requested but Telegram reports only one affected — the
+		// output must reflect the affected count, not len(refs).
+		Delete: func(_ context.Context, _ actionmessage.DeleteQuery) (int, error) { called = true; return 1, nil },
 	}
 	require.NoError(t, del.Run(context.Background(), opts))
 	require.True(t, called)
-	require.Contains(t, stdout.String(), "deleted")
+	require.Contains(t, stdout.String(), "deleted\t1")
 }
 
 func TestRun_PromptAcceptedCallsDelete(t *testing.T) {
@@ -56,7 +58,7 @@ func TestRun_PromptAcceptedCallsDelete(t *testing.T) {
 	called := false
 	opts := &del.Options{
 		RawMessageRefs: []string{"@a:5"}, Prompter: f.Prompter, IOStreams: ios,
-		Delete: func(_ context.Context, _ actionmessage.DeleteQuery) error { called = true; return nil },
+		Delete: func(_ context.Context, _ actionmessage.DeleteQuery) (int, error) { called = true; return 1, nil },
 	}
 	require.NoError(t, del.Run(context.Background(), opts))
 	require.True(t, called)
@@ -76,11 +78,19 @@ func TestRun_RevokeOutputsRevoked(t *testing.T) {
 	f := runtime.NewTestInvocation(t)
 	opts := &del.Options{
 		RawMessageRefs: []string{"@a:1"}, Revoke: true, Yes: true, Prompter: f.Prompter, IOStreams: ios,
-		Delete: func(_ context.Context, _ actionmessage.DeleteQuery) error { return nil },
+		Delete: func(_ context.Context, _ actionmessage.DeleteQuery) (int, error) { return 1, nil },
 	}
 	require.NoError(t, del.Run(context.Background(), opts))
 	require.Contains(t, stdout.String(), "revoked")
 	require.NotContains(t, stdout.String(), "deleted")
+}
+
+func TestDecodeDeleteCount(t *testing.T) {
+	// Current daemon: integer affected count is used as-is.
+	require.Equal(t, 3, del.DecodeDeleteCountForTest([]byte("3"), 5))
+	require.Equal(t, 0, del.DecodeDeleteCountForTest([]byte("0"), 5))
+	// Older daemon: bare "true" ack doesn't decode -> fall back to requested.
+	require.Equal(t, 5, del.DecodeDeleteCountForTest([]byte("true"), 5))
 }
 
 type stubPrompter struct{ ok bool }

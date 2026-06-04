@@ -155,10 +155,11 @@ func registerHandlers(
 		if err := json.Unmarshal(params, &q); err != nil { //nolint:musttag
 			return nil, fmt.Errorf("invalid msg.delete params: %w", err)
 		}
-		if err := telegram.DeleteMessages(ctx, api, res, q); err != nil {
+		affected, err := telegram.DeleteMessages(ctx, api, res, q)
+		if err != nil {
 			return nil, err
 		}
-		return json.RawMessage("true"), nil
+		return json.Marshal(affected)
 	})
 
 	srv.Register("msg.pin", func(ctx context.Context, params json.RawMessage) (json.RawMessage, error) {

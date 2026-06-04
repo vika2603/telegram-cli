@@ -433,8 +433,8 @@ type DeleteResult struct {
 	Count int
 }
 
-// DeleteFunc deletes messages.
-type DeleteFunc func(context.Context, DeleteQuery) error
+// DeleteFunc deletes messages and returns how many Telegram actually affected.
+type DeleteFunc func(context.Context, DeleteQuery) (int, error)
 
 // Delete validates, confirms, and dispatches a delete request.
 func Delete(ctx context.Context, req DeleteRequest, do DeleteFunc) (DeleteResult, error) {
@@ -452,14 +452,18 @@ func Delete(ctx context.Context, req DeleteRequest, do DeleteFunc) (DeleteResult
 	if err := ui.ConfirmDestructive(req.Prompter, fmt.Sprintf("%s %d message(s) in %s?", verb, len(query.IDs), query.Ref.String()), req.Yes); err != nil {
 		return DeleteResult{}, err
 	}
-	if err := do(ctx, query); err != nil {
+	affected, err := do(ctx, query)
+	if err != nil {
 		return DeleteResult{}, err
 	}
 	outVerb := "deleted"
 	if query.Revoke {
 		outVerb = "revoked"
 	}
-	return DeleteResult{Verb: outVerb, Count: len(query.IDs)}, nil
+	// Report the count Telegram actually affected, not the number requested:
+	// a self-side delete of another user's message in a supergroup is a no-op
+	// the server reports as 0.
+	return DeleteResult{Verb: outVerb, Count: affected}, nil
 }
 
 // NormalizeDelete parses delete refs.

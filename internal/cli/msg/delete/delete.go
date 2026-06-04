@@ -3,6 +3,7 @@ package deletecmd
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/gotd/td/telegram/peers"
@@ -72,19 +73,32 @@ func Run(ctx context.Context, opts *Options) error {
 
 // newDelete returns the production Delete closure that calls the Telegram API.
 func newDelete(f *runtime.Invocation) actionmessage.DeleteFunc {
-	return func(ctx context.Context, q actionmessage.DeleteQuery) error {
+	return func(ctx context.Context, q actionmessage.DeleteQuery) (int, error) {
 		acct, err := f.Account("")
 		if err != nil {
-			return err
+			return 0, err
 		}
 		if cl, _ := runtime.MaybeDialDaemon(ctx, f, acct); cl != nil {
 			defer func() { _ = cl.Close() }()
-			_, err := cl.Call(ctx, "msg.delete", q)
-			return err
+			raw, err := cl.Call(ctx, "msg.delete", q)
+			if err != nil {
+				return 0, err
+			}
+			var affected int
+			if err := json.Unmarshal(raw, &affected); err != nil {
+				// An older daemon answers msg.delete with a bare "true" ack
+				// instead of the affected count. Fall back to the requested
+				// count so delete still works across a version skew.
+				return len(q.IDs), nil
+			}
+			return affected, nil
 		}
-		return f.WithPeers(ctx, acct, runtime.ClientOptsFrom(f, acct),
+		var affected int
+		err = f.WithPeers(ctx, acct, runtime.ClientOptsFrom(f, acct),
 			func(ctx context.Context, api *tg.Client, _ *peers.Manager, res *peer.Resolver) error {
-				return telegram.DeleteMessages(ctx, api, res, q)
+				affected, err = telegram.DeleteMessages(ctx, api, res, q)
+				return err
 			})
+		return affected, err
 	}
 }

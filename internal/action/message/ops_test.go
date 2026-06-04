@@ -250,14 +250,16 @@ func TestDelete_ConfirmsBeforeDispatch(t *testing.T) {
 	result, err := actionmessage.Delete(context.Background(), actionmessage.DeleteRequest{
 		RawMessageRefs: []string{"@chat:1", "@chat:2"},
 		Prompter:       stubPrompter{ok: true},
-	}, func(_ context.Context, q actionmessage.DeleteQuery) error {
+	}, func(_ context.Context, q actionmessage.DeleteQuery) (int, error) {
 		called = true
 		require.Equal(t, []int{1, 2}, q.IDs)
-		return nil
+		// Server reports only one affected though two IDs were requested; the
+		// result count must come from this return value, not len(q.IDs).
+		return 1, nil
 	})
 	require.NoError(t, err)
 	require.True(t, called)
-	require.Equal(t, actionmessage.DeleteResult{Verb: "deleted", Count: 2}, result)
+	require.Equal(t, actionmessage.DeleteResult{Verb: "deleted", Count: 1}, result)
 }
 
 func TestDelete_DeclineSkipsDispatch(t *testing.T) {
@@ -265,9 +267,9 @@ func TestDelete_DeclineSkipsDispatch(t *testing.T) {
 	_, err := actionmessage.Delete(context.Background(), actionmessage.DeleteRequest{
 		RawMessageRefs: []string{"@chat:1"},
 		Prompter:       stubPrompter{ok: false},
-	}, func(context.Context, actionmessage.DeleteQuery) error {
+	}, func(context.Context, actionmessage.DeleteQuery) (int, error) {
 		called = true
-		return nil
+		return 0, nil
 	})
 	require.ErrorIs(t, err, command.ErrNotConfirmed)
 	require.False(t, called)

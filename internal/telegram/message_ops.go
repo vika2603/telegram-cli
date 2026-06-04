@@ -292,20 +292,29 @@ func ForwardMessages(ctx context.Context, api *tg.Client, resolver *peer.Resolve
 	return rows[0], nil
 }
 
-// DeleteMessages performs the Telegram RPC for `tg msg delete`.
-func DeleteMessages(ctx context.Context, api *tg.Client, resolver *peer.Resolver, q actionmessage.DeleteQuery) error {
+// DeleteMessages performs the Telegram RPC for `tg msg delete`. It returns the
+// number of messages Telegram actually affected (PtsCount), which can be less
+// than len(q.IDs) — e.g. deleting someone else's message self-side in a
+// supergroup is a no-op the server reports as 0.
+func DeleteMessages(ctx context.Context, api *tg.Client, resolver *peer.Resolver, q actionmessage.DeleteQuery) (int, error) {
 	sender := gotdmessage.NewSender(api)
 	if !q.Revoke {
-		_, err := sender.Delete().Messages(ctx, q.IDs...)
-		return err
+		affected, err := sender.Delete().Messages(ctx, q.IDs...)
+		if err != nil {
+			return 0, err
+		}
+		return affected.PtsCount, nil
 	}
 
 	resolved, err := resolver.Resolve(ctx, q.Ref)
 	if err != nil {
-		return err
+		return 0, err
 	}
-	_, err = sender.To(resolved.InputPeer).Revoke().Messages(ctx, q.IDs...)
-	return err
+	affected, err := sender.To(resolved.InputPeer).Revoke().Messages(ctx, q.IDs...)
+	if err != nil {
+		return 0, err
+	}
+	return affected.PtsCount, nil
 }
 
 // PinMessage performs the Telegram RPC for `tg msg pin` and `tg msg unpin`.

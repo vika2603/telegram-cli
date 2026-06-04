@@ -32,7 +32,7 @@ func TestRPC_ClassifiesForbiddenFamily(t *testing.T) {
 }
 
 func TestRPC_ClassifiesUsageFamily(t *testing.T) {
-	for _, typ := range []string{"HIDE_REQUESTER_MISSING", "PARTICIPANT_ID_INVALID"} {
+	for _, typ := range []string{"HIDE_REQUESTER_MISSING", "PARTICIPANT_ID_INVALID", "USER_CREATOR"} {
 		err := rpcErr(typ, 400)
 		require.Equal(t, CodeUsage, Code(err), typ)
 		require.Equal(t, 2, MapExitCode(err), typ)

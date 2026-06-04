@@ -125,23 +125,29 @@ func Run(ctx context.Context, opts *Options) error {
 
 // newSend returns the production Send closure that calls the Telegram API.
 //
-// Daemon fast-path applies only when the payload is pure text — file
-// attachments and stdin require byte streams the IPC socket does not
-// carry yet, so those fall through to the local WithPeers path.
+// Daemon fast-path: text/metadata sends always route through a reachable
+// daemon; sticker/GIF sends route through it only when the daemon advertised
+// the media-send capability (older daemons would drop the field and post an
+// empty message). File attachments carry bytes the IPC socket cannot relay, so
+// they always take the local WithPeers path.
 func newSend(f *runtime.Invocation) actionmessage.SendFunc {
 	return func(ctx context.Context, q actionmessage.SendQuery) ([]output.SendResultRow, error) {
 		acct, err := f.Account("")
 		if err != nil {
 			return nil, err
 		}
-		if canDaemonSend(q) {
+		if len(q.Attachments) == 0 {
 			if cl, _ := runtime.MaybeDialDaemon(ctx, f, acct); cl != nil {
+				if isMediaSend(q) && !cl.SupportsMediaSend() {
+					_ = cl.Close()
+					return nil, fmt.Errorf("%w: the running daemon is too old to relay stickers/GIFs; "+
+						"run `tg daemon restart` to enable daemon media sends, or `tg daemon stop` to send locally", account.ErrBusy)
+				}
 				defer func() { _ = cl.Close() }()
 				// SendQuery.Stdin is io.Reader, which the JSON encoder
-				// renders as `{}` and the decoder cannot rehydrate.
-				// Strip it before sending — telegram.SendMessage only
-				// consumes Stdin via Attachment.Path == "-", which the
-				// canDaemonSend gate already excluded.
+				// renders as `{}` and the decoder cannot rehydrate. Strip
+				// it before sending — telegram.SendMessage only consumes
+				// Stdin via Attachment.Path == "-", excluded above.
 				wire := q
 				wire.Stdin = nil
 				raw, err := cl.Call(ctx, "msg.send", wire)
@@ -172,17 +178,10 @@ func newSend(f *runtime.Invocation) actionmessage.SendFunc {
 	}
 }
 
-// canDaemonSend reports whether a SendQuery is daemon-routable.
-// Attachments require bytes the daemon cannot read from the client's
-// filesystem, so file uploads fall back to local mode. Stdin alone
-// is NOT a gate — the CLI plumbs IOStreams.In into every SendQuery
-// for use during stdin-text or stdin-file paths, but telegram.SendMessage
-// only consumes Stdin when an Attachment with Path == "-" is present,
-// and Normalize already resolves stdin-as-text into Text before this
-// point. Schedule + Silent + Parse + ReplyTo are pure metadata and
-// stay supported.
-func canDaemonSend(q actionmessage.SendQuery) bool {
-	return len(q.Attachments) == 0 && q.Sticker == nil && q.Gif == nil
+// isMediaSend reports whether the query carries a sticker or GIF, which a
+// daemon can only relay when it advertised FeatureMediaSend.
+func isMediaSend(q actionmessage.SendQuery) bool {
+	return q.Sticker != nil || q.Gif != nil
 }
 
 func recordSentMessages(store *account.PeerStore, peerRef, text string, rows []output.SendResultRow) {

@@ -74,6 +74,8 @@ func TestServer_HelloFrameOnConnect(t *testing.T) {
 	hello := cl.Hello()
 	require.Equal(t, "alice", hello.Account)
 	require.Equal(t, daemon.ProtocolSchema, hello.Schema)
+	require.Contains(t, hello.Features, daemon.FeatureMediaSend)
+	require.True(t, cl.SupportsMediaSend())
 }
 
 func TestServer_PingPong(t *testing.T) {

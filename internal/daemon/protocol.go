@@ -12,6 +12,20 @@ import (
 // because both ends ignore unknown JSON fields.
 const ProtocolSchema = 1
 
+// FeatureMediaSend is advertised in the Hello frame by daemons that can relay
+// sticker/GIF sends over IPC (i.e. their SendQuery decoder understands the
+// Sticker/Gif fields). A client that does not see this feature must fall back
+// to the local path for media sends, because an older daemon would silently
+// drop the unknown field and post an empty message. Additive on the wire:
+// older daemons simply omit it, older clients ignore it.
+const FeatureMediaSend = "msg.send.media"
+
+// DaemonFeatures lists the optional capabilities this build advertises to
+// clients in the Hello frame.
+func DaemonFeatures() []string {
+	return []string{FeatureMediaSend}
+}
+
 // Frame is the union sent in both directions over the Unix socket.
 // Exactly one of Method / Result / Error / Event is populated. The
 // daemon and client both decode into Frame first, then dispatch on
@@ -73,9 +87,10 @@ type FrameError struct {
 // connection. The client uses it to confirm the server is the right
 // account and that the schema version matches.
 type HelloPayload struct {
-	DaemonVersion string `json:"daemon_version"`
-	Account       string `json:"account"`
-	Schema        int    `json:"schema"`
+	DaemonVersion string   `json:"daemon_version"`
+	Account       string   `json:"account"`
+	Schema        int      `json:"schema"`
+	Features      []string `json:"features,omitempty"`
 }
 
 // SubscribeParams names the kinds/peers a subscriber wants. Empty

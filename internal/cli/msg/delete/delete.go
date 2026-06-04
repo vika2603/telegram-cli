@@ -84,14 +84,7 @@ func newDelete(f *runtime.Invocation) actionmessage.DeleteFunc {
 			if err != nil {
 				return 0, err
 			}
-			var affected int
-			if err := json.Unmarshal(raw, &affected); err != nil {
-				// An older daemon answers msg.delete with a bare "true" ack
-				// instead of the affected count. Fall back to the requested
-				// count so delete still works across a version skew.
-				return len(q.IDs), nil
-			}
-			return affected, nil
+			return decodeDeleteCount(raw, len(q.IDs)), nil
 		}
 		var affected int
 		err = f.WithPeers(ctx, acct, runtime.ClientOptsFrom(f, acct),
@@ -101,4 +94,16 @@ func newDelete(f *runtime.Invocation) actionmessage.DeleteFunc {
 			})
 		return affected, err
 	}
+}
+
+// decodeDeleteCount reads the affected-message count from a daemon msg.delete
+// response. A current daemon returns the integer count; an older one returns a
+// bare "true" ack that won't decode, in which case we fall back to the
+// requested count so delete still works across a version skew.
+func decodeDeleteCount(raw json.RawMessage, requested int) int {
+	var affected int
+	if err := json.Unmarshal(raw, &affected); err != nil {
+		return requested
+	}
+	return affected
 }

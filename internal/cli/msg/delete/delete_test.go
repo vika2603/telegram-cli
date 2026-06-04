@@ -85,6 +85,14 @@ func TestRun_RevokeOutputsRevoked(t *testing.T) {
 	require.NotContains(t, stdout.String(), "deleted")
 }
 
+func TestDecodeDeleteCount(t *testing.T) {
+	// Current daemon: integer affected count is used as-is.
+	require.Equal(t, 3, del.DecodeDeleteCountForTest([]byte("3"), 5))
+	require.Equal(t, 0, del.DecodeDeleteCountForTest([]byte("0"), 5))
+	// Older daemon: bare "true" ack doesn't decode -> fall back to requested.
+	require.Equal(t, 5, del.DecodeDeleteCountForTest([]byte("true"), 5))
+}
+
 type stubPrompter struct{ ok bool }
 
 func (s stubPrompter) Confirm(string, bool) (bool, error)   { return s.ok, nil }

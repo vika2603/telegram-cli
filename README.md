@@ -133,6 +133,7 @@ client commands route through when present).
 | `tg msg send <ref> [text...]` | Send text. Repeat `--file <path>` to attach one or more files; text becomes the first media caption. Use `--name` to override upload filenames. `--sticker <ref>` / `--gif <ref>` send a sticker/gif — either a `msg sticker list`/`msg gif list` ref or a `<msg-ref>` of an existing one (no text/`--file`). |
 | `tg msg sticker list` | List your stickers to get a sendable `ref`. `--recent` (default), `--faved`, `--installed` (sets), `--all` (recent+faved+all sets expanded; slow). |
 | `tg msg sticker fave <ref>` / `tg msg sticker unfave <ref>` | Add or remove a sticker from favorites (`<ref>` is a list ref or `<msg-ref>`). |
+| `tg msg sticker add <set>` / `tg msg sticker remove <set>` | Install or uninstall a sticker set. `<set>` is a set short name or an `https://t.me/addstickers/<name>` link. |
 | `tg msg gif list` | List your saved GIFs, each with a sendable `ref`. |
 | `tg msg poll <ref> <question> <option>...` | Send a poll (≥2 options). `--multiple`, `--public` (default anonymous); `--correct <n>` makes it a quiz with optional `--explanation`. |
 | `tg msg vote <msg-ref> <option-number>...` | Vote on a poll by 1-based option number (multiple numbers for multiple-choice polls); `--retract` to take back your vote. |

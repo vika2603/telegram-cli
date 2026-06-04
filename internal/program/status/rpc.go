@@ -46,6 +46,7 @@ var rpcErrors = map[string]rpcClass{
 	tg.ErrUserCreator:          {CodeUsage, 2, "this action isn't allowed on the group/channel creator"},
 	tg.ErrFileReferenceExpired: {CodeUsage, 2, "sticker reference expired; run `tg msg sticker list` again for a fresh ref"},
 	tg.ErrFileReferenceInvalid: {CodeUsage, 2, "sticker reference is no longer valid; run `tg msg sticker list` again for a fresh ref"},
+	tg.ErrStickersetInvalid:    {CodeUsage, 2, "no such sticker set (check the short name or addstickers link)"},
 }
 
 // matchRPC returns the classification for a known raw Telegram RPC error

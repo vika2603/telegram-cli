@@ -65,7 +65,7 @@ func newSet(f *runtime.Invocation, runF func(*SetOptions) error, remove bool, us
 
 // RunSet dispatches install/uninstall.
 func RunSet(ctx context.Context, opts *SetOptions) error {
-	res, err := actionmessage.StickerSet(ctx, actionmessage.StickerSetRequest{RawSet: opts.RawSet, Remove: opts.Remove}, opts.Do)
+	res, err := actionmessage.InstallStickerSet(ctx, actionmessage.StickerSetRequest{RawSet: opts.RawSet, Remove: opts.Remove}, opts.Do)
 	if err != nil {
 		return err
 	}

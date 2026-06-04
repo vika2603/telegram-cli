@@ -24,8 +24,10 @@ type StickerSetQuery struct {
 // StickerSetFunc installs or uninstalls a sticker set.
 type StickerSetFunc func(context.Context, StickerSetQuery) (output.StickerSetResult, error)
 
-// StickerSet validates the request and dispatches the install/uninstall.
-func StickerSet(ctx context.Context, req StickerSetRequest, do StickerSetFunc) (output.StickerSetResult, error) {
+// InstallStickerSet validates the request and dispatches the install/uninstall
+// (uninstall when req.Remove). Named for the positive verb, mirroring
+// FaveSticker, which likewise covers its inverse via a flag.
+func InstallStickerSet(ctx context.Context, req StickerSetRequest, do StickerSetFunc) (output.StickerSetResult, error) {
 	name, err := parseStickerSetRef(req.RawSet)
 	if err != nil {
 		return output.StickerSetResult{}, err

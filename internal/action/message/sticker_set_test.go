@@ -20,7 +20,7 @@ func TestStickerSet_ParsesShortNameAndLinks(t *testing.T) {
 		"https://telegram.me/addstickers/Animals",
 		"https://t.me/addstickers/Animals?utm=x",
 	} {
-		_, err := actionmessage.StickerSet(context.Background(), actionmessage.StickerSetRequest{RawSet: in},
+		_, err := actionmessage.InstallStickerSet(context.Background(), actionmessage.StickerSetRequest{RawSet: in},
 			func(_ context.Context, q actionmessage.StickerSetQuery) (output.StickerSetResult, error) {
 				require.Equal(t, "Animals", q.ShortName, in)
 				require.False(t, q.Remove)
@@ -31,7 +31,7 @@ func TestStickerSet_ParsesShortNameAndLinks(t *testing.T) {
 }
 
 func TestStickerSet_RemovePassesThrough(t *testing.T) {
-	_, err := actionmessage.StickerSet(context.Background(), actionmessage.StickerSetRequest{RawSet: "Animals", Remove: true},
+	_, err := actionmessage.InstallStickerSet(context.Background(), actionmessage.StickerSetRequest{RawSet: "Animals", Remove: true},
 		func(_ context.Context, q actionmessage.StickerSetQuery) (output.StickerSetResult, error) {
 			require.Equal(t, "Animals", q.ShortName)
 			require.True(t, q.Remove)
@@ -41,7 +41,7 @@ func TestStickerSet_RemovePassesThrough(t *testing.T) {
 }
 
 func TestStickerSet_RejectsEmptyRef(t *testing.T) {
-	_, err := actionmessage.StickerSet(context.Background(), actionmessage.StickerSetRequest{RawSet: "  "},
+	_, err := actionmessage.InstallStickerSet(context.Background(), actionmessage.StickerSetRequest{RawSet: "  "},
 		func(context.Context, actionmessage.StickerSetQuery) (output.StickerSetResult, error) {
 			t.Fatal("must not dispatch")
 			return output.StickerSetResult{}, nil

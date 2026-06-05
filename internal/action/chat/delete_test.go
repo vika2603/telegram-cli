@@ -36,3 +36,16 @@ func TestDeleteChat_DeclineSkipsDispatch(t *testing.T) {
 	})
 	require.ErrorIs(t, err, command.ErrNotConfirmed)
 }
+
+func TestDeleteChat_RevokePassesThrough(t *testing.T) {
+	_, err := actionchat.DeleteChat(context.Background(), actionchat.DeleteChatRequest{
+		RawRef:   "@bob",
+		Revoke:   true,
+		Prompter: &ui.StubPrompter{Answers: []any{true}},
+	}, func(_ context.Context, q actionchat.DeleteChatQuery) (output.PeerRef, error) {
+		require.Equal(t, "bob", q.Ref.Value)
+		require.True(t, q.Revoke)
+		return output.PeerRef{}, nil
+	})
+	require.NoError(t, err)
+}

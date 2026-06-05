@@ -20,19 +20,19 @@ func TestReportDefaultsToSpam(t *testing.T) {
 		func(_ context.Context, q contact.ReportQuery) error {
 			require.Equal(t, "bob", q.Ref.Value)
 			require.Equal(t, "spam", q.Reason)
-			require.False(t, q.Ban)
+			require.False(t, q.Block)
 			return nil
 		})
 	require.NoError(t, err)
 }
 
-func TestReportPassesReasonMessageAndBan(t *testing.T) {
+func TestReportPassesReasonMessageAndBlock(t *testing.T) {
 	err := contact.Report(context.Background(), contact.ReportRequest{
-		RawRef: "@bob", Reason: "fake", Message: "scam", Ban: true, Yes: true,
+		RawRef: "@bob", Reason: "fake", Message: "scam", Block: true, Yes: true,
 	}, func(_ context.Context, q contact.ReportQuery) error {
 		require.Equal(t, "fake", q.Reason)
 		require.Equal(t, "scam", q.Message)
-		require.True(t, q.Ban)
+		require.True(t, q.Block)
 		return nil
 	})
 	require.NoError(t, err)

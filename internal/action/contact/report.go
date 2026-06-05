@@ -31,7 +31,7 @@ type ReportRequest struct {
 	RawRef   string
 	Reason   string
 	Message  string
-	Ban      bool // also block the peer after reporting
+	Block    bool // also block the peer after reporting
 	Yes      bool
 	Prompter ui.Prompter
 }
@@ -41,7 +41,7 @@ type ReportQuery struct {
 	Ref     ref.Ref
 	Reason  string
 	Message string
-	Ban     bool
+	Block   bool
 }
 
 // ReportFunc reports one peer after request validation.
@@ -64,11 +64,11 @@ func Report(ctx context.Context, req ReportRequest, do ReportFunc) error {
 		return fmt.Errorf("%w: contact report called without report function", command.ErrPrecondition)
 	}
 	prompt := fmt.Sprintf("report %s for %s?", req.RawRef, reason)
-	if req.Ban {
+	if req.Block {
 		prompt = fmt.Sprintf("report %s for %s and block them?", req.RawRef, reason)
 	}
 	if err := ui.ConfirmDestructive(req.Prompter, prompt, req.Yes); err != nil {
 		return err
 	}
-	return do(ctx, ReportQuery{Ref: parsed, Reason: reason, Message: req.Message, Ban: req.Ban})
+	return do(ctx, ReportQuery{Ref: parsed, Reason: reason, Message: req.Message, Block: req.Block})
 }

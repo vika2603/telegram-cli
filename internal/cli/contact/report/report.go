@@ -22,7 +22,7 @@ type Options struct {
 	RawRef  string
 	Reason  string
 	Message string
-	Ban     bool
+	Block   bool
 	Yes     bool
 
 	IOStreams *ui.IOStreams
@@ -53,7 +53,7 @@ func New(f *runtime.Invocation, runF func(*Options) error) *cobra.Command {
 	}
 	cmd.Flags().StringVar(&opts.Reason, "reason", "spam", "Report reason: spam, violence, porn, child-abuse, copyright, fake, drugs, personal-details, geo-irrelevant, other")
 	cmd.Flags().StringVar(&opts.Message, "message", "", "Optional comment for report moderation")
-	cmd.Flags().BoolVar(&opts.Ban, "ban", false, "Also block the peer after reporting")
+	cmd.Flags().BoolVar(&opts.Block, "block", false, "Also block the peer after reporting")
 	cmd.Flags().BoolVarP(&opts.Yes, "yes", "y", false, "Skip confirmation prompt")
 	command.SetMeta(cmd, command.Meta{NeedsAccount: true, NeedsClient: true})
 	return cmd
@@ -65,14 +65,14 @@ func Run(ctx context.Context, opts *Options) error {
 		RawRef:   opts.RawRef,
 		Reason:   opts.Reason,
 		Message:  opts.Message,
-		Ban:      opts.Ban,
+		Block:    opts.Block,
 		Yes:      opts.Yes,
 		Prompter: opts.Prompter,
 	}, opts.Report); err != nil {
 		return err
 	}
 	verb := "reported"
-	if opts.Ban {
+	if opts.Block {
 		verb = "reported+blocked"
 	}
 	_, _ = fmt.Fprintf(opts.IOStreams.Out, "%s\t%s\n", verb, opts.RawRef)

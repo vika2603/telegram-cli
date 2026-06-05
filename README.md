@@ -123,7 +123,7 @@ client commands route through when present).
 | `tg chat invite create <ref>` | Create an invite link. `--title`, `--expire <RFC3339\|dur>`, `--usage-limit <n>`, `--request-needed`. |
 | `tg chat invite list <ref>` | List invite links. `--revoked`, `--admin <user>`, `--limit`. |
 | `tg chat invite revoke <ref> <link>` / `delete <ref> <link>` | Revoke a link, or delete a revoked one. |
-| `tg chat ban <ref> <user>` / `tg chat unban <ref> <user>` | Ban (remove + block) or unban a member. Ban prompts unless `--yes`. |
+| `tg chat ban <ref> <user>` / `tg chat unban <ref> <user>` | Ban (remove + restrict) or unban a member of a group/channel. Ban prompts unless `--yes`. |
 | `tg chat admin promote <ref> <user>` / `tg chat admin demote <ref> <user>` | Grant or revoke admin rights. `--rights <keywords>` grants a specific set (`info,post,edit,delete,ban,invite,pin,add_admins,anonymous,call,topics,post_stories,edit_stories,delete_stories`); omit `--rights` for a broad default set. `--title <rank>` sets a custom admin title (≤16 chars); omit `--title` to keep the current title, pass `--title ""` to clear it. |
 | `tg chat member set-perms <ref> <user>` | Set a member's permissions with `--deny`/`--allow` keywords (`send,media,stickers,bots,polls,links,invite,pin,info,topics`) and optional `--until <RFC3339\|dur>` (default permanent). |
 | `tg chat member unset-perms <ref> <user>` | Clear all permission restrictions on a member. |
@@ -159,7 +159,7 @@ client commands route through when present).
 | `tg contact delete <ref>` | Delete a contact. |
 | `tg contact block <ref>` | Block a user, bot, or channel. |
 | `tg contact unblock <ref>` | Unblock a user, bot, or channel. |
-| `tg contact report <ref>` | Report a peer to Telegram. `--reason` (spam (default), violence, porn, child-abuse, copyright, fake, drugs, personal-details, geo-irrelevant, other), `--message <comment>`, `--ban` (also block). Prompts unless `--yes`. |
+| `tg contact report <ref>` | Report a peer to Telegram. `--reason` (spam (default), violence, porn, child-abuse, copyright, fake, drugs, personal-details, geo-irrelevant, other), `--message <comment>`, `--block` (also block the peer). Prompts unless `--yes`. |
 | `tg me` | Print the current Telegram identity. |
 | `tg profile set-name <first>` | Set first name; `--last` sets or clears last name. |
 | `tg profile set-username <username>` | Set or clear the public username. |

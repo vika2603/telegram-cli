@@ -116,8 +116,8 @@ func UnblockContact(ctx context.Context, api *tg.Client, resolver *peer.Resolver
 }
 
 // ReportPeer reports one resolved peer to Telegram moderation via
-// account.reportPeer with the given reason and optional comment. When q.Ban is
-// set it also blocks the peer (contacts.block) after a successful report.
+// account.reportPeer with the given reason and optional comment. When q.Block
+// is set it also blocks the peer (contacts.block) after a successful report.
 func ReportPeer(ctx context.Context, api *tg.Client, resolver *peer.Resolver, q actioncontact.ReportQuery) error {
 	resolved, err := resolver.Resolve(ctx, q.Ref)
 	if err != nil {
@@ -130,7 +130,7 @@ func ReportPeer(ctx context.Context, api *tg.Client, resolver *peer.Resolver, q 
 	}); err != nil {
 		return err
 	}
-	if q.Ban {
+	if q.Block {
 		if _, err := api.ContactsBlock(ctx, &tg.ContactsBlockRequest{ID: resolved.InputPeer}); err != nil {
 			return err
 		}

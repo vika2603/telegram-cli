@@ -9,8 +9,10 @@ import (
 	"github.com/vika2603/telegram-cli/internal/ui"
 )
 
-// ReportReasons are the keywords accepted by `tg contact report --reason`,
-// mapped (in the telegram layer) to a tg.ReportReasonClass.
+// ReportReasons are the keywords accepted by `tg contact report --reason`.
+// Keep this set in sync with reportReason() in internal/telegram/contacts.go,
+// which maps each keyword to a tg.ReportReasonClass — a keyword present here but
+// missing there would silently report as spam.
 var ReportReasons = map[string]bool{
 	"spam":             true,
 	"violence":         true,

@@ -138,7 +138,10 @@ func ReportPeer(ctx context.Context, api *tg.Client, resolver *peer.Resolver, q 
 	return nil
 }
 
-// reportReason maps a validated reason keyword to a tg.ReportReasonClass.
+// reportReason maps a validated reason keyword to a tg.ReportReasonClass. Keep
+// the cases in sync with ReportReasons in internal/action/contact/report.go;
+// the action layer validates the keyword before it reaches here, so the default
+// is only a safety net.
 func reportReason(reason string) tg.ReportReasonClass {
 	switch reason {
 	case "violence":

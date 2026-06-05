@@ -22,6 +22,7 @@ import (
 // Options holds the resolved flags and injected dependencies for Run.
 type Options struct {
 	RawRef    string
+	Revoke    bool
 	Yes       bool
 	Exporter  output.Exporter
 	IOStreams *ui.IOStreams
@@ -31,7 +32,7 @@ type Options struct {
 
 // New builds the cobra command for "tg chat delete".
 func New(f *runtime.Invocation, runF func(*Options) error) *cobra.Command {
-	return NewWith(f, runF, "Delete a supergroup or channel (irreversible)")
+	return NewWith(f, runF, "Delete a supergroup/channel, or remove a user DM from your chat list")
 }
 
 // NewWith builds the delete command with a caller-supplied short description so
@@ -55,6 +56,7 @@ func NewWith(f *runtime.Invocation, runF func(*Options) error, short string) *co
 			return Run(cmd.Context(), opts)
 		},
 	}
+	cmd.Flags().BoolVar(&opts.Revoke, "revoke", false, "For a user DM, also delete the conversation on the other side")
 	cmd.Flags().BoolVarP(&opts.Yes, "yes", "y", false, "Skip confirmation prompt")
 	command.SetMeta(cmd, command.Meta{NeedsAccount: true, NeedsClient: true})
 	output.AddJSONFlags(cmd, &opts.Exporter, []string{"id", "ref", "kind", "title", "username"})
@@ -65,6 +67,7 @@ func NewWith(f *runtime.Invocation, runF func(*Options) error, short string) *co
 func Run(ctx context.Context, opts *Options) error {
 	pr, err := actionchat.DeleteChat(ctx, actionchat.DeleteChatRequest{
 		RawRef:   opts.RawRef,
+		Revoke:   opts.Revoke,
 		Yes:      opts.Yes,
 		Prompter: opts.Prompter,
 	}, opts.Delete)

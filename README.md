@@ -89,7 +89,7 @@ client commands route through when present).
 | `tg chat list` | List dialogs. |
 | `tg chat info <ref>` | Show one user, chat, bot, or channel. `--full` adds members/admins/online counts, about, linked discussion group, pinned message, and slow mode (supergroups/channels only). |
 | `tg chat create <title>` | Create a supergroup. `--forum` enables topics; `--about` sets the description. |
-| `tg chat delete <ref>` | Delete a supergroup or channel (irreversible). Prompts unless `--yes`. |
+| `tg chat delete <ref>` | Delete a supergroup/channel (irreversible), or remove a user DM from your chat list (`--revoke` also deletes it on the other side). Prompts unless `--yes`. |
 | `tg chat edit <ref>` | Edit a supergroup: `--title`, `--about`, `--public <name>` / `--private`; toggles: `--forum`/`--no-forum`, `--hide-members`/`--show-members`, `--hide-history`/`--show-history`, `--slow-mode <s>`, `--no-forwards`/`--allow-forwards`, `--need-approval`/`--no-need-approval` (public only). |
 | `tg chat topic list <ref>` | List a forum supergroup's topics. `--search` filters by title; `--limit` caps results (single page only, ~100 max — pagination not implemented). |
 | `tg chat topic create <ref> <title>` | Create a topic. `--icon-color`, `--icon-emoji`, and `--random-id` (idempotent retry). |

@@ -8,6 +8,7 @@ import (
 	"github.com/vika2603/telegram-cli/internal/cli/contact/block"
 	del "github.com/vika2603/telegram-cli/internal/cli/contact/delete"
 	"github.com/vika2603/telegram-cli/internal/cli/contact/list"
+	"github.com/vika2603/telegram-cli/internal/cli/contact/report"
 	"github.com/vika2603/telegram-cli/internal/cli/contact/unblock"
 	"github.com/vika2603/telegram-cli/internal/runtime"
 )
@@ -16,7 +17,7 @@ import (
 func New(f *runtime.Invocation) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "contact",
-		Short:   "Address book: list, add, delete, block, unblock",
+		Short:   "Address book: list, add, delete, block, unblock, report",
 		GroupID: "core",
 	}
 	cmd.AddCommand(list.New(f, nil))
@@ -24,5 +25,6 @@ func New(f *runtime.Invocation) *cobra.Command {
 	cmd.AddCommand(del.New(f, nil))
 	cmd.AddCommand(block.New(f, nil))
 	cmd.AddCommand(unblock.New(f, nil))
+	cmd.AddCommand(report.New(f, nil))
 	return cmd
 }

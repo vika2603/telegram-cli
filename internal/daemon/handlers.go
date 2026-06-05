@@ -274,6 +274,17 @@ func registerHandlers(
 		return json.RawMessage("true"), nil
 	})
 
+	srv.Register("contact.report", func(ctx context.Context, params json.RawMessage) (json.RawMessage, error) {
+		var q actioncontact.ReportQuery
+		if err := json.Unmarshal(params, &q); err != nil { //nolint:musttag
+			return nil, fmt.Errorf("invalid contact.report params: %w", err)
+		}
+		if err := telegram.ReportPeer(ctx, api, res, q); err != nil {
+			return nil, err
+		}
+		return json.RawMessage("true"), nil
+	})
+
 	srv.Register("profile.set_name", func(ctx context.Context, params json.RawMessage) (json.RawMessage, error) {
 		var q actionprofile.SetNameRequest
 		if err := json.Unmarshal(params, &q); err != nil { //nolint:musttag

@@ -115,6 +115,55 @@ func UnblockContact(ctx context.Context, api *tg.Client, resolver *peer.Resolver
 	return err
 }
 
+// ReportPeer reports one resolved peer to Telegram moderation via
+// account.reportPeer with the given reason and optional comment. When q.Ban is
+// set it also blocks the peer (contacts.block) after a successful report.
+func ReportPeer(ctx context.Context, api *tg.Client, resolver *peer.Resolver, q actioncontact.ReportQuery) error {
+	resolved, err := resolver.Resolve(ctx, q.Ref)
+	if err != nil {
+		return err
+	}
+	if _, err := api.AccountReportPeer(ctx, &tg.AccountReportPeerRequest{
+		Peer:    resolved.InputPeer,
+		Reason:  reportReason(q.Reason),
+		Message: q.Message,
+	}); err != nil {
+		return err
+	}
+	if q.Ban {
+		if _, err := api.ContactsBlock(ctx, &tg.ContactsBlockRequest{ID: resolved.InputPeer}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// reportReason maps a validated reason keyword to a tg.ReportReasonClass.
+func reportReason(reason string) tg.ReportReasonClass {
+	switch reason {
+	case "violence":
+		return &tg.InputReportReasonViolence{}
+	case "porn":
+		return &tg.InputReportReasonPornography{}
+	case "child-abuse":
+		return &tg.InputReportReasonChildAbuse{}
+	case "copyright":
+		return &tg.InputReportReasonCopyright{}
+	case "fake":
+		return &tg.InputReportReasonFake{}
+	case "drugs":
+		return &tg.InputReportReasonIllegalDrugs{}
+	case "personal-details":
+		return &tg.InputReportReasonPersonalDetails{}
+	case "geo-irrelevant":
+		return &tg.InputReportReasonGeoIrrelevant{}
+	case "other":
+		return &tg.InputReportReasonOther{}
+	default:
+		return &tg.InputReportReasonSpam{}
+	}
+}
+
 func listBlockedContacts(ctx context.Context, api *tg.Client) ([]output.ContactRow, error) {
 	var out []output.ContactRow
 	err := query.GetBlocked(api).ForEach(ctx, func(_ context.Context, e blocked.Elem) error {

@@ -42,6 +42,7 @@ func TestRegisterHandlers_BindsExpectedMethods(t *testing.T) {
 		"contact.delete",
 		"contact.block",
 		"contact.unblock",
+		"contact.report",
 		"profile.set_name",
 		"profile.set_bio",
 		"profile.set_username",

@@ -159,6 +159,7 @@ client commands route through when present).
 | `tg contact delete <ref>` | Delete a contact. |
 | `tg contact block <ref>` | Block a user, bot, or channel. |
 | `tg contact unblock <ref>` | Unblock a user, bot, or channel. |
+| `tg contact report <ref>` | Report a peer to Telegram. `--reason` (spam (default), violence, porn, child-abuse, copyright, fake, drugs, personal-details, geo-irrelevant, other), `--message <comment>`, `--ban` (also block). Prompts unless `--yes`. |
 | `tg me` | Print the current Telegram identity. |
 | `tg profile set-name <first>` | Set first name; `--last` sets or clears last name. |
 | `tg profile set-username <username>` | Set or clear the public username. |

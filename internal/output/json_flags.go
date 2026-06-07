@@ -32,7 +32,7 @@ func AddJSONFlags(cmd *cobra.Command, exporter *Exporter, fields []string) {
 		jqExpr     string
 		tmplExpr   string
 	)
-	cmd.Flags().StringVar(&jsonFields, "json", "", "emit JSON; value is comma-separated field subset (omit value for all fields)")
+	cmd.Flags().StringVar(&jsonFields, "json", "", "emit JSON (lists are ndjson: one object per line, not an array); value is comma-separated field subset (omit value for all fields)")
 	cmd.Flag("json").NoOptDefVal = "*"
 	cmd.Flags().StringVarP(&jqExpr, "jq", "q", "", "filter JSON output through a jq expression")
 	cmd.Flags().StringVarP(&tmplExpr, "template", "t", "", "format JSON output using a Go template")

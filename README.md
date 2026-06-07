@@ -182,8 +182,9 @@ and `tg auth switch` instead.
 ## Output
 
 Human output by default. Add `--json=<fields>` to get structured output.
-List commands emit ndjson (one JSON object per line); scalar commands
-emit a single object.
+List commands emit ndjson (one JSON object per line), not a JSON array, so
+parse line by line or collect with `jq -s` (e.g. `tg read @x --json | jq -s .`);
+scalar commands emit a single object.
 
 ```sh
 tg auth list --json=name,state,api_id

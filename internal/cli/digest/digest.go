@@ -37,6 +37,7 @@ func New(f *runtime.Invocation, runF func(*Options) error) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "digest <ref>",
 		Short:             "Show a compact message digest for a chat",
+		Long:              "Show a compact message digest for a chat.\n\nThe human table truncates long message text; pass --json for the full, untruncated text.",
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: complete.PeerRefs(f),
 		RunE: func(cmd *cobra.Command, args []string) error {

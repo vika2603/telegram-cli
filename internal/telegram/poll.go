@@ -66,7 +66,11 @@ func VotePoll(ctx context.Context, api *tg.Client, resolver *peer.Resolver, q ac
 			if i < 0 || i >= len(media.Poll.Answers) {
 				return output.VoteResult{}, fmt.Errorf("%w: option %d is out of range (poll has %d options)", command.ErrUsage, i+1, len(media.Poll.Answers))
 			}
-			options = append(options, media.Poll.Answers[i].Option)
+			ans, ok := media.Poll.Answers[i].(*tg.PollAnswer)
+			if !ok {
+				return output.VoteResult{}, fmt.Errorf("%w: unexpected poll answer type", command.ErrUnsupported)
+			}
+			options = append(options, ans.Option)
 		}
 	}
 	if _, err := api.MessagesSendVote(ctx, &tg.MessagesSendVoteRequest{
@@ -129,7 +133,11 @@ func pollInfoFromMedia(m *tg.MessageMediaPoll) output.PollInfo {
 	for _, r := range m.Results.Results {
 		tally[string(r.Option)] = r
 	}
-	for _, a := range m.Poll.Answers {
+	for _, ac := range m.Poll.Answers {
+		a, ok := ac.(*tg.PollAnswer)
+		if !ok {
+			continue
+		}
 		opt := output.PollOption{Text: a.Text.Text}
 		if r, ok := tally[string(a.Option)]; ok {
 			opt.Voters = r.Voters

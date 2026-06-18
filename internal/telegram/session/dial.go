@@ -28,7 +28,7 @@ func buildTelegramClientWithHandler(acct *account.Account, opts Options, handler
 	sess := &account.FileSessionStorage{AccountName: acct.Meta.Name}
 	b := &built{}
 	tgOpts := telegram.Options{
-		Logger:         opts.Logger,
+		Logger:         gotdLogger(opts.Logger),
 		SessionStorage: sess,
 		UpdateHandler:  handler,
 		Device:         deviceConfig(opts.Device),

@@ -21,28 +21,33 @@ func ListForumTopics(ctx context.Context, api *tg.Client, resolver *peer.Resolve
 	if err != nil {
 		return nil, err
 	}
-	inCh, ok := inputChannelFromPeer(resolved.InputPeer)
-	if !ok {
+	if _, ok := inputChannelFromPeer(resolved.InputPeer); !ok {
 		return nil, fmt.Errorf("%w: topics are only available in forum supergroups", command.ErrUnsupported)
 	}
 
 	// Single page only: offset-based pagination over forum topics is not
 	// implemented, so groups with more than one page (~100) of topics are
-	// truncated to what the server returns in one call.
-	req := &tg.ChannelsGetForumTopicsRequest{Channel: inCh, Limit: q.Limit}
-	if q.Q != "" {
-		req.SetQ(q.Q)
-	}
-	resp, err := api.ChannelsGetForumTopics(ctx, req)
+	// truncated to what the server returns in one call. messages.getForumTopics
+	// has no server-side search param, so --search filters by title client-side.
+	resp, err := api.MessagesGetForumTopics(ctx, &tg.MessagesGetForumTopicsRequest{
+		Peer:  resolved.InputPeer,
+		Limit: q.Limit,
+	})
 	if err != nil {
 		return nil, mapForumErr(err)
 	}
+	needle := strings.ToLower(q.Q)
 	rows := make([]output.TopicRow, 0, len(resp.Topics))
 	for _, tc := range resp.Topics {
 		// ForumTopicDeleted carries no fields worth surfacing; skip it.
-		if t, ok := tc.(*tg.ForumTopic); ok {
-			rows = append(rows, forumTopicToRow(t))
+		t, ok := tc.(*tg.ForumTopic)
+		if !ok {
+			continue
 		}
+		if needle != "" && !strings.Contains(strings.ToLower(t.Title), needle) {
+			continue
+		}
+		rows = append(rows, forumTopicToRow(t))
 	}
 	return rows, nil
 }
@@ -70,8 +75,7 @@ func CreateForumTopic(ctx context.Context, api *tg.Client, resolver *peer.Resolv
 	if err != nil {
 		return output.TopicRow{}, err
 	}
-	inCh, ok := inputChannelFromPeer(resolved.InputPeer)
-	if !ok {
+	if _, ok := inputChannelFromPeer(resolved.InputPeer); !ok {
 		return output.TopicRow{}, fmt.Errorf("%w: topics can only be created in forum supergroups", command.ErrUnsupported)
 	}
 	// createForumTopic requires a random_id. Honor --random-id when given so
@@ -82,8 +86,8 @@ func CreateForumTopic(ctx context.Context, api *tg.Client, resolver *peer.Resolv
 			return output.TopicRow{}, err
 		}
 	}
-	req := &tg.ChannelsCreateForumTopicRequest{
-		Channel:  inCh,
+	req := &tg.MessagesCreateForumTopicRequest{
+		Peer:     resolved.InputPeer,
 		Title:    q.Title,
 		RandomID: randomID,
 	}
@@ -93,7 +97,7 @@ func CreateForumTopic(ctx context.Context, api *tg.Client, resolver *peer.Resolv
 	if q.IconEmojiID != 0 {
 		req.SetIconEmojiID(q.IconEmojiID)
 	}
-	upd, err := api.ChannelsCreateForumTopic(ctx, req)
+	upd, err := api.MessagesCreateForumTopic(ctx, req)
 	if err != nil {
 		return output.TopicRow{}, mapForumErr(err)
 	}
@@ -109,11 +113,11 @@ func CreateForumTopic(ctx context.Context, api *tg.Client, resolver *peer.Resolv
 // the caller set (non-nil) are sent, so an edit changes title/closed/hidden
 // independently.
 func EditForumTopic(ctx context.Context, api *tg.Client, resolver *peer.Resolver, q actionchat.EditTopicQuery) (output.TopicRow, error) {
-	inCh, err := topicChannel(ctx, resolver, q.Ref)
+	inPeer, err := topicPeer(ctx, resolver, q.Ref)
 	if err != nil {
 		return output.TopicRow{}, err
 	}
-	req := &tg.ChannelsEditForumTopicRequest{Channel: inCh, TopicID: q.TopicID}
+	req := &tg.MessagesEditForumTopicRequest{Peer: inPeer, TopicID: q.TopicID}
 	row := output.TopicRow{ID: q.TopicID}
 	if q.Title != nil {
 		req.SetTitle(*q.Title)
@@ -127,7 +131,7 @@ func EditForumTopic(ctx context.Context, api *tg.Client, resolver *peer.Resolver
 		req.SetHidden(*q.Hidden)
 		row.Hidden = *q.Hidden
 	}
-	if _, err := api.ChannelsEditForumTopic(ctx, req); err != nil {
+	if _, err := api.MessagesEditForumTopic(ctx, req); err != nil {
 		return output.TopicRow{}, mapForumErr(err)
 	}
 	return row, nil
@@ -137,13 +141,13 @@ func EditForumTopic(ctx context.Context, api *tg.Client, resolver *peer.Resolver
 // the topic's message history; deleteTopicHistory returns the remaining
 // offset, so loop (bounded) until it's drained.
 func DeleteForumTopic(ctx context.Context, api *tg.Client, resolver *peer.Resolver, q actionchat.DeleteTopicQuery) error {
-	inCh, err := topicChannel(ctx, resolver, q.Ref)
+	inPeer, err := topicPeer(ctx, resolver, q.Ref)
 	if err != nil {
 		return err
 	}
 	for range 100 {
-		aff, err := api.ChannelsDeleteTopicHistory(ctx, &tg.ChannelsDeleteTopicHistoryRequest{
-			Channel:  inCh,
+		aff, err := api.MessagesDeleteTopicHistory(ctx, &tg.MessagesDeleteTopicHistoryRequest{
+			Peer:     inPeer,
 			TopMsgID: q.TopicID,
 		})
 		if err != nil {
@@ -158,12 +162,12 @@ func DeleteForumTopic(ctx context.Context, api *tg.Client, resolver *peer.Resolv
 
 // PinForumTopic performs the RPC for `tg chat topic pin`.
 func PinForumTopic(ctx context.Context, api *tg.Client, resolver *peer.Resolver, q actionchat.PinTopicQuery) (output.TopicRow, error) {
-	inCh, err := topicChannel(ctx, resolver, q.Ref)
+	inPeer, err := topicPeer(ctx, resolver, q.Ref)
 	if err != nil {
 		return output.TopicRow{}, err
 	}
-	if _, err := api.ChannelsUpdatePinnedForumTopic(ctx, &tg.ChannelsUpdatePinnedForumTopicRequest{
-		Channel: inCh,
+	if _, err := api.MessagesUpdatePinnedForumTopic(ctx, &tg.MessagesUpdatePinnedForumTopicRequest{
+		Peer:    inPeer,
 		TopicID: q.TopicID,
 		Pinned:  q.Pinned,
 	}); err != nil {
@@ -174,13 +178,13 @@ func PinForumTopic(ctx context.Context, api *tg.Client, resolver *peer.Resolver,
 
 // GetForumTopicByID fetches a single forum topic by its ID.
 func GetForumTopicByID(ctx context.Context, api *tg.Client, resolver *peer.Resolver, q actionchat.TopicInfoQuery) (output.TopicRow, error) {
-	inCh, err := topicChannel(ctx, resolver, q.Ref)
+	inPeer, err := topicPeer(ctx, resolver, q.Ref)
 	if err != nil {
 		return output.TopicRow{}, err
 	}
-	resp, err := api.ChannelsGetForumTopicsByID(ctx, &tg.ChannelsGetForumTopicsByIDRequest{
-		Channel: inCh,
-		Topics:  []int{q.TopicID},
+	resp, err := api.MessagesGetForumTopicsByID(ctx, &tg.MessagesGetForumTopicsByIDRequest{
+		Peer:   inPeer,
+		Topics: []int{q.TopicID},
 	})
 	if err != nil {
 		return output.TopicRow{}, mapForumErr(err)
@@ -220,13 +224,12 @@ func ReadForumTopic(ctx context.Context, api *tg.Client, resolver *peer.Resolver
 	if err != nil {
 		return output.TopicRow{}, err
 	}
-	inCh, ok := inputChannelFromPeer(resolved.InputPeer)
-	if !ok {
+	if _, ok := inputChannelFromPeer(resolved.InputPeer); !ok {
 		return output.TopicRow{}, fmt.Errorf("%w: topics are only available in forum supergroups", command.ErrUnsupported)
 	}
-	resp, err := api.ChannelsGetForumTopicsByID(ctx, &tg.ChannelsGetForumTopicsByIDRequest{
-		Channel: inCh,
-		Topics:  []int{q.TopicID},
+	resp, err := api.MessagesGetForumTopicsByID(ctx, &tg.MessagesGetForumTopicsByIDRequest{
+		Peer:   resolved.InputPeer,
+		Topics: []int{q.TopicID},
 	})
 	if err != nil {
 		return output.TopicRow{}, mapForumErr(err)
@@ -251,17 +254,17 @@ func ReadForumTopic(ctx context.Context, api *tg.Client, resolver *peer.Resolver
 	return output.TopicRow{ID: q.TopicID}, nil
 }
 
-// topicChannel resolves a ref to the InputChannel forum RPCs need.
-func topicChannel(ctx context.Context, resolver *peer.Resolver, target ref.Ref) (tg.InputChannelClass, error) {
+// topicPeer resolves a ref to the InputPeer the forum RPCs need, guarding that
+// it's a channel/supergroup (forum topics only exist there).
+func topicPeer(ctx context.Context, resolver *peer.Resolver, target ref.Ref) (tg.InputPeerClass, error) {
 	resolved, err := resolver.Resolve(ctx, target)
 	if err != nil {
 		return nil, err
 	}
-	inCh, ok := inputChannelFromPeer(resolved.InputPeer)
-	if !ok {
+	if _, ok := inputChannelFromPeer(resolved.InputPeer); !ok {
 		return nil, fmt.Errorf("%w: topics are only available in forum supergroups", command.ErrUnsupported)
 	}
-	return inCh, nil
+	return resolved.InputPeer, nil
 }
 
 // mapForumErr translates "this chat is not a forum" RPC errors into a clear

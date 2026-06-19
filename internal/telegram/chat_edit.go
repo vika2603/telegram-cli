@@ -83,7 +83,7 @@ func EditChat(ctx context.Context, api *tg.Client, resolver *peer.Resolver, q ac
 		}
 	}
 	if q.Signatures != nil {
-		if _, err := api.ChannelsToggleSignatures(ctx, &tg.ChannelsToggleSignaturesRequest{Channel: inCh, Enabled: *q.Signatures}); err != nil {
+		if _, err := api.ChannelsToggleSignatures(ctx, &tg.ChannelsToggleSignaturesRequest{Channel: inCh, SignaturesEnabled: *q.Signatures}); err != nil {
 			return output.ChatRow{}, err
 		}
 	}
